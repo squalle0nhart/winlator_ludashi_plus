@@ -19,10 +19,6 @@ public class Client {
         this.clientSocket = clientSocket;
     }
 
-    public ClientSocket getClientSocket() {
-        return clientSocket;
-    }
-
     public void createIOStreams() {
         if (inputStream != null || outputStream != null) return;
         inputStream = new XInputStream(clientSocket, connector.getInitialInputBufferCapacity());

@@ -17,8 +17,12 @@ import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.inputcontrols.ControllerManager;
 import com.winlator.cmod.winhandler.WinHandler;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class ControllerAssignmentDialog {
     private final ContentDialog dialog;
@@ -45,7 +49,9 @@ public class ControllerAssignmentDialog {
 
     /** Preferred call when you already have the handler. */
     public static void show(Context context, WinHandler winHandler) {
-        int initialPlayerCount = ControllerManager.getInstance().getEnabledPlayerCount();
+        ControllerManager manager = ControllerManager.getInstance();
+        manager.init(context.getApplicationContext());
+        int initialPlayerCount = manager.getEnabledPlayerCount();
         Activity act = (Activity) context; // all current callers pass an Activity
         new ControllerAssignmentDialog(act, initialPlayerCount, winHandler).showContentDialog();
     }
@@ -206,16 +212,26 @@ public class ControllerAssignmentDialog {
             });
 
             assignButtons[i].setOnClickListener(v -> {
-                String message = dialog.getContext().getString(R.string.press_any_button_for_player) + " " + (slotIndex + 1);
-                dialog.setMessage(message);
+                controllerManager.scanForDevices();
+                List<InputDevice> devices = controllerManager.getDetectedDevices();
+                if (devices == null || devices.isEmpty()) {
+                    AppUtils.showToast(dialog.getContext(), R.string.no_controllers_detected);
+                    return;
+                }
 
-                dialog.setOnControllerInputListener(device -> {
-                    if (!ControllerManager.isGameController(device)) return;
-                    controllerManager.assignDeviceToSlot(slotIndex, device);
-                    dialog.setMessage(null);
-                    dialog.setOnControllerInputListener(null);
-                    populateView();
-                });
+                List<String> names = new ArrayList<>();
+                for (InputDevice d : devices) names.add(d.getName());
+
+                ContentDialog.showSingleChoiceList(
+                        dialog.getContext(),
+                        R.string.controller_assignment,
+                        names.toArray(new String[0]),
+                        index -> {
+                            if (index == null || index < 0 || index >= devices.size()) return;
+                            controllerManager.assignDeviceToSlot(slotIndex, devices.get(index));
+                            populateView();
+                        }
+                );
             });
         }
 

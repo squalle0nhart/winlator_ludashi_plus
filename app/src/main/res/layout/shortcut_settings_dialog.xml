@@ -196,20 +196,6 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/ddraw_wrapper" >
-        </TextView>
-
-        <Spinner
-            android:id="@+id/SDDrawrapper"
-            style="@style/ComboBox"
-            android:layout_width="match_parent"
-            android:layout_weight="1"
-            android:entries="@array/ddrawrapper_entries">
-        </Spinner>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:text="@string/audio_driver" />
 
         <Spinner
@@ -253,71 +239,29 @@
             android:layout_width="match_parent"
             android:id="@+id/SMIDISoundFont" />
 
-        <!-- Checkbox for enabling/disabling secondary executable options -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/secondary_exec" />
+            android:text="@string/lc_all" />
 
-        <CheckBox
-            android:id="@+id/CBUseSecondaryExec"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/use_secondary_executable" />
-
-
-        <!-- Secondary Executable Options -->
         <LinearLayout
-            android:id="@+id/LLSecondaryExecOptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="8dp"
-            android:visibility="gone">
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <EditText
+                style="@style/AppTheme"
+                android:layout_gravity="center"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/secondary_exe_path_subtext" />
+                android:layout_weight="1"
+                android:id="@+id/ETlcall" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/secondary_executable" />
-
-                <EditText
-                    android:id="@+id/ETSecondaryExec"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/enter_secondary_exec_path" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingTop="8dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/exec_delay" />
-
-                <EditText
-                    android:id="@+id/ETExecDelay"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:hint="@string/enter_delay_seconds" />
-            </LinearLayout>
+            <ImageButton
+                style="@style/ListMenuButton"
+                android:id="@+id/BTShowLCALL"
+                android:layout_gravity="center"
+                android:src="@drawable/icon_menu" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
@@ -418,7 +362,7 @@
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:id="@+id/box86box64Frame"
+                android:id="@+id/box64Frame"
                 android:layout_marginTop="8dp">
 
                 <LinearLayout style="@style/FieldSet">
@@ -444,21 +388,12 @@
                         android:id="@+id/SBox64Preset"
                         android:layout_width="match_parent" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/box86_64_rc_files" />
-
-                    <Spinner
-                        style="@style/ComboBox"
-                        android:id="@+id/SRCFile"
-                        android:layout_width="match_parent" />
                 </LinearLayout>
 
                 <TextView
                     style="@style/FieldSetLabel"
                     android:background="#ffffff"
-                    android:text="@string/box86_box64" />
+                    android:text="@string/box64" />
             </FrameLayout>
             
             <FrameLayout
@@ -481,32 +416,12 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/fexcore_tso_preset" />
-                        
+                        android:text="@string/fexcore_preset" />
+
                     <Spinner
                         style="@style/ComboBox"
-                        android:id="@+id/SFEXCoreTSOPreset"
+                        android:id="@+id/SFEXCorePreset"
                         android:layout_width="match_parent" />
-                        
-                   <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/fexcore_x87reduced_precision" />
-                        
-                    <Spinner
-                        style="@style/ComboBox"
-                        android:id="@+id/SFEXCoreX87ReducedPrecision"
-                        android:layout_width="match_parent"/>
-                       
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/fexcore_multiblock" />
-                        
-                   <Spinner
-                        style="@style/ComboBox"
-                        android:id="@+id/SFEXCoreMultiblock"
-                        android:layout_width="match_parent"/>
                 </LinearLayout>
                     
                 <TextView
@@ -532,20 +447,7 @@
                         android:layout_width="match_parent"
                         android:id="@+id/SStartupSelection"
                         android:entries="@array/startup_selection_entries" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/workarounds" />
-
-                    <CheckBox
-                        android:id="@+id/CBGStreamerWorkaroundToggle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/enable_gstreamer_workaround" />
-
                 </LinearLayout>
-
 
                 <TextView
                     android:id="@+id/TVSystem"
@@ -576,12 +478,6 @@
                         android:layout_height="wrap_content"
                         android:text="@string/disable_xinput_for_shortcut" />
 
-<!--                    <CheckBox-->
-<!--                        android:id="@+id/CBRelativeMouseMovement"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="@string/relative_mouse_movement" />-->
-
                     <CheckBox
                         android:id="@+id/CBTouchscreenMode"
                         android:layout_width="wrap_content"
@@ -598,82 +494,75 @@
                     android:text="@string/input_controls" />
             </FrameLayout>
 
-<!--            <FrameLayout-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_marginTop="8dp">-->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
 
-<!--                <LinearLayout style="@style/FieldSet">-->
+                <LinearLayout style="@style/FieldSet">
 
-<!--                    <LinearLayout-->
-<!--                        android:id="@+id/LLDinputMapperType"-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:orientation="vertical">-->
+                    <LinearLayout
+                        android:id="@+id/LLDinputMapperType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
 
-<!--                        <TextView-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="@string/directinput_mapper_type" />-->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/directinput_mapper_type" />
 
-<!--                        <Spinner-->
-<!--                            style="@style/ComboBox"-->
-<!--                            android:id="@+id/SDInputType"-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:entries="@array/dinput_mapper_type_entries" />-->
-<!--                    </LinearLayout>-->
+                        <Spinner
+                            style="@style/ComboBox"
+                            android:id="@+id/SDInputType"
+                            android:layout_width="match_parent"
+                            android:entries="@array/dinput_mapper_type_entries" />
+                    </LinearLayout>
 
-<!--                    <LinearLayout-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:orientation="horizontal"-->
-<!--                        android:layout_marginTop="8dp">-->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
 
-<!--                        <CheckBox-->
-<!--                            android:id="@+id/CBEnableXInput"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:layout_gravity="center"-->
-<!--                            android:text="@string/enable_xinput_for_wine_game" />-->
+                        <CheckBox
+                            android:id="@+id/CBEnableXInput"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:text="@string/enable_xinput_for_wine_game" />
 
-<!--                        <ImageView-->
-<!--                            android:id="@+id/BTXInputHelp"-->
-<!--                            style="@style/HelpButton"-->
-<!--                            android:layout_gravity="center" />-->
-<!--                    </LinearLayout>-->
+                        <ImageView
+                            android:id="@+id/BTXInputHelp"
+                            style="@style/HelpButton"
+                            android:layout_gravity="center" />
+                    </LinearLayout>
 
-<!--                    <LinearLayout-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:orientation="horizontal"-->
-<!--                        android:layout_marginTop="8dp">-->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
 
-<!--                        <CheckBox-->
-<!--                            android:id="@+id/CBEnableDInput"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="@string/enable_dinput_for_wine_game" />-->
+                        <CheckBox
+                            android:id="@+id/CBEnableDInput"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/enable_dinput_for_wine_game" />
 
-<!--                        <ImageView-->
-<!--                            android:id="@+id/BTDInputHelp"-->
-<!--                            style="@style/HelpButton"-->
-<!--                            android:layout_gravity="center" />-->
-<!--                    </LinearLayout>-->
+                        <ImageView
+                            android:id="@+id/BTDInputHelp"
+                            style="@style/HelpButton"
+                            android:layout_gravity="center" />
+                    </LinearLayout>
 
-<!--                    <TextView-->
-<!--                        android:id="@+id/TVLegacyInputMessage"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="7.1.2 Legacy Input Mode Enabled in Settings"-->
-<!--                        android:visibility="gone" />-->
+                </LinearLayout>
 
-<!--                </LinearLayout>-->
-
-<!--                <TextView-->
-<!--                    style="@style/FieldSetLabel"-->
-<!--                    android:background="#ffffff"-->
-<!--                    android:text="@string/game_controller" />-->
-<!--            </FrameLayout>-->
+                <TextView
+                    style="@style/FieldSetLabel"
+                    android:background="#ffffff"
+                    android:text="@string/game_controller" />
+            </FrameLayout>
 
             <FrameLayout
                 android:layout_width="match_parent"
@@ -710,12 +599,6 @@
                         android:layout_height="wrap_content"
                         android:text="@string/fullscreen_stretched" />
 
-                    <CheckBox
-                        android:id="@+id/CBForceFullscreen"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/force_fullscreen"
-                        android:layout_marginTop="4dp" />
                 </LinearLayout>
 
                 <TextView
@@ -822,19 +705,6 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"
                 android:layout_marginTop="4dp" />
-
-<!--            <TextView-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="@string/processor_affinity_32_bit_apps"-->
-<!--                android:layout_marginTop="8dp" />-->
-
-<!--            <com.winlator.cmod.widget.CPUListView-->
-<!--                android:id="@+id/CPUListViewWoW64"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:gravity="center_horizontal"-->
-<!--                android:layout_marginTop="4dp" />-->
 
         </LinearLayout>
     </LinearLayout>

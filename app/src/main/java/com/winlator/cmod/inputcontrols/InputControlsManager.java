@@ -4,11 +4,13 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.media.MediaScannerConnection;
+import android.net.Uri;
 import android.os.Environment;
 import android.util.JsonReader;
 
 import androidx.preference.PreferenceManager;
 
+import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 
@@ -184,8 +186,16 @@ public class InputControlsManager {
     }
 
     public File exportProfile(ControlsProfile profile) {
-        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File destination = new File(downloadsDir, "Winlator/profiles/"+profile.getName()+".icp");
+        File destination;
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        String winlatorPath = sp.getString("winlator_path_uri", null);
+        if (winlatorPath != null) {
+            Uri winlatorUri = Uri.parse(winlatorPath);
+            destination = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "profiles/" + profile.getName() + ".icp");
+        }
+        else {
+            destination = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "profiles/" + profile.getName() + ".icp");
+        }
         FileUtils.copy(ControlsProfile.getProfileFile(context, profile.id), destination);
         MediaScannerConnection.scanFile(context, new String[]{destination.getAbsolutePath()}, null, null);
         return destination.isFile() ? destination : null;

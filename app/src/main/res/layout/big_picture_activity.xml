@@ -513,7 +513,7 @@
                         android:layout_width="300dp"
                         android:layout_height="wrap_content"
                         android:max="100"
-                        android:progress="33" />
+                        android:progress="66" />
 
 
                 </LinearLayout>

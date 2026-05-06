@@ -14,16 +14,6 @@ public class XEnvironment implements Iterable<EnvironmentComponent> {
     private final ImageFs imageFs;
     private final ArrayList<EnvironmentComponent> components = new ArrayList<>();
 
-    private boolean winetricksRunning = false;
-
-    public synchronized boolean isWinetricksRunning() {
-        return winetricksRunning;
-    }
-
-    public synchronized void setWinetricksRunning(boolean running) {
-        this.winetricksRunning = running;
-    }
-
     public XEnvironment(Context context, ImageFs imageFs) {
         this.context = context;
         this.imageFs = imageFs;

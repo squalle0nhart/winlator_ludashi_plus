@@ -54,17 +54,5 @@
             android:text="@string/enable_touchscreen_haptics"
             android:checked="false" />
 
-        <CheckBox
-            android:id="@+id/CBSimulateTouchScreen"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/simulate_touch_screen" />
-
-        <CheckBox
-            android:id="@+id/CBDisableTouchscreenMouse"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/disable_touchscreen_mouse"
-            android:checked="false" />
     </LinearLayout>
 </HorizontalScrollView>

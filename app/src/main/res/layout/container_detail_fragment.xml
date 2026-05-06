@@ -191,20 +191,6 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/ddraw_wrapper" >
-            </TextView>
-
-            <Spinner
-                android:id="@+id/SDDrawrapper"
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:layout_weight="1"
-                android:entries="@array/ddrawrapper_entries">
-            </Spinner>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
                 android:text="@string/audio_driver" />
 
             <Spinner
@@ -400,73 +386,6 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/renderer" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SRenderer"
-                            android:layout_width="match_parent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/csmt" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SCSMT"
-                            android:layout_width="match_parent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/gpu_name" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SGPUName"
-                            android:layout_width="match_parent"
-                            android:focusable="true"
-                            android:focusableInTouchMode="true"
-                            android:clickable="true"
-                            android:spinnerMode="dialog" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/offscreen_rendering_mode" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SOffscreenRenderingMode"
-                            android:layout_width="match_parent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/strict_shader_math" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SStrictShaderMath"
-                            android:layout_width="match_parent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/video_memory_size" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SVideoMemorySize"
-                            android:layout_width="match_parent"
-                            android:entries="@array/video_memory_size_entries" />
-
-                        <View style="@style/FieldSeparator" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
                             android:text="@string/mouse_warp_override" />
 
                         <Spinner
@@ -476,9 +395,9 @@
                     </LinearLayout>
 
                     <TextView
-                        android:id="@+id/TVRegistryKeys"
+                        android:id="@+id/TVDirectInput"
                         style="@style/FieldSetLabel"
-                        android:text="@string/registry_keys" />
+                        android:text="DirectInput" />
                 </FrameLayout>
             </LinearLayout>
 
@@ -584,7 +503,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:text="@string/no_items_to_display_drives"
+                    android:text="@string/no_items_to_display"
                     android:padding="16dp"
                     android:visibility="gone" />
 
@@ -610,7 +529,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:id="@+id/box86box64Frame">
+                    android:id="@+id/box64Frame">
 
                     <LinearLayout style="@style/FieldSet">
                         <TextView
@@ -635,29 +554,20 @@
                             android:layout_width="match_parent"
                             android:spinnerMode="dialog" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/box86_64_rc_files" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SRCFile"
-                            android:layout_width="match_parent" />
                     </LinearLayout>
 
                     <TextView
-                        android:id="@+id/TVBox86Box64"
+                        android:id="@+id/TVBox64"
                         style="@style/FieldSetLabel"
-                        android:text="@string/box86_box64" />
+                        android:text="@string/box64" />
                 </FrameLayout>
-
+                
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:id="@+id/fexcoreFrame"
                     android:layout_marginTop="8dp">
-
+                
                     <LinearLayout style="@style/FieldSet">
                         <TextView
                             android:layout_width="wrap_content"
@@ -672,41 +582,22 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/fexcore_tso_preset" />
+                            android:text="@string/fexcore_preset" />
 
                         <Spinner
                             style="@style/ComboBox"
-                            android:id="@+id/SFEXCoreTSOPreset"
-                            android:layout_width="match_parent" />
-
-                       <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/fexcore_x87reduced_precision" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SFEXCoreX87ReducedPrecision"
-                            android:layout_width="match_parent"/>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/fexcore_multiblock" />
-
-                       <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SFEXCoreMultiblock"
-                            android:layout_width="match_parent"/>
+                            android:id="@+id/SFEXCorePreset"
+                            android:layout_width="match_parent"
+                            android:spinnerMode="dialog" />
                     </LinearLayout>
-
+                    
                     <TextView
                         android:id="@+id/TVFEXCore"
                         style="@style/FieldSetLabel"
                         android:text="@string/fexcore_config" />
-
+                    
                 </FrameLayout>
-
+                
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -724,29 +615,6 @@
                             android:id="@+id/SStartupSelection"
                             android:entries="@array/startup_selection_entries" />
 
-                        <CheckBox
-                            android:id="@+id/CBWoW64Mode"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/enable_experimental_wow64_mode"
-                            android:checked="true"
-                            android:enabled="false"
-                            android:layout_marginTop="8dp" />
-
-                        <CheckBox
-                            android:id="@+id/CBGStreamerWorkaroundToggle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/enable_gstreamer_workaround" />
-
-<!--                        <CheckBox-->
-<!--                            android:id="@+id/CBRelativeMouseMovement"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="Enable relative mouse movement"-->
-<!--                            android:checked="false"-->
-<!--                            android:enabled="true"-->
-<!--                            android:layout_marginTop="8dp" />-->
                     </LinearLayout>
 
                     <TextView
@@ -755,91 +623,84 @@
                         android:text="@string/system" />
                 </FrameLayout>
 
-<!--                <FrameLayout-->
-<!--                    android:layout_width="match_parent"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:layout_marginTop="8dp">-->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
 
-<!--                    <LinearLayout style="@style/FieldSet">-->
+                    <LinearLayout style="@style/FieldSet">
 
-<!--                        <LinearLayout-->
-<!--                            android:id="@+id/LLDinputMapperType"-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:orientation="vertical">-->
+                        <LinearLayout
+                            android:id="@+id/LLDinputMapperType"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
 
-<!--                            <TextView-->
-<!--                                android:layout_width="wrap_content"-->
-<!--                                android:layout_height="wrap_content"-->
-<!--                                android:text="@string/directinput_mapper_type" />-->
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/directinput_mapper_type" />
 
-<!--                            <Spinner-->
-<!--                                style="@style/ComboBox"-->
-<!--                                android:id="@+id/SDInputType"-->
-<!--                                android:layout_width="match_parent"-->
-<!--                                android:entries="@array/dinput_mapper_type_entries" />-->
-<!--                        </LinearLayout>-->
+                            <Spinner
+                                style="@style/ComboBox"
+                                android:id="@+id/SDInputType"
+                                android:layout_width="match_parent"
+                                android:entries="@array/dinput_mapper_type_entries" />
+                        </LinearLayout>
 
-<!--                        <LinearLayout-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:orientation="horizontal"-->
-<!--                            android:layout_marginTop="8dp">-->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
 
-<!--                            <CheckBox-->
-<!--                                android:id="@+id/CBEnableXInput"-->
-<!--                                android:layout_width="wrap_content"-->
-<!--                                android:layout_height="wrap_content"-->
-<!--                                android:layout_gravity="center"-->
-<!--                                android:text="@string/enable_xinput_for_wine_game" />-->
+                            <CheckBox
+                                android:id="@+id/CBEnableXInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:text="@string/enable_xinput_for_wine_game" />
 
-<!--                            <ImageView-->
-<!--                                android:id="@+id/BTXInputHelp"-->
-<!--                                style="@style/HelpButton"-->
-<!--                                android:layout_gravity="center" />-->
-<!--                        </LinearLayout>-->
+                            <ImageView
+                                android:id="@+id/BTXInputHelp"
+                                style="@style/HelpButton"
+                                android:layout_gravity="center" />
+                        </LinearLayout>
 
-<!--                        <LinearLayout-->
-<!--                            android:layout_width="match_parent"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:orientation="horizontal"-->
-<!--                            android:layout_marginTop="8dp">-->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
 
-<!--                            <CheckBox-->
-<!--                                android:id="@+id/CBEnableDInput"-->
-<!--                                android:layout_width="wrap_content"-->
-<!--                                android:layout_height="wrap_content"-->
-<!--                                android:text="@string/enable_dinput_for_wine_game" />-->
-
-
-
-<!--                            <ImageView-->
-<!--                                android:id="@+id/BTDInputHelp"-->
-<!--                                style="@style/HelpButton"-->
-<!--                                android:layout_gravity="center" />-->
-<!--                        </LinearLayout>-->
-
-<!--                        <TextView-->
-<!--                            android:id="@+id/TVLegacyInputMessage"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="7.1.2 Legacy Input Mode Enabled in Settings"-->
-<!--                            android:visibility="gone" />-->
-
-<!--                        <CheckBox-->
-<!--                            android:id="@+id/CBSdl2Toggle"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="Enable SDL2 Compatibility" />-->
+                            <CheckBox
+                                android:id="@+id/CBEnableDInput"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/enable_dinput_for_wine_game" />
 
 
-<!--                    </LinearLayout>-->
 
-<!--                    <TextView-->
-<!--                        android:id="@+id/TVGameController"-->
-<!--                        style="@style/FieldSetLabel"-->
-<!--                        android:text="@string/game_controller" />-->
-<!--                </FrameLayout>-->
+                            <ImageView
+                                android:id="@+id/BTDInputHelp"
+                                style="@style/HelpButton"
+                                android:layout_gravity="center" />
+                        </LinearLayout>
+
+                        <CheckBox
+                            android:id="@+id/CBSdl2Toggle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Enable SDL2 Compatibility" />
+
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/TVGameController"
+                        style="@style/FieldSetLabel"
+                        android:text="@string/game_controller" />
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -854,18 +715,18 @@
                     android:gravity="center_horizontal"
                     android:layout_marginTop="4dp" />
 
-<!--                <TextView-->
-<!--                    android:layout_width="wrap_content"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:text="@string/processor_affinity_32_bit_apps"-->
-<!--                    android:layout_marginTop="8dp" />-->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/processor_affinity_32_bit_apps"
+                    android:layout_marginTop="8dp" />
 
-<!--                <com.winlator.cmod.widget.CPUListView-->
-<!--                    android:id="@+id/CPUListViewWoW64"-->
-<!--                    android:layout_width="match_parent"-->
-<!--                    android:layout_height="wrap_content"-->
-<!--                    android:gravity="center_horizontal"-->
-<!--                    android:layout_marginTop="4dp" />-->
+                <com.winlator.cmod.widget.CPUListView
+                    android:id="@+id/CPUListViewWoW64"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:layout_marginTop="4dp" />
             </LinearLayout>
 
             <LinearLayout

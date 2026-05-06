@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <!-- Light Theme -->
     <style name="AppTheme" parent="@style/Theme.AppCompat.Light.NoActionBar">
         <item name="colorAccent">@color/colorAccent</item>
@@ -668,46 +667,6 @@
         <item name="android:layout_height">36.0dip</item>
         <item name="tint">@color/colorPrimary</item>
     </style>
-
-    <style name="MacroToggleBase">
-        <item name="android:background">@drawable/bg_macro_toggle</item>
-        <item name="android:textColor">@color/macro_toggle_text</item>
-        <item name="android:gravity">center</item>
-        <item name="android:minWidth">0dp</item>
-        <item name="android:minHeight">0dp</item>
-        <item name="android:padding">0dp</item>
-        <item name="android:includeFontPadding">false</item>
-    </style>
-
-    <style name="MacroToggle" parent="MacroToggleBase">
-        <!-- Face buttons, LB/RB -->
-        <item name="android:layout_width">36dp</item>
-        <item name="android:layout_height">36dp</item>
-        <item name="android:textSize">14sp</item>
-    </style>
-
-    <style name="MacroToggleLarge" parent="MacroToggleBase">
-        <!-- L3/R3 bigger circles -->
-        <item name="android:layout_width">44dp</item>
-        <item name="android:layout_height">44dp</item>
-        <item name="android:textSize">14sp</item>
-    </style>
-
-    <style name="MacroToggleSmallPill">
-        <item name="android:background">@drawable/bg_macro_pill</item>
-        <item name="android:button">@null</item>
-        <item name="android:textColor">@color/macro_toggle_text</item>
-        <item name="android:minHeight">28dp</item>
-        <item name="android:minWidth">52dp</item>
-        <item name="android:textSize">12sp</item>
-        <item name="android:paddingLeft">8dp</item>
-        <item name="android:paddingRight">8dp</item>
-        <item name="android:includeFontPadding">false</item>
-        <item name="android:gravity">center</item>
-    </style>
-
-
-
 
 
 </resources>

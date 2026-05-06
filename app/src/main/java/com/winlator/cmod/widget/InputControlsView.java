@@ -653,7 +653,7 @@ public class InputControlsView extends View {
 
 
     private void resetTouchscreenTimeout() {
-//        Log.d("InputControlsView", "Touch detected, resetting timeout.");
+        Log.d("InputControlsView", "Touch detected, resetting timeout.");
         if (timeoutHandler != null && hideControlsRunnable != null) {
             // Cancel any pending hide requests
             timeoutHandler.removeCallbacks(hideControlsRunnable);
@@ -722,7 +722,6 @@ public class InputControlsView extends View {
                 ExternalController controller = winHandler.getCurrentController();
                 if (controller != null) controller.state.copy(state);
                 winHandler.sendGamepadState();
-                winHandler.sendVirtualGamepadState(state);
             }
         }
         else {

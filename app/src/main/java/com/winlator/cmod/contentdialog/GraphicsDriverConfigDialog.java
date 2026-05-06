@@ -1,10 +1,9 @@
 package com.winlator.cmod.contentdialog;
 
 import android.content.Context;
-import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
@@ -12,18 +11,21 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
-import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
+import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.widget.MultiSelectionComboBox;
 
-import java.io.File;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,59 +35,50 @@ import java.util.Map;
 public class GraphicsDriverConfigDialog extends ContentDialog {
 
     private static final String TAG = "GraphicsDriverConfigDialog"; // Tag for logging
-    HashMap<String, Boolean> extensionsState = new HashMap<>();
     private Spinner sVersion;
-    private Spinner sAvailableExtensions;
+    private Spinner sVulkanVersion;
+    private MultiSelectionComboBox mscAvailableExtensions;
+    private Spinner sGPUName;
     private Spinner sMaxDeviceMemory;
-    private Spinner sFrameSynchronization;
-    private CheckBox cbAdrenotoolsTurnip;
+    private Spinner sPresentMode;
+    private Spinner sResourceType;
+    private Spinner sBCnEmulation;
+    private Spinner sBCnEmulationType;
+    private Spinner sBCnEmulationCache;
+    private CheckBox cbSyncFrame;
+    private CheckBox cbDisablePresentWait;
+
+    private static String selectedVulkanVersion;
     private static String selectedVersion;
     private static String blacklistedExtensions = "";
+    private static String selectedGPUName;
     private static String selectedDeviceMemory;
-    private static String isAdrenotoolsTurnip = "1";
-    private static String frameSynchronization;
 
-    protected class ExtensionAdapter extends ArrayAdapter<String> {
-        ArrayList<String> extensions;
+    private static String isSyncFrame;
+    private static String isDisablePresentWait;
+    private static String selectedPresentMode;
+    private static String selectedResourceType;
+    private static String selectedBCnEmulation;
+    private static String selectedBCnEmulationType;
+    private static String isBCnCacheEnabled;
 
-        public ExtensionAdapter(Context context, List<String> list) {
-            super(context, 0, list);
-            this.extensions = new ArrayList<>(list);
-        }
+    private void loadGPUNameSpinner(Context context, Spinner spinner)  {
+        String gpuNameList = FileUtils.readString(context, "gpu_cards.json");
+        ArrayList<String> entries = new ArrayList<>();
 
-        @Override
-        public View getView(int position, View convertView, ViewGroup parent) {
-            return initSpinnerElement(position, convertView, parent);
-        }
+        entries.add("Device");
 
-        @Override
-        public View getDropDownView(int position, View convertView, ViewGroup parent) {
-            return initDropDownView(position, convertView, parent);
-        }
-
-        private View initSpinnerElement(int position, View convertView, ViewGroup parent) {
-            if (convertView == null) {
-                convertView = (View)new TextView(getContext());
+        try {
+            JSONArray jarray = new JSONArray(gpuNameList);
+            for (int i = 0; i < jarray.length(); i++) {
+                JSONObject jobj = jarray.getJSONObject(i);
+                String gpuName = jobj.getString("name");
+                entries.add(gpuName);
             }
-            ((TextView)convertView).setText(extensions.size() + " System Extensions");
-            return convertView;
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, entries);
+            spinner.setAdapter(adapter);
         }
-
-        private View initDropDownView(int position, View convertView, ViewGroup parent) {
-            SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getContext());
-            boolean isDarkMode = sp.getBoolean("dark_mode", false);
-            if (convertView == null) {
-                convertView = getLayoutInflater().inflate(R.layout.checkbox_spinner, parent, false);
-            }
-            CheckBox cb = convertView.findViewById(R.id.checkbox);
-            cb.setTextAppearance(isDarkMode ? R.style.CheckBox_Dark : R.style.CheckBox);
-            cb.setText(extensions.get(position));
-            cb.setOnCheckedChangeListener(null);
-            cb.setChecked(extensionsState.getOrDefault(extensions.get(position), true));
-            cb.setOnCheckedChangeListener((buttonView, isChecked) ->  {
-                extensionsState.put(extensions.get(position), isChecked);
-            });
-            return convertView;
+        catch (JSONException e) {
         }
     }
 
@@ -125,9 +118,24 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     public static String writeGraphicsDriverConfig() {
-        String graphicsDriverConfig = "version=" + selectedVersion + ";" + "blacklistedExtensions=" + blacklistedExtensions + ";" + "maxDeviceMemory=" + StringUtils.parseNumber(selectedDeviceMemory) + ";" + "adrenotoolsTurnip=" + isAdrenotoolsTurnip + ";" + "frameSync=" + frameSynchronization;
+        String graphicsDriverConfig = "vulkanVersion=" + selectedVulkanVersion + ";" +
+                "version=" + selectedVersion + ";" +
+                "blacklistedExtensions=" + blacklistedExtensions + ";" +
+                "maxDeviceMemory=" + StringUtils.parseNumber(selectedDeviceMemory) + ";" +
+                "presentMode=" + selectedPresentMode + ";" +
+                "syncFrame=" + isSyncFrame + ";" +
+                "disablePresentWait=" + isDisablePresentWait + ";" +
+                "resourceType=" + selectedResourceType + ";" +
+                "bcnEmulation=" + selectedBCnEmulation + ";" +
+                "bcnEmulationType=" + selectedBCnEmulationType + ";" +
+                "bcnEmulationCache=" + isBCnCacheEnabled + ";" +
+                "gpuName=" + selectedGPUName;
         Log.i(TAG, "Written config " + graphicsDriverConfig);
         return graphicsDriverConfig;
+    }
+
+    private String[] queryAvailableExtensions(String driver, Context context) {
+        return GPUInformation.enumerateExtensions(driver, context);
     }
   
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
@@ -142,31 +150,82 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         String graphicsDriverConfig = anchor.getTag().toString();
 
         sVersion = findViewById(R.id.SGraphicsDriverVersion);
-        sAvailableExtensions = findViewById(R.id.SGraphicsDriverAvailableExtensions);
-        sFrameSynchronization = findViewById(R.id.SGraphicsDriverFrameSync);
+        sVulkanVersion = findViewById(R.id.SGraphicsDriverVulkanVersion);
+        mscAvailableExtensions = findViewById(R.id.MSCAvailableExtensions);
+        sPresentMode = findViewById(R.id.SGraphicsDriverPresentMode);
+        sGPUName = findViewById(R.id.SGraphicsDriverGPUName);
         sMaxDeviceMemory = findViewById(R.id.SGraphicsDriverMaxDeviceMemory);
-        cbAdrenotoolsTurnip = findViewById(R.id.CBAdrenotoolsTurnip);
+        sResourceType = findViewById(R.id.SGraphicsDriverResourceType);
+        sBCnEmulation = findViewById(R.id.SGraphicsDriverBCnEmulation);
+        sBCnEmulationType = findViewById(R.id.SGraphicsDriverBCnEmulationType);
+        sBCnEmulationCache = findViewById(R.id.SGraphicsDriverBCnEmulationCache);
+        cbSyncFrame = findViewById(R.id.CBSyncFrame);
+        cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
-        String initialVersion = config.getOrDefault("version", DefaultVersion.WRAPPER);
-        String blExtensions = config.getOrDefault("blacklistedExtensions", "");
-        String maxDeviceMemory = config.getOrDefault("maxDeviceMemory", "0");
-        String adrenotoolsTurnip = config.getOrDefault("adrenotoolsTurnip", "1"); // Default to "1" (checked)
-        String frameSync = config.getOrDefault("frameSync", "Normal");
+        String vulkanVersion = config.get("vulkanVersion");
+        String initialVersion = config.get("version");
+        String blExtensions = config.get("blacklistedExtensions");
+        String gpuName = config.get("gpuName");
+        String maxDeviceMemory = config.get("maxDeviceMemory");
+        String syncFrame = config.get("syncFrame");
+        String disablePresentWait = config.get("disablePresentWait");
+        String presentMode = config.get("presentMode");
+        String resourceType = config.get("resourceType");
+        String bcnEmulation = config.get("bcnEmulation");
+        String bcnEmulationType = config.get("bcnEmulationType");
+        String bcnEmulationCache = config.get("bcnEmulationCache");
 
         // Update the selectedVersion whenever the user selects a different version
         sVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedVersion = sVersion.getSelectedItem().toString();
-                Log.d(TAG, "User selected version: " + selectedVersion);
+                String[] availableExtensions = queryAvailableExtensions(selectedVersion, anchor.getContext());
+                String blacklistedExtensions = "";
+
+                mscAvailableExtensions.setItems(availableExtensions, "Extensions");
+                mscAvailableExtensions.setSelectedItems(availableExtensions);
+
+                if(selectedVersion.equals(initialVersion))
+                    blacklistedExtensions = blExtensions;
+
+                String[] bl = blacklistedExtensions.split("\\,");
+
+                for (String extension : bl) {
+                    mscAvailableExtensions.unsetSelectedItem(extension);
+                }
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 selectedVersion = sVersion.getSelectedItem().toString();
                 Log.d(TAG, "User selected version: " + selectedVersion);
+            }
+        });
+
+        sVulkanVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedVulkanVersion = sVulkanVersion.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
+        sGPUName.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedGPUName = sGPUName.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
             }
         });
 
@@ -182,10 +241,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         });
 
-        sFrameSynchronization.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        sPresentMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                frameSynchronization = sFrameSynchronization.getSelectedItem().toString();
+                selectedPresentMode = sPresentMode.getSelectedItem().toString();
             }
 
             @Override
@@ -194,10 +253,64 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         });
 
-        cbAdrenotoolsTurnip.setOnCheckedChangeListener(null);
-        cbAdrenotoolsTurnip.setChecked(adrenotoolsTurnip.equals("1") ? true : false);
-        cbAdrenotoolsTurnip.setOnCheckedChangeListener((buttonView, isChecked) ->  {
-            isAdrenotoolsTurnip = isChecked ? "1" : "0";
+        sResourceType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                selectedResourceType = sResourceType.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        sBCnEmulation.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                selectedBCnEmulation = sBCnEmulation.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        sBCnEmulationType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                selectedBCnEmulationType = sBCnEmulationType.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        sBCnEmulationCache.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+                isBCnCacheEnabled = sBCnEmulationCache.getSelectedItem().toString();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> adapterView) {
+
+            }
+        });
+
+        isSyncFrame = syncFrame;
+        cbSyncFrame.setChecked(isSyncFrame.equals("1") ? true : false);
+        cbSyncFrame.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isSyncFrame = isChecked ? "1" : "0";
+        });
+
+        isDisablePresentWait = disablePresentWait;
+        cbDisablePresentWait.setChecked(isDisablePresentWait.equals("1") ? true : false);
+        cbDisablePresentWait.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isDisablePresentWait = isChecked ? "1" : "0";
         });
 
         // Ensure ContentsManager syncContents is called
@@ -205,18 +318,10 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         contentsManager.syncContents();
         
         // Populate the spinner with available versions from ContentsManager and pre-select the initial version
-        populateGraphicsDriverVersions(anchor.getContext(), contentsManager, initialVersion, blExtensions, maxDeviceMemory, frameSync, graphicsDriver);
+        populateGraphicsDriverVersions(anchor.getContext(), contentsManager, vulkanVersion, initialVersion, blExtensions, gpuName, maxDeviceMemory, presentMode, resourceType, bcnEmulation, bcnEmulationType, bcnEmulationCache, graphicsDriver);
 
         setOnConfirmCallback(() -> {
-            // Reset blacklistedExtensions before rebuilding it
-            blacklistedExtensions = "";
-            ArrayList<String> blacklist = new ArrayList<>();
-            for (HashMap.Entry<String, Boolean> entry : extensionsState.entrySet()) {
-                if(!entry.getKey().isEmpty() && !entry.getValue()) {
-                    blacklist.add(entry.getKey());
-                }
-            }
-            blacklistedExtensions = String.join(",", blacklist);
+            blacklistedExtensions = mscAvailableExtensions.getUnSelectedItemsAsString();
 
             if (graphicsDriverVersionView != null)
                 graphicsDriverVersionView.setText(selectedVersion);
@@ -225,51 +330,40 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         });
     }
 
-    private void populateGraphicsDriverVersions(Context context, ContentsManager contentsManager, @Nullable String initialVersion, @Nullable String blExtensions, String maxDeviceMemory, String frameSync, String graphicsDriver) {
+    private void populateGraphicsDriverVersions(Context context, ContentsManager contentsManager, String vulkanVersion, @Nullable String initialVersion, @Nullable String blExtensions, String gpuName, String maxDeviceMemory, String presentMode, String selectedResourceType, String bcnEmulation, String bcnEmulationType, String bcnEmulationCache, String graphicsDriver) {
         List<String> wrapperVersions = new ArrayList<>();
-        ArrayList<String> availableExtensions;
-
         String[] wrapperDefaultVersions = context.getResources().getStringArray(R.array.wrapper_graphics_driver_version_entries);
 
-        wrapperVersions.addAll(Arrays.asList(wrapperDefaultVersions));
+        for (String version : wrapperDefaultVersions) {
+            if (GPUInformation.isDriverSupported(version, context))
+                wrapperVersions.add(version);
+        }
         
         // Add installed versions from AdrenotoolsManager
         AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(context);
         wrapperVersions.addAll(adrenotoolsManager.enumarateInstalledDrivers());
 
-
-        availableExtensions = new ArrayList<>(Arrays.asList(GPUInformation.enumerateExtensions()));
-
-        // Remove essential and wrapper disabled extensions
-        String[] essentialExtensions = {"VK_EXT_hdr_metadata", "VK_GOOGLE_display_timing", "VK_KHR_shader_float_controls", "VK_KHR_shader_presentable_image", "VK_EXT_image_compression_control_swapchain"};
-        for (String extension : essentialExtensions) {
-            availableExtensions.remove(extension);
-        }
-
         // Set the adapter and select the initial version
         ArrayAdapter<String> wrapperAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wrapperVersions);
-        ExtensionAdapter extensionsAdapter = new ExtensionAdapter(context, availableExtensions);
-
-        String[] bl = blExtensions.split("\\,");
-
-        for (String extension : bl) {
-            if (!extension.isEmpty()) {
-                Log.d("GraphicsDriverConfigDialog", "Getting initial blacklisted extension: " + extension);
-                extensionsState.put(extension, false);
-            }
-        }
         
         sVersion.setAdapter(wrapperAdapter);
-        sAvailableExtensions.setAdapter(extensionsAdapter);
         
         // We can start logging selected graphics driver and initial version
         Log.d(TAG, "Graphics driver: " + graphicsDriver);
         Log.d(TAG, "Initial version: " + initialVersion);
 
+        loadGPUNameSpinner(context, sGPUName);
+
         // Use the custom selection logic
         setSpinnerSelectionWithFallback(sVersion, initialVersion, graphicsDriver);
+        AppUtils.setSpinnerSelectionFromValue(sVulkanVersion, vulkanVersion);
+        AppUtils.setSpinnerSelectionFromValue(sGPUName, gpuName);
         AppUtils.setSpinnerSelectionFromNumber(sMaxDeviceMemory, maxDeviceMemory);
-        AppUtils.setSpinnerSelectionFromValue(sFrameSynchronization, frameSync);
+        AppUtils.setSpinnerSelectionFromValue(sPresentMode, presentMode);
+        AppUtils.setSpinnerSelectionFromValue(sResourceType, selectedResourceType);
+        AppUtils.setSpinnerSelectionFromValue(sBCnEmulation, bcnEmulation);
+        AppUtils.setSpinnerSelectionFromValue(sBCnEmulationType, bcnEmulationType);
+        AppUtils.setSpinnerSelectionFromValue(sBCnEmulationCache, bcnEmulationCache);
 
         // We can log the spinner values now
         Log.d(TAG, "Spinner selected position: " + sVersion.getSelectedItemPosition());
@@ -286,7 +380,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             }
         }
 
-        AppUtils.setSpinnerSelectionFromValue(spinner, DefaultVersion.WRAPPER);
+        AppUtils.setSpinnerSelectionFromValue(spinner, GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, getContext()) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
     }
 
 }
+

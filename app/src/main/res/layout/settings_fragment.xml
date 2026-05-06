@@ -37,33 +37,148 @@
                             android:layout_weight="1"
                             android:spinnerMode="dialog" />
 
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="start"
+                        android:paddingTop="4dp">
+
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTAddBox64Preset"
+                            android:tooltipText="Add"
                             android:src="@drawable/icon_add" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
                             android:id="@+id/BTEditBox64Preset"
+                            android:tooltipText="Edit"
                             android:src="@drawable/icon_edit" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
+                            android:tooltipText="Duplicate"
                             android:id="@+id/BTDuplicateBox64Preset"
                             android:src="@drawable/icon_duplicate" />
 
                         <ImageButton
                             style="@style/ListMenuButton"
+                            android:tooltipText="Remove"
                             android:id="@+id/BTRemoveBox64Preset"
                             android:layout_marginRight="0dp"
                             android:src="@drawable/icon_remove" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTExportBox64Preset"
+                            android:tooltipText="Export"
+                            android:layout_marginRight="0dp"
+                            android:src="@drawable/icon_export" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:tooltipText="Import"
+                            android:id="@+id/BTImportBox64Preset"
+                            android:layout_marginRight="0dp"
+                            android:src="@drawable/icon_popup_menu_download" />
+
+                        <Space
+                            android:layout_width="75dp"
+                            android:layout_height="0dp" />
                     </LinearLayout>
                 </LinearLayout>
 
                 <TextView
-                    android:id="@+id/TVBox86Box64"
+                    android:id="@+id/TVBox64"
                     style="@style/FieldSetLabel"
-                    android:text="@string/box86_box64" />
+                    android:text="@string/box64" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout style="@style/FieldSet">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/fexcore_preset" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <Spinner
+                            style="@style/ComboBox"
+                            android:id="@+id/SFEXCorePreset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:spinnerMode="dialog" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="start"
+                        android:paddingTop="4dp">
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTAddFEXCorePreset"
+                            android:tooltipText="Add"
+                            android:src="@drawable/icon_add" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTEditFEXCorePreset"
+                            android:tooltipText="Edit"
+                            android:src="@drawable/icon_edit" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:tooltipText="Duplicate"
+                            android:id="@+id/BTDuplicateFEXCorePreset"
+                            android:src="@drawable/icon_duplicate" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:tooltipText="Remove"
+                            android:id="@+id/BTRemoveFEXCorePreset"
+                            android:layout_marginRight="0dp"
+                            android:src="@drawable/icon_remove" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTExportFEXCorePreset"
+                            android:tooltipText="Export"
+                            android:layout_marginRight="0dp"
+                            android:src="@drawable/icon_export" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:tooltipText="Import"
+                            android:id="@+id/BTImportFEXCorePreset"
+                            android:layout_marginRight="0dp"
+                            android:src="@drawable/icon_popup_menu_download" />
+
+                        <Space
+                            android:layout_width="75dp"
+                            android:layout_height="0dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVFEXCore"
+                    style="@style/FieldSetLabel"
+                    android:text="@string/fexcore_config" />
             </FrameLayout>
 
             <FrameLayout
@@ -134,7 +249,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Frontend Export Path" />
+                        android:text="Winlator Path" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -142,13 +257,36 @@
                         android:orientation="horizontal"
                         android:gravity="center_vertical">
                         <TextView
-                            android:id="@+id/TVFrontendExportPath"
+                            android:id="@+id/TVWinlatorPath"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Default Path: Downloads/Winlator/Frontend" />
+                            android:layout_weight="1" />
                         <Button
-                            android:id="@+id/BTChooseFrontendExportPath"
+                            style="@style/ButtonNeutral"
+                            android:id="@+id/BTChooseWinlatorPath"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Choose Path" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Shortcut Export Path" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:id="@+id/TVShortcutExportPath"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+                        <Button
+                            style="@style/ButtonNeutral"
+                            android:id="@+id/BTChooseShortcutExportPath"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Choose Path" />
@@ -157,7 +295,7 @@
                 <TextView
                     android:id="@+id/TVShortcutSettings"
                     style="@style/FieldSetLabel"
-                    android:text="Shortcut Settings" />
+                    android:text="Path Settings" />
             </FrameLayout>
 
 
@@ -268,27 +406,20 @@
                         android:text="@string/use_xr"
                         android:layout_marginTop="8dp" />
 
-                    <!-- First ever mod =D - Cursor Lock Checkbox. You now live with relative mouse mode, Bye, Felicia -->
-<!--                    <CheckBox-->
-<!--                        android:id="@+id/CBCursorLock"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="True Mouse Control (Toggle with Volume Down)"-->
-<!--                        android:layout_marginTop="8dp" />-->
+                    <!-- New Cursor Lock Checkbox -->
+                    <CheckBox
+                        android:id="@+id/CBCursorLock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Capture External Pointer"
+                        android:layout_marginTop="8dp" />
 
                     <!-- New Xinput Toggle Checkbox -->
                     <CheckBox
                         android:id="@+id/CBXinputToggle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Disable Controller Input"
-                        android:layout_marginTop="8dp" />
-
-                    <CheckBox
-                        android:id="@+id/CBXTouchscreenToggle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Enable Touchscreen Mode Globally"
+                        android:text="Disable Xinput (Used for Exclusive M/KB support)"
                         android:layout_marginTop="8dp" />
 
                 </LinearLayout>
@@ -297,149 +428,6 @@
                     android:id="@+id/TVXServer"
                     style="@style/FieldSetLabel"
                     android:text="@string/xserver" />
-            </FrameLayout>
-
-<!--            &lt;!&ndash; Gyroscope Settings Section &ndash;&gt;-->
-<!--            <FrameLayout-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:layout_marginTop="16dp"> &lt;!&ndash; Add margin for spacing &ndash;&gt;-->
-
-<!--                <LinearLayout style="@style/FieldSet">-->
-
-<!--                    &lt;!&ndash; Enable Gyroscope Checkbox &ndash;&gt;-->
-<!--                    <CheckBox-->
-<!--                        android:id="@+id/CBGyroEnabled"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="Enable Right-Stick Gyroscope (Experimental)"-->
-<!--                        android:layout_marginBottom="16dp" /> &lt;!&ndash; Added margin for better spacing &ndash;&gt;-->
-
-<!--                    &lt;!&ndash; Gyro Activator Button Label &ndash;&gt;-->
-<!--                    <TextView-->
-<!--                        android:id="@+id/TVGyroTriggerLabel"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="Gyro Activator Button:"-->
-<!--                        android:layout_marginBottom="8dp"/> &lt;!&ndash; Add some bottom margin for better spacing &ndash;&gt;-->
-
-<!--                    &lt;!&ndash; Spinner for selecting the gyro trigger button &ndash;&gt;-->
-<!--                    <Spinner-->
-<!--                        android:id="@+id/SBGyroTriggerButton"-->
-<!--                        android:layout_width="match_parent"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:entries="@array/button_options"-->
-<!--                        android:layout_marginBottom="16dp" /> &lt;!&ndash; Add bottom margin to separate it from other elements &ndash;&gt;-->
-
-<!--                    &lt;!&ndash; RadioGroup for selecting gyro mode (toggle/hold) &ndash;&gt;-->
-<!--                    <RadioGroup-->
-<!--                        android:id="@+id/RGyroMode"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:orientation="horizontal">-->
-
-<!--                        <RadioButton-->
-<!--                            android:id="@+id/RBHoldMode"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="Hold Mode"-->
-<!--                            android:layout_marginEnd="16dp" /> &lt;!&ndash; Add end margin for spacing &ndash;&gt;-->
-
-<!--                        <RadioButton-->
-<!--                            android:id="@+id/RBToggleMode"-->
-<!--                            android:layout_width="wrap_content"-->
-<!--                            android:layout_height="wrap_content"-->
-<!--                            android:text="Toggle Mode" />-->
-<!--                    </RadioGroup>-->
-
-<!--                    &lt;!&ndash; Configure Gyroscope Button &ndash;&gt;-->
-<!--                    <Button-->
-<!--                        android:id="@+id/BTConfigureGyro"-->
-<!--                        android:layout_width="wrap_content"-->
-<!--                        android:layout_height="wrap_content"-->
-<!--                        android:text="Calibrate Gyroscope"-->
-<!--                        android:layout_marginTop="16dp" />-->
-
-<!--                </LinearLayout>-->
-
-<!--                <TextView-->
-<!--                    android:id="@+id/TVGyroSettings"-->
-<!--                    style="@style/FieldSetLabel"-->
-<!--                    android:text="Gyro Settings" />-->
-<!--            </FrameLayout>-->
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout style="@style/FieldSet">
-
-                    <!--                    <LinearLayout-->
-                    <!--                        android:layout_width="match_parent"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:orientation="horizontal">-->
-
-                    <!--                        <TextView-->
-                    <!--                            android:layout_width="wrap_content"-->
-                    <!--                            android:layout_height="wrap_content"-->
-                    <!--                            android:text="@string/trigger_type"-->
-                    <!--                            android:layout_gravity="center"/>-->
-
-                    <!--                        <ImageView-->
-                    <!--                            android:id="@+id/BTHelpTriggerMode"-->
-                    <!--                            android:layout_gravity="center"-->
-                    <!--                            style="@style/HelpButton" />-->
-                    <!--                    </LinearLayout>-->
-
-
-                    <!--                    <RadioGroup-->
-                    <!--                        android:id="@+id/RGTriggerType"-->
-                    <!--                        android:layout_width="match_parent"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:orientation="horizontal">-->
-                    <!--                        <RadioButton-->
-                    <!--                            android:id="@+id/RBTriggerIsButton"-->
-                    <!--                            android:layout_width="wrap_content"-->
-                    <!--                            android:layout_height="wrap_content"-->
-                    <!--                            android:layout_weight="1"-->
-                    <!--                            android:text="@string/as_button"/>-->
-
-                    <!--                        <RadioButton-->
-                    <!--                            android:id="@+id/RBTriggerIsAxis"-->
-                    <!--                            android:layout_width="wrap_content"-->
-                    <!--                            android:layout_height="wrap_content"-->
-                    <!--                            android:layout_weight="1"-->
-                    <!--                            android:text="@string/as_axis"/>-->
-
-                    <!--                        <RadioButton-->
-                    <!--                            android:id="@+id/RBTriggerIsMixed"-->
-                    <!--                            android:visibility="gone"-->
-                    <!--                            android:layout_width="wrap_content"-->
-                    <!--                            android:layout_height="wrap_content"-->
-                    <!--                            android:layout_weight="1"-->
-                    <!--                            android:text="@string/mixed"/>-->
-                    <!--                    </RadioGroup>-->
-
-                    <!--                    <CheckBox-->
-                    <!--                        android:id="@+id/CBLegacyInputMode"-->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:text="@string/enable_legacy_input_mode"-->
-                    <!--                        android:layout_marginTop="8dp" />-->
-
-                    <Button
-                        android:id="@+id/BTConfigureAnalogSticks"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Override Joystick Behavior"
-                        android:layout_marginTop="8dp" />
-
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/TVGameControllerLabel"
-                    style="@style/FieldSetLabel"
-                    android:text="@string/game_controller" />
             </FrameLayout>
 
             <FrameLayout
@@ -468,21 +456,11 @@
                     <View style="@style/FieldSeparator" />
 
                     <CheckBox
-                        android:id="@+id/CBEnableBox86_64Logs"
+                        android:id="@+id/CBEnableBox64Logs"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/enable_box86_64_logs"
+                        android:text="@string/enable_box64_logs"
                         android:layout_marginTop="8dp" />
-
-                    <View style="@style/FieldSeparator" />
-
-                    <CheckBox
-                        android:id="@+id/CBEnablePebLogs"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8.0dip"
-                        android:text="@string/enable_peb_logs" />
-
                 </LinearLayout>
 
                 <TextView
@@ -490,8 +468,6 @@
                     style="@style/FieldSetLabel"
                     android:text="@string/logs" />
             </FrameLayout>
-
-
 
             <FrameLayout
                 android:layout_width="match_parent"
@@ -533,6 +509,20 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="left|center"
                             android:text="@string/share_android_clipboard" />
+
+                        <View style="@style/FieldSeparator" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Downloadable Contents URL" />
+
+                        <EditText
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="left|center"
+                            android:id="@+id/ETDownloadableContentsURL"/>
+
                     </LinearLayout>
                 </LinearLayout>
 
@@ -555,22 +545,6 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_horizontal"
                         android:text="@string/reinstall_imagefs" />
-
-                    <Button
-                        style="@style/ButtonPositive"
-                        android:id="@+id/BTBackupData"
-                        android:layout_width="240dp"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:text="Backup Data" />
-
-                    <Button
-                        style="@style/ButtonPositive"
-                        android:id="@+id/BTRestoreData"
-                        android:layout_width="240dp"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_horizontal"
-                        android:text="Restore Data" />
 
                 </LinearLayout>
 

@@ -5,13 +5,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.util.SparseBooleanArray;
-import android.view.InputDevice;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.InputDevice;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -25,35 +22,26 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
-import com.winlator.cmod.inputcontrols.ControllerManager;
 
 import java.util.ArrayList;
 
 public class ContentDialog extends Dialog {
-    public Runnable onConfirmCallback;
-    private Runnable onCancelCallback;
-    private final View contentView;
-
-    private boolean isDarkMode;
-
-    private Button gyroButton;
-
     public interface OnControllerInputListener {
         void onControllerInput(InputDevice device);
     }
+
+    public Runnable onConfirmCallback;
+    private Runnable onCancelCallback;
     private OnControllerInputListener onControllerInputListener;
+    private final View contentView;
 
-    public void setOnControllerInputListener(OnControllerInputListener listener) {
-        this.onControllerInputListener = listener;
-    }
-
+    private boolean isDarkMode;
 
     public ContentDialog(@NonNull Context context) {
         this(context, 0);
     }
 
     private View inflatedLayout;
-
 
     public ContentDialog(@NonNull Context context, int layoutResId) {
         super(context, R.style.ContentDialog);
@@ -106,6 +94,14 @@ public class ContentDialog extends Dialog {
 
     public void setOnCancelCallback(Runnable onCancelCallback) {
         this.onCancelCallback = onCancelCallback;
+    }
+
+    public void setOnControllerInputListener(OnControllerInputListener listener) {
+        this.onControllerInputListener = listener;
+    }
+
+    public OnControllerInputListener getOnControllerInputListener() {
+        return onControllerInputListener;
     }
 
     @Override
@@ -266,60 +262,4 @@ public class ContentDialog extends Dialog {
         dialog.setTitle(titleResId);
         dialog.show();
     }
-
-    @Override
-    public boolean dispatchKeyEvent(@NonNull KeyEvent event) {
-        // If we are actively listening for controller input...
-        if (onControllerInputListener != null && event.getAction() == KeyEvent.ACTION_DOWN) {
-            InputDevice device = event.getDevice();
-            // And the event is from a real, physical game controller...
-            if (device != null && !device.isVirtual() && ControllerManager.isGameController(device)) {
-                // ...then trigger our callback and consume the event so it doesn't do anything else.
-                onControllerInputListener.onControllerInput(device);
-                return true;
-            }
-        }
-        // Otherwise, process the key event normally (e.g., for keyboard input in an EditText).
-        return super.dispatchKeyEvent(event);
-    }
-
-    public static class ConfirmationResult {
-        public final boolean confirmed;
-        public final boolean checkboxChecked;
-
-        public ConfirmationResult(boolean confirmed, boolean checkboxChecked) {
-            this.confirmed = confirmed;
-            this.checkboxChecked = checkboxChecked;
-        }
-    }
-
-    public static void confirmWithCheckbox(Context context, String message, String checkboxText, Callback<ConfirmationResult> callback) {
-        ContentDialog dialog = new ContentDialog(context);
-        dialog.setMessage(message);
-
-        final CheckBox checkBox = dialog.findViewById(R.id.CBExtraOption);
-        final View confirmButton = dialog.findViewById(R.id.BTConfirm);
-
-        checkBox.setText(checkboxText);
-        checkBox.setVisibility(View.VISIBLE);
-        checkBox.setChecked(false);
-
-        // Link the checkbox to the OK button's state
-        checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            confirmButton.setEnabled(!isChecked);
-            // Add this line to visually fade the button when disabled
-            confirmButton.setAlpha(isChecked ? 0.5f : 1.0f);
-        });
-
-        dialog.setOnConfirmCallback(() -> {
-            callback.call(new ConfirmationResult(true, false));
-        });
-        dialog.setOnCancelCallback(() -> {
-            callback.call(new ConfirmationResult(false, checkBox.isChecked()));
-        });
-
-        dialog.show();
-    }
-
-
 }

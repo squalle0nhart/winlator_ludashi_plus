@@ -63,9 +63,9 @@ public final class MacrosDialog {
         Button btEnableAllLocal  = dialog.findViewById(R.id.BTEnableAllLocal);
         Button btDisableAllLocal = dialog.findViewById(R.id.BTDisableAllLocal);
 
-        // Bottom‑bar copies (in ContentDialog)
-        Button btEnableAllBar  = dialog.findViewById(R.id.BTEnableAll);
-        Button btDisableAllBar = dialog.findViewById(R.id.BTDisableAll);
+        // Bottom-bar variants are optional in this merged layout set.
+        Button btEnableAllBar  = null;
+        Button btDisableAllBar = null;
         Button btCancel        = dialog.findViewById(R.id.BTCancel);
         Button btOk            = dialog.findViewById(R.id.BTConfirm);
 

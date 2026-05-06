@@ -102,7 +102,6 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
             }
             else if (type == ControlElement.Type.RANGE_BUTTON) {
                 view.findViewById(R.id.LLRangeOptions).setVisibility(View.VISIBLE);
-                view.findViewById(R.id.CBToggleSwitch).setVisibility(View.VISIBLE);
             }
 
             loadBindingSpinners(element, view);
@@ -224,6 +223,7 @@ public class ControlsEditorActivity extends AppCompatActivity implements View.On
         ControlElement.Type type = element.getType();
         if (type == ControlElement.Type.BUTTON) {
             loadBindingSpinner(element, container, 0, R.string.binding);
+            loadBindingSpinner(element, container, 1, R.string.binding_secondary);
         }
         else if (type == ControlElement.Type.D_PAD || type == ControlElement.Type.STICK || type == ControlElement.Type.TRACKPAD) {
             loadBindingSpinner(element, container, 0, R.string.binding_up);

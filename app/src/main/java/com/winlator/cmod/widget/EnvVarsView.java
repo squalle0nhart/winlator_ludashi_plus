@@ -1,6 +1,5 @@
 package com.winlator.cmod.widget;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.InputType;
@@ -34,11 +33,17 @@ public class EnvVarsView extends FrameLayout {
         {"MESA_SHADER_CACHE_DISABLE", "CHECKBOX", "false", "true"},
         {"mesa_glthread", "CHECKBOX", "false", "true"},
         {"WINEESYNC", "CHECKBOX", "0", "1"},
-        {"TU_DEBUG", "SELECT_MULTIPLE", "startup", "nir", "nobin", "sysmem", "gmem", "forcebin", "layout", "noubwc", "nomultipos", "nolrz", "nolrzfc", "perf", "perfc", "flushall", "syncdraw", "push_consts_per_stage", "rast_order", "unaligned_store", "log_skip_gmem_ops", "dynamic", "bos", "3d_load", "fdm", "noconform", "rd"},
-        {"DXVK_HUD", "SELECT_MULTIPLE", "devinfo", "fps", "frametimes", "submissions", "drawcalls", "pipelines", "descriptors", "memory", "gpuload", "version", "api", "cs", "compiler", "samplers"},
-        {"MESA_EXTENSION_MAX_YEAR", "NUMBER"},
+        {"TU_DEBUG", "SELECT_MULTIPLE", "forcecb", "nocb", "startup", "nir", "nobin", "sysmem", "gmem", "forcebin", "layout", "noubwc", "nomultipos", "nolrz", "nolrzfc", "perf", "perfc", "flushall", "syncdraw", "push_consts_per_stage", "rast_order", "unaligned_store", "log_skip_gmem_ops", "dynamic", "bos", "3d_load", "fdm", "noconform", "rd"},
+        {"DXVK_HUD", "SELECT_MULTIPLE", "scale=0.5", "scale=0.7", "opacity=0.5", "opacity=0.7", "devinfo", "fps", "frametimes", "submissions", "drawcalls", "pipelines", "descriptors", "memory", "gpuload", "version", "api", "cs", "compiler", "samplers"},
+        {"MESA_EXTENSION_MAX_YEAR", "TEXT"},
+        {"WRAPPER_MAX_IMAGE_COUNT", "TEXT"},
+        {"MESA_GL_VERSION_OVERRIDE", "TEXT"},
         {"PULSE_LATENCY_MSEC", "NUMBER"},
-        {"MANGOHUD", "CHECKBOX", "0", "1"}
+        {"WINE_DO_NOT_CREATE_DXGI_DEVICE_MANAGER", "CHECKBOX", "0", "1"},
+        {"WINE_NEW_MEDIASOURCE", "CHECKBOX", "0", "1"},
+        {"GALLIUM_HUD", "SELECT_MULTIPLE", "simple", "fps", "frametime"},
+        {"WINE_LARGE_ADDRESS_AWARE", "CHECKBOX", "0", "1"},
+        {"WINEDLLOVERRIDES", "TEXT"}
     };
     private final LinearLayout container;
     private final TextView emptyTextView;
@@ -75,7 +80,7 @@ public class EnvVarsView extends FrameLayout {
         addView(container);
 
         emptyTextView = new TextView(context);
-        emptyTextView.setText(R.string.no_items_to_display_envvars);
+        emptyTextView.setText(R.string.no_items_to_display);
         emptyTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         emptyTextView.setGravity(Gravity.CENTER);
         int padding = (int) UnitUtils.dpToPx(16);
@@ -185,7 +190,7 @@ public class EnvVarsView extends FrameLayout {
                 final ToggleButton toggleButton = itemView.findViewById(R.id.ToggleButton);
                 toggleButton.setVisibility(VISIBLE);
                 toggleButton.setChecked(value.equals("1") || value.equals("true"));
-                applyDarkTheme(toggleButton);
+                applyDarkTheme(toggleButton); // Apply dark theme
                 getValueCallback = () -> toggleButton.isChecked() ? knownEnvVar[3] : knownEnvVar[2];
                 break;
             case "SELECT":
@@ -194,59 +199,23 @@ public class EnvVarsView extends FrameLayout {
                 spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items));
                 AppUtils.setSpinnerSelectionFromValue(spinner, value);
                 spinner.setVisibility(VISIBLE);
-                applyDarkTheme(spinner);
+                applyDarkTheme(spinner); // Apply dark theme
                 getValueCallback = () -> spinner.getSelectedItem().toString();
                 break;
             case "SELECT_MULTIPLE":
-                final LinearLayout multiSelectArea = itemView.findViewById(R.id.LLMultiSelectArea);
-                final TextView multiSelectTextView = itemView.findViewById(R.id.TVMultiSelectValue);
-                multiSelectArea.setVisibility(VISIBLE);
-                multiSelectTextView.setText(value);
-                applyDarkTheme(multiSelectTextView);
-                if (isDarkMode) multiSelectArea.setBackgroundResource(R.drawable.edit_text_dark);
-
-
-                final String[] multiItems = Arrays.copyOfRange(knownEnvVar, 2, knownEnvVar.length);
-                final boolean[] checkedItems = new boolean[multiItems.length];
-
-                String[] selected = value.split(",");
-                for (String s : selected) {
-                    for (int i = 0; i < multiItems.length; i++) {
-                        if (multiItems[i].equals(s.trim())) {
-                            checkedItems[i] = true;
-                            break;
-                        }
-                    }
-                }
-
-                multiSelectArea.setOnClickListener(v -> {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-                    builder.setTitle(name);
-                    builder.setMultiChoiceItems(multiItems, checkedItems, (dialog, which, isChecked) -> {
-                        checkedItems[which] = isChecked;
-                    });
-                    builder.setPositiveButton("OK", (dialog, which) -> {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 0; i < checkedItems.length; i++) {
-                            if (checkedItems[i]) {
-                                if (sb.length() > 0) sb.append(",");
-                                sb.append(multiItems[i]);
-                            }
-                        }
-                        multiSelectTextView.setText(sb.toString());
-                    });
-                    builder.setNegativeButton("Cancel", null);
-                    builder.show();
-                });
-
-                getValueCallback = () -> multiSelectTextView.getText().toString();
+                final MultiSelectionComboBox comboBox = itemView.findViewById(R.id.MultiSelectionComboBox);
+                comboBox.setItems(Arrays.copyOfRange(knownEnvVar, 2, knownEnvVar.length));
+                comboBox.setSelectedItems(value.split(","));
+                comboBox.setVisibility(VISIBLE);
+                // applyDarkTheme(comboBox); // Implement if required for custom views
+                getValueCallback = comboBox::getSelectedItemsAsString;
                 break;
             case "TEXT":
                 EditText editText = itemView.findViewById(R.id.EditText);
                 editText.setVisibility(VISIBLE);
                 editText.setText(value);
-                editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
-                applyDarkTheme(editText);
+                // Apply specific styling for "TEXT" fields
+                editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text); // Apply dark background resource for "TEXT"
                 getValueCallback = () -> editText.getText().toString();
                 break;
             case "NUMBER":
@@ -255,7 +224,7 @@ public class EnvVarsView extends FrameLayout {
                 editTextNumber.setVisibility(VISIBLE);
                 editTextNumber.setText(value);
                 if (type.equals("NUMBER")) editTextNumber.setInputType(InputType.TYPE_CLASS_NUMBER);
-                applyDarkTheme(editTextNumber);
+                editTextNumber.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
                 getValueCallback = () -> editTextNumber.getText().toString();
                 break;
         }
@@ -268,7 +237,6 @@ public class EnvVarsView extends FrameLayout {
         container.addView(itemView);
         emptyTextView.setVisibility(View.GONE);
     }
-
 
     // Method to set the environment variables
     public void setEnvVars(EnvVars envVars) {

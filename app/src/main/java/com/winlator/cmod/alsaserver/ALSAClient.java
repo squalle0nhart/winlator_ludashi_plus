@@ -23,9 +23,6 @@ public class ALSAClient {
     private ByteBuffer sharedBuffer;
     private boolean playing = false;
     private long streamPtr = 0;
-    private long mirrorStreamPtr = 0;
-
-    private boolean reflectorMode;
 
     static {
         System.loadLibrary("winlator");
@@ -37,19 +34,10 @@ public class ALSAClient {
             sharedBuffer = null;
         }
 
-        if (reflectorMode) {
-            simulatedStop(streamPtr);
-            stop(mirrorStreamPtr);
-            simulatedClose(streamPtr);
-            close(mirrorStreamPtr);
-        } else {
-            stop(streamPtr);
-            close(streamPtr);
-        }
-
+        stop(streamPtr);
+        close(streamPtr);
         playing = false;
         streamPtr = 0;
-        mirrorStreamPtr = 0;
     }
 
     public void prepare() {
@@ -59,147 +47,49 @@ public class ALSAClient {
 
         if (!isValidBufferSize()) return;
 
-        if (reflectorMode) {
-            // In reflector mode, create both the pacer and the real stream
-            streamPtr = simulatedCreate(dataType.ordinal(), channelCount, sampleRate, bufferSize);
-            mirrorStreamPtr = create(dataType.ordinal(), channelCount, sampleRate, bufferSize);
-        } else {
-            // In normal mode, create only the real stream and assign it to streamPtr
-            streamPtr = create(dataType.ordinal(), channelCount, sampleRate, bufferSize);
-            mirrorStreamPtr = 0; // Ensure mirror is null
-        }
-
+        streamPtr = create(dataType.ordinal(), channelCount, sampleRate, bufferSize);
         if (streamPtr > 0) start();
     }
 
     public void start() {
         if (streamPtr > 0 && !playing) {
-            if (reflectorMode) {
-                simulatedStart(streamPtr);
-                start(mirrorStreamPtr);
-            } else {
-                start(streamPtr);
-            }
+            start(streamPtr);
             playing = true;
         }
     }
 
     public void stop() {
         if (streamPtr > 0 && playing) {
-            if (reflectorMode) {
-                simulatedStop(streamPtr);
-                stop(mirrorStreamPtr);
-            } else {
-                stop(streamPtr);
-            }
+            stop(streamPtr);
             playing = false;
         }
     }
 
     public void pause() {
         if (streamPtr > 0) {
-            if (reflectorMode) {
-                simulatedPause(streamPtr);
-                pause(mirrorStreamPtr);
-            } else {
-                pause(streamPtr);
-            }
+            pause(streamPtr);
             playing = false;
         }
     }
 
     public void drain() {
-        if (streamPtr > 0) {
-            if (reflectorMode) {
-                simulatedFlush(streamPtr);
-                flush(mirrorStreamPtr);
-            } else {
-                flush(streamPtr);
-            }
-        }
+        if (streamPtr > 0) flush(streamPtr);
     }
 
     public void writeDataToStream(ByteBuffer data) {
-        ByteBuffer mirrorData = data.duplicate();
-
         if (dataType == DataType.S16LE || dataType == DataType.FLOATLE) {
             data.order(ByteOrder.LITTLE_ENDIAN);
-            mirrorData.order(ByteOrder.LITTLE_ENDIAN);
-        } else if (dataType == DataType.S16BE || dataType == DataType.FLOATBE) {
-            data.order(ByteOrder.BIG_ENDIAN);
-            mirrorData.order(ByteOrder.BIG_ENDIAN);
         }
-
-        int numFrames = data.limit() / frameBytes;
+        else if (dataType == DataType.S16BE || dataType == DataType.FLOATBE) {
+            data.order(ByteOrder.BIG_ENDIAN);
+        }
 
         if (playing) {
-            if (reflectorMode) {
-                // Reflector Mode: Write to pacer, mirror to real stream
-                int framesWritten = simulatedWrite(streamPtr, data, numFrames);
-                write(mirrorStreamPtr, mirrorData, numFrames);
-                if (framesWritten > 0) position += framesWritten;
-                data.rewind();
-                mirrorData.rewind();
-            } else {
-                // Normal Mode: Write directly to the real stream
-                int framesWritten = write(streamPtr, data, numFrames);
-                if (framesWritten > 0) position += framesWritten;
-                data.rewind();
-            }
+            int numFrames = data.limit() / frameBytes;
+            int framesWritten = write(streamPtr, data, numFrames);
+            if (framesWritten > 0) position += framesWritten;
+            data.rewind();
         }
-    }
-
-    /**
-     * This is the new method to handle audio device changes.
-     * It will be called from the Android system when a device is connected or disconnected.
-     */
-    public void onAudioDeviceChanged() {
-        // This entire feature is designed for reflector mode.
-        // If we are in normal mode, the underlying connection to Wine is
-        // likely broken, and we should do nothing.
-        if (!reflectorMode) {
-            System.out.println("Audio device change detected, but reflector mode is off. Ignoring.");
-            return;
-        }
-
-        // --- REFLECTOR MODE LOGIC ---
-        // The pacer (streamPtr) is safe. We only need to rebuild the hardware stream (mirrorStreamPtr).
-        if (mirrorStreamPtr != 0) {
-            System.out.println("Tearing down old playback stream...");
-            stop(mirrorStreamPtr);
-            close(mirrorStreamPtr);
-            mirrorStreamPtr = 0;
-        }
-
-        final int MAX_RETRIES = 5;
-        final int RETRY_DELAY_MS = 200;
-
-        for (int i = 0; i < MAX_RETRIES; i++) {
-            System.out.println("Attempting to rebuild playback stream (Attempt " + (i + 1) + ")");
-            long newStreamPtr = create(dataType.ordinal(), channelCount, sampleRate, bufferSize);
-
-            if (newStreamPtr > 0) {
-                if (playing) {
-                    int result = start(newStreamPtr);
-                    if (result == 0) { // AAUDIO_OK
-                        mirrorStreamPtr = newStreamPtr;
-                        System.out.println("Successfully resumed playback on new stream.");
-                        return;
-                    } else {
-                        System.out.println("Failed to start new stream, result code: " + result + ". Retrying...");
-                        close(newStreamPtr);
-                    }
-                } else {
-                    mirrorStreamPtr = newStreamPtr;
-                    System.out.println("Successfully created new stream while paused.");
-                    return;
-                }
-            }
-            try {
-                Thread.sleep(RETRY_DELAY_MS);
-            } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
-        }
-        System.out.println("Failed to rebuild playback stream after " + MAX_RETRIES + " attempts.");
     }
 
     public int pointer() {
@@ -258,26 +148,17 @@ public class ALSAClient {
         return (int)(((float)bufferSize / sampleRate) * 1000);
     }
 
-    public void setReflectorMode(boolean enabled) {
-        this.reflectorMode = enabled;
-    }
+    private native long create(int format, byte channelCount, int sampleRate, int bufferSize);
 
-    private native long simulatedCreate(int format, byte channelCount, int sampleRate, int bufferSize);
-    private native long create(int format, byte channelCount, int sampleRate, int mirrorBufferSize);
-    private native int simulatedWrite(long streamPtr, ByteBuffer buffer, int numberFrames);
-    private native int write(long mirrorStreamPtr, ByteBuffer mirrorBuffer, int numFrames);
-    private native void simulatedStart(long streamPtr);
-    private native int start(long mirrorStreamPtr);
+    private native int write(long streamPtr, ByteBuffer buffer, int numFrames);
 
-    private native void simulatedStop(long streamPtr);
-    private native void stop(long mirrorStreamPtr);
+    private native void start(long streamPtr);
 
-    private native void simulatedPause(long streamPtr);
-    private native void pause(long mirrorStreamPtr);
+    private native void stop(long streamPtr);
 
-    private native void simulatedFlush(long streamPtr);
-    private native void flush(long mirrorStreamPtr);
+    private native void pause(long streamPtr);
 
-    private native void simulatedClose(long streamPtr);
-    private native void close(long mirrorStreamPtr);
+    private native void flush(long streamPtr);
+
+    private native void close(long streamPtr);
 }

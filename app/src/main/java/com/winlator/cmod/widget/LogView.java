@@ -1,9 +1,11 @@
 package com.winlator.cmod.widget;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PointF;
+import android.net.Uri;
 import android.os.Environment;
 import android.text.format.DateFormat;
 import android.util.AttributeSet;
@@ -11,9 +13,12 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.contentdialog.DebugDialog;
+import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.math.Mathf;
 
@@ -72,7 +77,7 @@ public class LogView extends View {
             if (lines.isEmpty()) {
                 paint.setTextSize(UnitUtils.dpToPx(20));
                 paint.setColor(0xffbdbdbd);
-                String text = getContext().getString(R.string.no_items_to_display_logs);
+                String text = getContext().getString(R.string.no_items_to_display);
                 float centerX = (width - paint.measureText(text)) * 0.5f;
                 float centerY = (height - paint.getFontSpacing()) * 0.5f - paint.ascent();
                 canvas.drawText(text, centerX, centerY, paint);
@@ -184,11 +189,24 @@ public class LogView extends View {
         fileName = file.substring(0, file.lastIndexOf("."));
     }
 
-    public static File getLogFile() {
-        File winlatorDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Winlator/logs");
-        winlatorDir.mkdirs();
+    public static File getLogFile(Context context) {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        String winlatorPath = sp.getString("winlator_path_uri", null);
+        File logsDir;
+
+        if (winlatorPath != null) {
+            Uri winlatorUri = Uri.parse(winlatorPath);
+            logsDir = new File(FileUtils.getFilePathFromUri(context, winlatorUri), "logs");
+        }
+        else {
+            logsDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH, "logs");
+        }
+
+        if (!logsDir.exists())
+            logsDir.mkdirs();
+
         String logFile = fileName.replaceAll("\\s", "_").toLowerCase() + "_" + DateFormat.format("yyyy-MM-dd_HH-mm-ss", new Date()) + ".txt";
-        return new File(winlatorDir, logFile);
+        return new File(logsDir, logFile);
     }
     
     @Override

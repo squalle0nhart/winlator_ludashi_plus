@@ -1,11 +1,6 @@
 package com.winlator.cmod.xenvironment;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.net.Uri;
-import android.os.Build;
-import android.text.Html;
-import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -14,8 +9,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
-import com.winlator.cmod.contents.ContentProfile;
-import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DownloadProgressDialog;
 import com.winlator.cmod.core.FileUtils;
@@ -28,16 +22,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class ImageFsInstaller {
-    public static final byte LATEST_VERSION = 24;
+    public static final byte LATEST_VERSION = 21;
 
     private static void resetContainerImgVersions(Context context) {
         ContainerManager manager = new ContainerManager(context);
@@ -61,6 +51,14 @@ public abstract class ImageFsInstaller {
             outFile.mkdirs();
             TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, activity, version + ".txz", outFile);
         }
+    }
+
+    public static void installDriversFromAssets(final MainActivity activity) {
+        AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(activity);
+        String[] adrenotoolsAssetDrivers = activity.getResources().getStringArray(R.array.wrapper_graphics_driver_version_entries);
+
+        for (String driver : adrenotoolsAssetDrivers)
+            adrenotoolsManager.extractDriverFromResources(driver);
     }
 
     public static void installFromAssets(final MainActivity activity) {
@@ -89,94 +87,19 @@ public abstract class ImageFsInstaller {
 
             if (success) {
                 installWineFromAssets(activity);
-//                installGuestLibs(activity); // If evshim.tzst ends up being used
+                installDriversFromAssets(activity);
                 imageFs.createImgVersionFile(LATEST_VERSION);
                 resetContainerImgVersions(activity);
             }
             else AppUtils.showToast(activity, R.string.unable_to_install_system_files);
 
             dialog.closeOnUiThread();
-        });
-    }
-
-    public static void installFromAssets(final MainActivity activity, final Runnable onCompletion) {
-        AppUtils.keepScreenOn(activity);
-        ImageFs imageFs = ImageFs.find(activity);
-        File rootDir = imageFs.getRootDir();
-
-        SettingsFragment.resetEmulatorsVersion(activity);
-
-        final DownloadProgressDialog dialog = new DownloadProgressDialog(activity);
-        dialog.show(R.string.installing_system_files);
-        Executors.newSingleThreadExecutor().execute(() -> {
-            clearRootDir(rootDir);
-            final byte compressionRatio = 24;
-            final long contentLength = (long)(FileUtils.getSize(activity, "imagefs.txz") * (100.0f / compressionRatio));
-            AtomicLong totalSizeRef = new AtomicLong();
-
-            boolean success = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, activity, "imagefs.txz", rootDir, (file, size) -> {
-                if (size > 0) {
-                    long totalSize = totalSizeRef.addAndGet(size);
-                    final int progress = (int)(((float)totalSize / contentLength) * 100);
-                    activity.runOnUiThread(() -> dialog.setProgress(progress));
-                }
-                return file;
-            });
-
-
-
-            if (success) {
-                installWineFromAssets(activity);
-//                installGuestLibs(activity); // If evshim.tzst ends up being used
-                imageFs.createImgVersionFile(LATEST_VERSION);
-                resetContainerImgVersions(activity);
-            }
-            else AppUtils.showToast(activity, R.string.unable_to_install_system_files);
-
-            dialog.closeOnUiThread();
-            if (onCompletion != null) {
-                activity.runOnUiThread(onCompletion);
-            }
         });
     }
 
     public static void installIfNeeded(final MainActivity activity) {
         ImageFs imageFs = ImageFs.find(activity);
         if (!imageFs.isValid() || imageFs.getVersion() < LATEST_VERSION) installFromAssets(activity);
-    }
-
-    public static void installIfNeeded(final MainActivity activity, final Runnable onCompletion) {
-        ImageFs imageFs = ImageFs.find(activity);
-
-        // Fresh Install. The imagefs is not valid/doesn't exist.
-        if (!imageFs.isValid()) {
-            // Silently install without showing a warning dialog.
-            installFromAssets(activity, onCompletion);
-        }
-        // Update. The imagefs exists but is an old version.
-        else if (imageFs.getVersion() < LATEST_VERSION) {
-            // Show the warning dialog because the user is updating.
-            String htmlMessageString = activity.getString(R.string.system_update_warning);
-            CharSequence formattedMessage;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                formattedMessage = Html.fromHtml(htmlMessageString, Html.FROM_HTML_MODE_LEGACY);
-            } else {
-                //noinspection deprecation
-                formattedMessage = Html.fromHtml(htmlMessageString);
-            }
-            new AlertDialog.Builder(activity)
-                    .setTitle("System Files Update Required")
-                    .setMessage(formattedMessage)
-                    .setCancelable(false)
-                    .setPositiveButton("Continue", (dialog, which) -> {
-                        installFromAssets(activity, onCompletion);
-                    })
-                    .show();
-        }
-        // Already Up-to-Date.
-        else if (onCompletion != null) {
-            onCompletion.run();
-        }
     }
 
     private static void clearOptDir(File optDir) {
@@ -206,25 +129,4 @@ public abstract class ImageFsInstaller {
         }
         else rootDir.mkdirs();
     }
-
-    private static void installGuestLibs(Context ctx) {
-        final String ASSET_TAR = "evshim.tzst";          // ➊  add this to assets/
-        File imagefs = new File(ctx.getFilesDir(), "imagefs");
-        // ➋  Unpack straight into imagefs, preserving relative paths.
-        try (InputStream in  = ctx.getAssets().open(ASSET_TAR)) {
-            TarCompressorUtils.extract(
-                    TarCompressorUtils.Type.ZSTD,      // you said .tzst
-                    in, imagefs);                      // helper already exists in the project
-        } catch (IOException e) {
-            Log.e("ImageFsInstaller", "evshim deploy failed", e);
-            return;
-        }
-
-        // ➌  Make sure the new libs are world-readable / executable
-        chmod(new File(imagefs, "lib/libevshim.so"));
-        chmod(new File(imagefs, "lib/libSDL2.so"));
-        chmod(new File(imagefs, "lib/libSDL2-2.0.so"));
-        chmod(new File(imagefs, "lib/libSDL2-2.0.so.0"));
-    }
-    private static void chmod(File f) { if (f.exists()) FileUtils.chmod(f, 0755);}
 }

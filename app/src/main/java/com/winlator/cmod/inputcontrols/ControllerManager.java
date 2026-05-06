@@ -60,6 +60,7 @@ public class ControllerManager {
      * @param context The application context.
      */
     public void init(Context context) {
+        if (context == null) return;
         this.context = context.getApplicationContext();
         this.preferences = PreferenceManager.getDefaultSharedPreferences(this.context);
         this.inputManager = (InputManager) this.context.getSystemService(Context.INPUT_SERVICE);
@@ -77,6 +78,13 @@ public class ControllerManager {
      */
     public void scanForDevices() {
         detectedDevices.clear();
+        if (inputManager == null && context != null) {
+            inputManager = (InputManager) context.getSystemService(Context.INPUT_SERVICE);
+        }
+        if (inputManager == null) {
+            Log.w("ControllerManager", "InputManager is null; skipping controller scan.");
+            return;
+        }
         int[] deviceIds = inputManager.getInputDeviceIds();
         for (int deviceId : deviceIds) {
             InputDevice device = inputManager.getInputDevice(deviceId);
@@ -92,6 +100,7 @@ public class ControllerManager {
      * Loads the saved player slot assignments and enabled states from SharedPreferences.
      */
     private void loadAssignments() {
+        if (preferences == null) return;
         slotAssignments.clear();
         for (int i = 0; i < 4; i++) {
             // Load which device is assigned to this slot
@@ -114,6 +123,7 @@ public class ControllerManager {
      * Saves the current player slot assignments and enabled states to SharedPreferences.
      */
     public void saveAssignments() {
+        if (preferences == null) return;
         SharedPreferences.Editor editor = preferences.edit();
         for (int i = 0; i < 4; i++) {
             // Save the assigned device identifier
@@ -301,6 +311,7 @@ public class ControllerManager {
      * @return The player slot index (0-3), or -1 if the device is not assigned.
      */
     public int getSlotForDevice(int deviceId) {
+        if (inputManager == null) return -1;
         InputDevice device = inputManager.getInputDevice(deviceId);
         String deviceIdentifier = getDeviceIdentifier(device);
         if (deviceIdentifier == null) return -1;
@@ -370,6 +381,7 @@ public class ControllerManager {
     }
 
     public int getSlotForDeviceOrSibling(int deviceId) {
+        if (inputManager == null) return -1;
         InputDevice d = inputManager.getInputDevice(deviceId);
         if (d == null) return -1;
 

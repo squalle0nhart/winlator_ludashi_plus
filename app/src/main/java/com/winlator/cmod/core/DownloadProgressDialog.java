@@ -77,9 +77,8 @@ public class DownloadProgressDialog {
         catch (Exception e) {}
     }
 
-    public boolean closeOnUiThread() {
+    public void closeOnUiThread() {
         activity.runOnUiThread(this::close);
-        return true;
     }
 
     public boolean isShowing() {

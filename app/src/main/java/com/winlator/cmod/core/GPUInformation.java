@@ -1,25 +1,25 @@
 package com.winlator.cmod.core;
 
-import java.util.Locale;
+import android.content.Context;
 
 public abstract class GPUInformation {
 
-    public static boolean isAdreno6xx() {
-        return getRenderer().toLowerCase(Locale.ENGLISH).matches(".*adreno[^6]+6[0-9]{2}.*");
+    public static boolean isAdrenoGPU(Context context) {
+        return getRenderer(null, context).toLowerCase().contains("adreno");
     }
 
-    public static boolean isAdreno7xx() {
-        return getRenderer().toLowerCase(Locale.ENGLISH).matches(".*adreno[^7]+7[0-9]{2}.*");
-    }
+    public static boolean isDriverSupported(String driverName, Context context) {
+        if (!isAdrenoGPU(context) && !driverName.equals("System"))
+            return false;
 
-    public static boolean isAdreno8xx() {
-        return getRenderer().toLowerCase(Locale.ENGLISH).matches(".*adreno[^8]+8[0-9]{2}.*");
-    }
+        String renderer = getRenderer(driverName, context);
 
-    public native static String getVersion();
-    public native static String getRenderer();
-    public native static long getMemorySize();
-    public native static String[] enumerateExtensions();
+        return !renderer.toLowerCase().contains("unknown");
+    }
+    public native static String getVulkanVersion(String driverName, Context context);
+    public native static int getVendorID(String driverName, Context context);
+    public native static String getRenderer(String driverName, Context context);
+    public native static String[] enumerateExtensions(String driverName, Context context);
 
     static {
         System.loadLibrary("winlator");

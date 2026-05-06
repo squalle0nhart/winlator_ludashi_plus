@@ -64,7 +64,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:text="@string/no_items_to_display_taskmgr"
+                    android:text="@string/no_items_to_display"
                     android:visibility="gone" />
             </FrameLayout>
         </LinearLayout>

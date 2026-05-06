@@ -11,17 +11,8 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
 public class SysVSharedMemory {
-    private static SysVSharedMemory instance;
-    public static SysVSharedMemory getInstance() { return instance; }
-
     private final SparseArray<SHMemory> shmemories = new SparseArray<>();
     private int maxSHMemoryId = 0;
-
-    public SysVSharedMemory() {
-        instance = this;
-    }
-
-
 
     static {
         System.loadLibrary("winlator");
@@ -123,40 +114,4 @@ public class SysVSharedMemory {
     public static native ByteBuffer mapSHMSegment(int fd, long size, int offset, boolean readonly);
 
     public static native void unmapSHMSegment(ByteBuffer data, long size);
-
-    public void remove(int shmid) {
-        synchronized (shmemories) {
-            SHMemory shmemory = shmemories.get(shmid);
-            if (shmemory != null) {
-                if (shmemory.fd != -1) {
-                    XConnectorEpoll.closeFd(shmemory.fd);
-                    shmemory.fd = -1;
-                }
-                shmemories.remove(shmid);
-//                Log.i("SysVSHM", "Removed and closed FD for SHMID "+shmid);
-            }
-        }
-    }
-
-    public int get(int shmid, long size) {
-        synchronized (shmemories) {
-            if (shmemories.get(shmid) != null) {
-//                Log.e("SysVSHM", "Attempted to get a new segment with an existing ID: "+shmid);
-                return -1;
-            }
-
-            int fd = ashmemCreateRegion(shmid, size);
-            if (fd < 0) fd = createSharedMemory("sysvshm-"+shmid, (int)size);
-            if (fd < 0) return -1;
-
-            SHMemory shmemory = new SHMemory();
-            shmemory.fd = fd;
-            shmemory.size = size;
-            shmemories.put(shmid, shmemory);
-            if (shmid > maxSHMemoryId) maxSHMemoryId = shmid;
-            return shmid;
-        }
-    }
-
-
 }

@@ -5,6 +5,8 @@ import android.net.Uri;
 
 import android.content.Context;
 import android.util.Log;
+
+import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.container.ContainerManager;
@@ -34,7 +36,7 @@ public class AdrenotoolsManager {
     
     public AdrenotoolsManager(Context context) {
         this.mContext = context;
-        this.adrenotoolsContentDir = new File(mContext.getFilesDir(), "imagefs/contents/adrenotools");
+        this.adrenotoolsContentDir = new File(mContext.getFilesDir(), "contents/adrenotools");
         if (!adrenotoolsContentDir.exists())
             adrenotoolsContentDir.mkdirs();
     }
@@ -78,6 +80,10 @@ public class AdrenotoolsManager {
         return driverVersion;
     }
 
+    public String getDriverPath(String adrenotoolsDriverId) {
+        return adrenotoolsContentDir.getAbsolutePath() + "/" + adrenotoolsDriverId + "/";
+    }
+
     private void reloadContainers(String adrenoToolsDriverId) {
         ContainerManager containerManager = new ContainerManager(mContext);
         for (Container container : containerManager.getContainers()) {
@@ -85,7 +91,7 @@ public class AdrenotoolsManager {
             Log.d("AdrenotoolsManager", "Checking if container driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
                 Log.d("AdrenotoolsManager", "Found a match for container " + container.getName());
-                config.put("version", DefaultVersion.WRAPPER);
+                config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                 container.setGraphicsDriverConfig(GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 container.saveData();
             }     
@@ -95,7 +101,7 @@ public class AdrenotoolsManager {
             Log.d("AdrenotoolsManager", "Checking if shortcut driver version " + config.get("version") + " matches " + getDriverName(adrenoToolsDriverId));
             if (config.get("version").contains(getDriverName(adrenoToolsDriverId))) {
                 Log.d("AdrenotoolsManager", "Found a match for shortcut " + shortcut.name);
-                config.put("version", DefaultVersion.WRAPPER);
+                config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, mContext) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
                 shortcut.putExtra("graphicsDriverConfig", GraphicsDriverConfigDialog.toGraphicsDriverConfig(config));
                 shortcut.saveData();
             }
@@ -113,14 +119,15 @@ public class AdrenotoolsManager {
         ArrayList<String> driversList = new ArrayList<>();
         
         for (File f : adrenotoolsContentDir.listFiles()) {
-            boolean fromResources = isFromResources("graphics_driver/adrenotools-" + f.getName() + ".tzst");
+            boolean fromResources = isFromResources(f.getName());
             if (!fromResources && new File(f, "meta.json").exists())
                 driversList.add(f.getName());
         }
         return driversList;
     }
     
-    private boolean isFromResources(String driver) {
+    public boolean isFromResources(String adrenotoolsDriverId) {
+        String driver = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
         AssetManager am = mContext.getResources().getAssets();
         InputStream is = null;
         boolean isFromResources = true;
@@ -136,7 +143,7 @@ public class AdrenotoolsManager {
         return isFromResources;
     }
         
-    private boolean extractDriverFromResources(String adrenotoolsDriverId) {
+    public boolean extractDriverFromResources(String adrenotoolsDriverId) {
         String src = "graphics_driver/adrenotools-" + adrenotoolsDriverId + ".tzst";
         boolean hasExtracted;
 
@@ -196,19 +203,20 @@ public class AdrenotoolsManager {
     }
     
     public void setDriverById(EnvVars envVars, ImageFs imagefs, String adrenotoolsDriverId) {
-        if (extractDriverFromResources(adrenotoolsDriverId) || enumarateInstalledDrivers().contains(adrenotoolsDriverId)) {
-            String driverPath = adrenotoolsContentDir.getAbsolutePath() + "/" + adrenotoolsDriverId + "/";
+        boolean isFromResources = isFromResources(adrenotoolsDriverId);
+
+        if (isFromResources || enumarateInstalledDrivers().contains(adrenotoolsDriverId)) {
+            String driverPath = getDriverPath(adrenotoolsDriverId);
+
             if (!getLibraryName(adrenotoolsDriverId).equals("")) {
                 envVars.put("ADRENOTOOLS_DRIVER_PATH", driverPath);
                 envVars.put("ADRENOTOOLS_HOOKS_PATH", imagefs.getLibDir());
                 envVars.put("ADRENOTOOLS_DRIVER_NAME", getLibraryName(adrenotoolsDriverId));
-                if (adrenotoolsDriverId.contains("v762") && GPUInformation.getVersion().contains("512.530")) {
-                    Log.d("AdrenotoolsManager", "Patching v762 driver for stock v530");
-                    FileUtils.writeToBinaryFile(driverPath + "notadreno_utils.so", 0x2680, 3);
-                } else if (adrenotoolsDriverId.contains("v762") && GPUInformation.getVersion().contains("512.502")) {
-                    Log.d("AdrenotoolsManager", "Patching v762 driver for stock v502");
-                    FileUtils.writeToBinaryFile(driverPath + "notadreno_utils.so", 0x2680, 2);
-                }
+
+                File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
+                File qglConfig = new File(winlatorDir, "qgl_config.txt");
+                if (qglConfig.exists())
+                    envVars.put("ADRENOTOOLS_REDIRECT_DIR", winlatorDir.getAbsolutePath() + "/");
             }
         }
     }

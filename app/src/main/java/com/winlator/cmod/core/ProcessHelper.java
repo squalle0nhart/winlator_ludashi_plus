@@ -26,22 +26,22 @@ public abstract class ProcessHelper {
 
     public static void suspendProcess(int pid) {
         Process.sendSignal(pid, SIGSTOP);
-//        Log.d("ProcessHelper", "Process suspended with pid: " + pid);
+        Log.d("ProcessHelper", "Process suspended with pid: " + pid);
     }
 
     public static void resumeProcess(int pid) {
         Process.sendSignal(pid, SIGCONT);
-//        Log.d("ProcessHelper", "Process resumed with pid: " + pid);
+        Log.d("ProcessHelper", "Process resumed with pid: " + pid);
     }
 
     public static void terminateProcess(int pid) {
         Process.sendSignal(pid, SIGTERM);
-//        Log.d("ProcessHelper", "Process terminated with pid: " + pid);
+        Log.d("ProcessHelper", "Process terminated with pid: " + pid);
     }
 
     public static void killProcess(int pid) {
         Process.sendSignal(pid, SIGKILL);
-//        Log.d("ProcessHelper", "Process killed with pid: " + pid);
+        Log.d("ProcessHelper", "Process killed with pid: " + pid);
     }
 
     public static void terminateAllWineProcesses() {
@@ -94,7 +94,6 @@ public abstract class ProcessHelper {
                 pb.redirectError(null_file);
                 pb.redirectOutput(null_file);
             }
-            //java.lang.Process process = Runtime.getRuntime().exec(splitCommand, envp, workingDir);
             java.lang.Process process = pb.start();
 
             // Accessing hidden field
@@ -109,6 +108,8 @@ public abstract class ProcessHelper {
                 createDebugThread(process.getInputStream());
                 createDebugThread(process.getErrorStream());
             }
+
+            if (terminationCallback != null) createWaitForThread(process, terminationCallback);
 
         }
         catch (Exception e) {
@@ -132,6 +133,21 @@ public abstract class ProcessHelper {
             }
             catch (IOException e) {
                 Log.e("ProcessHelper", "Error in debug thread", e);
+            }
+        });
+    }
+
+    private static void createWaitForThread(java.lang.Process process, final Callback<Integer> terminationCallback) {
+        Executors.newSingleThreadExecutor().execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int status = process.waitFor();
+                    terminationCallback.call(status);
+                }
+                catch (InterruptedException e) {
+                    Log.e("ProcessHelper", "Error waiting for process termination", e);
+                }
             }
         });
     }

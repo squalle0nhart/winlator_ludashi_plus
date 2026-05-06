@@ -44,7 +44,7 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
         });
         llBottomBarPanel.addView(toolbarView);
         try {
-            writer = new BufferedWriter(new FileWriter(logView.getLogFile()));
+            writer = new BufferedWriter(new FileWriter(logView.getLogFile(context)));
         }
         catch (IOException e) {
             throw new RuntimeException(e);

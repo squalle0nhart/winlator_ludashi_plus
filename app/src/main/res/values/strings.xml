@@ -34,11 +34,13 @@
     <string name="keyboard">Keyboard</string>
     <string name="toggle_fullscreen">Toggle Fullscreen</string>
     <string name="exit">Exit</string>
+    <string name="shutdown">Shutting down…</string>
     <string name="no_control_element_selected">No control element selected</string>
     <string name="scale">Scale</string>
     <string name="shape">Shape</string>
     <string name="type">Type</string>
     <string name="binding">Binding</string>
+    <string name="binding_secondary">Secondary binding</string>
     <string name="binding_up">Binding Up</string>
     <string name="binding_right">Binding Right</string>
     <string name="binding_down">Binding Down</string>
@@ -347,6 +349,14 @@
     <string name="graphics_driver_configuration">Graphics Driver Configuration</string>
     <string name="select_graphics_driver_version">Select Graphics Driver Version:</string>
     <string name="graphics_driver_version">Graphics Driver Version</string>
+    <string name="graphics_driver_vulkan_version">Vulkan Version</string>
+    <string name="graphics_driver_present_modes">Present Modes</string>
+    <string name="graphics_driver_resource_type">Resource Type</string>
+    <string name="graphics_driver_bcn_emulation">BCN Emulation</string>
+    <string name="graphics_driver_bcn_emulation_type">BCN Emulation Type</string>
+    <string name="graphics_driver_bcn_emulation_cache">BCN Emulation Cache</string>
+    <string name="graphics_driver_sync_frame">Sync Frame</string>
+    <string name="graphics_driver_disable_present_wait">Disable Present Wait</string>
     <string name="graphics_driver_available_extensions">Available Extensions</string>
     <string name="add_to_homescreen">Add to Homescreen</string>
     <string name="add_save">Add Save</string>
@@ -625,9 +635,15 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="share_android_clipboard">Share Android Clipboard with Wine</string>
     <string name="ddraw_wrapper">DDraw/Glide Wrapper</string>
     <string name="fexcore_version">FEXCore Version</string>
+    <string name="fexcore_preset">FEXCore Preset</string>
+    <string name="box64">Box64</string>
+    <string name="dxvk_version">DXVK Version</string>
+    <string name="vkd3d_version">VKD3D Version</string>
+    <string name="enable_box64_logs">Enable Box64 Logs</string>
     <string name="graphics_driver_max_device_memory">Max Device Memory</string>
 
     <string name="controller_assignment">Controller Assignment</string>
+    <string name="no_controllers_detected">No controllers detected.</string>
     <string name="player_1">Player 1</string>
     <string name="player_2">Player 2</string>
     <string name="player_3">Player 3</string>

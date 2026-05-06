@@ -328,6 +328,10 @@ public abstract class AppUtils {
         }
     }
 
+    public static String getNativeLibDir(Context context) {
+        return context.getApplicationInfo().nativeLibraryDir;
+    }
+
     public static void runDelayed(Runnable callback, long delay) {
         if (callback == null) {
             return;

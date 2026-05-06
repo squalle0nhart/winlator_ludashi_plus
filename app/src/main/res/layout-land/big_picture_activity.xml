@@ -228,21 +228,6 @@
                         android:paddingLeft="16dp"
                         android:textColor="@android:color/white" />
 
-                    <!-- Box86 Preset -->
-                    <TextView
-                        android:id="@+id/TVBox86PresetLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Box86 Preset:"
-                        android:textStyle="bold"
-                        android:textColor="@android:color/white" />
-                    <TextView
-                        android:id="@+id/TVBox86Preset"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingLeft="16dp"
-                        android:textColor="@android:color/white" />
-
                     <!-- Box64 Preset -->
                     <TextView
                         android:id="@+id/TVBox64PresetLabel"

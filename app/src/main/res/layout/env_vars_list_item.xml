@@ -25,27 +25,12 @@
             android:visibility="gone"
             android:spinnerMode="dialog"/>
 
-        <LinearLayout
-            android:id="@+id/LLMultiSelectArea"
+        <com.winlator.cmod.widget.MultiSelectionComboBox
+            style="@style/MultiSelectionComboBox"
+            android:id="@+id/MultiSelectionComboBox"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/edit_text"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/TVMultiSelectValue"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text=""
-                android:textColor="?android:attr/textColorPrimary" />
-        </LinearLayout>
+            android:visibility="gone"
+            android:spinnerMode="dialog"/>
 
         <ToggleButton
             android:id="@+id/ToggleButton"

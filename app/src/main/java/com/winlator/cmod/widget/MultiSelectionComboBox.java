@@ -20,6 +20,7 @@ import java.util.Collections;
 public class MultiSelectionComboBox extends AppCompatTextView {
     private String[] items;
     private final ArraySet<String> selectedItemSet = new ArraySet<>();
+    private String text = "";
 
     public MultiSelectionComboBox(@NonNull Context context) {
         this(context, null);
@@ -42,14 +43,50 @@ public class MultiSelectionComboBox extends AppCompatTextView {
         setText(getSelectedItemsAsString());
     }
 
+    public void setItems(String[] items, String text) {
+        this.items = items;
+        this.text = text;
+        if (!text.isEmpty())
+            setText(items.length + " " + text);
+        else
+            setText(getSelectedItemsAsString());
+    }
+
+
     public void setSelectedItems(String[] selectedItems) {
+        selectedItemSet.clear();
         Collections.addAll(selectedItemSet, selectedItems);
-        setText(getSelectedItemsAsString());
+        if (!text.isEmpty())
+            setText(selectedItemSet.size() + " " + text);
+        else
+            setText(getSelectedItemsAsString());
+    }
+
+    public void setSelectedItem(String item) {
+        if (selectedItemSet.contains(item)) selectedItemSet.add(item);
+        if (!text.isEmpty())
+            setText(selectedItemSet.size() + " " + text);
+        else
+            setText(getSelectedItemsAsString());
+    }
+
+    public void unsetSelectedItem(String item) {
+        if (selectedItemSet.contains(item)) selectedItemSet.remove(item);
+        if (!text.isEmpty())
+            setText(selectedItemSet.size() + " " + text);
+        else
+            setText(getSelectedItemsAsString());
     }
 
     public String getSelectedItemsAsString() {
         String result = "";
         for (String item : items) if (selectedItemSet.contains(item)) result += (!result.isEmpty() ? "," : "")+item;
+        return result;
+    }
+
+    public String getUnSelectedItemsAsString() {
+        String result = "";
+        for (String item : items) if (!selectedItemSet.contains(item)) result += (!result.isEmpty() ? "," : "")+item;
         return result;
     }
 
@@ -62,7 +99,10 @@ public class MultiSelectionComboBox extends AppCompatTextView {
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
                 CheckedTextView checkedTextView = (CheckedTextView)super.getView(position, convertView, parent);
                 checkedTextView.setChecked(selectedItemSet.contains(items[position]));
-                setText(getSelectedItemsAsString());
+                if (!text.isEmpty())
+                    setText(selectedItemSet.size() + " " + text);
+                else
+                    setText(getSelectedItemsAsString());
                 return checkedTextView;
             }
         };
@@ -78,6 +118,7 @@ public class MultiSelectionComboBox extends AppCompatTextView {
                 selectedItemSet.remove(item);
             }
             else selectedItemSet.add(item);
+
             adapter.notifyDataSetChanged();
         });
 

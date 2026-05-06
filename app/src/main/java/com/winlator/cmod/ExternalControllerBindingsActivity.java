@@ -74,6 +74,25 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         updateEmptyTextView();
     }
 
+//    private void updateControllerBinding(int keyCode, Binding binding) {
+//        if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
+//
+//        ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
+//        int position;
+//        if (controllerBinding == null) {
+//            controllerBinding = new ExternalControllerBinding();
+//            controllerBinding.setKeyCode(keyCode);
+//            controllerBinding.setBinding(binding);
+//
+//            controller.addControllerBinding(controllerBinding);
+//            profile.save();
+//            adapter.notifyDataSetChanged();
+//            updateEmptyTextView();
+//            position = controller.getPosition(controllerBinding);
+//        }
+//        else animateItemView(position = controller.getPosition(controllerBinding));
+//        recyclerView.scrollToPosition(position);
+//    }
 
     private void updateControllerBinding(int keyCode, Binding binding) {
         if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
@@ -96,6 +115,34 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         recyclerView.scrollToPosition(position);
     }
 
+
+//    private void processJoystickInput() {
+//        int keyCode = KeyEvent.KEYCODE_UNKNOWN;
+//        Binding binding = Binding.NONE;
+//        final int[] axes = {MotionEvent.AXIS_X, MotionEvent.AXIS_Y, MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ, MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y};
+//        final float[] values = {controller.state.thumbLX, controller.state.thumbLY, controller.state.thumbRX, controller.state.thumbRY, controller.state.getDPadX(), controller.state.getDPadY()};
+//
+//        byte sign;
+//        for (int i = 0; i < axes.length; i++) {
+//            if ((sign = Mathf.sign(values[i])) != 0) {
+//                if (axes[i] == MotionEvent.AXIS_X || axes[i] == MotionEvent.AXIS_Z) {
+//                    binding = sign > 0 ? Binding.MOUSE_MOVE_RIGHT : Binding.MOUSE_MOVE_LEFT;
+//                }
+//                else if (axes[i] == MotionEvent.AXIS_Y || axes[i] == MotionEvent.AXIS_RZ) {
+//                    binding = sign > 0 ? Binding.MOUSE_MOVE_DOWN : Binding.MOUSE_MOVE_UP;
+//                }
+//                else if (axes[i] == MotionEvent.AXIS_HAT_X) {
+//                    binding = sign > 0 ? Binding.KEY_D : Binding.KEY_A;
+//                }
+//                else if (axes[i] == MotionEvent.AXIS_HAT_Y) {
+//                    binding = sign > 0 ? Binding.KEY_S : Binding.KEY_W;
+//                }
+//
+//                keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
+//                updateControllerBinding(keyCode, binding);
+//            }
+//        }
+//    }
 
     private void processJoystickInput() {
         final int[] axes = {

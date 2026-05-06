@@ -53,10 +53,6 @@ public class EnvVars implements Iterable<String> {
         return data.isEmpty();
     }
 
-    public String print() {
-        return String.join(", ", toStringArray());
-    }
-
     @NonNull
     @Override
     public String toString() {
