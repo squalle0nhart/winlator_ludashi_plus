@@ -5,11 +5,12 @@ layout(push_constant) uniform PC {
     float ndcY0;
     float ndcX1;
     float ndcY1;
-    int swapRB;
+    int   useTexAlpha;
 } pc;
 layout(location = 0) in vec2 fragTexCoord;
 layout(location = 0) out vec4 outColor;
 void main() {
     vec4 c = texture(texSampler, fragTexCoord);
-    outColor = (pc.swapRB != 0) ? c.bgra : c;
+
+    outColor = vec4(c.rgb, pc.useTexAlpha != 0 ? c.a : 1.0);
 }
