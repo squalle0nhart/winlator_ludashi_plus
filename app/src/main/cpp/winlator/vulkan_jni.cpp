@@ -129,21 +129,19 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetRenderList(
 {
     auto* r=reinterpret_cast<VulkanRendererContext*>(handle);
     if (!r||count<=0) return;
-    jlong* ids=env->GetLongArrayElements(jids,nullptr);
-    jint*  xs =env->GetIntArrayElements(jxs,nullptr);
-    jint*  ys =env->GetIntArrayElements(jys,nullptr);
+
+    jlong* ids=(jlong*)env->GetPrimitiveArrayCritical(jids,nullptr);
+    jint*  xs =(jint*) env->GetPrimitiveArrayCritical(jxs, nullptr);
+    jint*  ys =(jint*) env->GetPrimitiveArrayCritical(jys, nullptr);
     r->setRenderList(reinterpret_cast<const int64_t*>(ids),xs,ys,count);
-    env->ReleaseLongArrayElements(jids,ids,JNI_ABORT);
-    env->ReleaseIntArrayElements(jxs,xs,JNI_ABORT);
-    env->ReleaseIntArrayElements(jys,ys,JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jys, ys,  JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jxs, xs,  JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(jids,ids, JNI_ABORT);
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeRemoveWindow(JNIEnv*, jobject, jlong handle, jlong id) {
     auto* r=reinterpret_cast<VulkanRendererContext*>(handle); if (r) r->removeWindow(id);
 }
-
-
-
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeInitScanout(JNIEnv*, jobject, jlong handle) {
@@ -159,10 +157,10 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeDestroyScanout(JNIEnv*, job
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeScanoutSetBuffer(
-    JNIEnv*, jobject, jlong handle, jlong ahbPtr, jint x, jint y, jint w, jint h)
+    JNIEnv*, jobject, jlong handle, jlong ahbPtr, jint x, jint y, jint w, jint h, jint fenceFd)
 {
     auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
-    if (r && ahbPtr) r->scanoutSetBuffer(reinterpret_cast<AHardwareBuffer*>(ahbPtr), x, y, w, h);
+    if (r && ahbPtr) r->scanoutSetBuffer(reinterpret_cast<AHardwareBuffer*>(ahbPtr), x, y, w, h, (int)fenceFd);
 }
 
 extern "C" JNIEXPORT void JNICALL

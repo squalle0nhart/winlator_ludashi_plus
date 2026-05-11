@@ -93,7 +93,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeDetachSurface(long handle);
     private native boolean nativeReattachSurface(long handle, android.view.Surface surface);
     private native void nativeDestroyScanout(long handle);
-    private native void nativeScanoutSetBuffer(long handle, long ahbPtr, int x, int y, int w, int h);
+    private native void nativeScanoutSetBuffer(long handle, long ahbPtr, int x, int y, int w, int h, int fenceFd);
     private native void nativeScanoutSetCursorImage(long handle, java.nio.ByteBuffer pixels, short w, short h, short stride);
     private native void nativeScanoutSetCursorPos(long handle, short x, short y, short hotX, short hotY);
     private native boolean nativeIsScanoutActive(long handle);
@@ -124,7 +124,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         initExecutor.execute(() -> {
             synchronized (lock) {
                 if (nativeHandle != 0) {
-                    
+
                     boolean ok = nativeReattachSurface(nativeHandle, surface);
                     if (!ok) {
                         nativeDestroy(nativeHandle);
@@ -137,7 +137,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 }
                 nativeHandle = nativeInit(surface, xServer.screenInfo.width, xServer.screenInfo.height, driverPath, driverLibraryName, nativeLibDir);
                 if (nativeHandle != 0) {
-                  
+
                     nativeSetPresentMode(nativeHandle, pendingPresentMode);
                     nativeSetFilterMode(nativeHandle, pendingFilterMode);
                     nativeSetSwapRB(nativeHandle, pendingSwapRB);
@@ -211,12 +211,12 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         synchronized (lock) {
             if (nativeHandle != 0) {
                 if (nativeMode) {
-                    
+
                     nativeDestroyScanout(nativeHandle);
                     nativeDestroy(nativeHandle);
                     nativeHandle = 0;
                 } else {
-                  
+
                     nativeDetachSurface(nativeHandle);
                 }
             }
@@ -336,7 +336,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             int n = ns.size();
             long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
             for (int i = 0; i < n; i++) {
-                ids[i] = did(ns.get(i).content); xs[i] = ns.get(i).rootX; ys[i] = ns.get(i).rootY;
+                ids[i] = did(ns.get(i).content);
+                xs[i] = ns.get(i).rootX; ys[i] = ns.get(i).rootY;
             }
             nativeSetRenderList(nativeHandle, ids, xs, ys, n);
             return;
@@ -347,7 +348,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
             for (int i = 0; i < n; i++) {
                 RenderableWindow rw = list.get(start + i);
-                ids[i] = did(rw.content); xs[i] = rw.rootX; ys[i] = rw.rootY;
+                ids[i] = did(rw.content);
+                xs[i] = rw.rootX; ys[i] = rw.rootY;
             }
             nativeSetRenderList(nativeHandle, ids, xs, ys, n);
             return;
@@ -357,7 +359,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
         for (int i = 0; i < n; i++) {
             RenderableWindow rw = list.get(start + i);
-            ids[i] = did(rw.content); xs[i] = rw.rootX; ys[i] = rw.rootY;
+            ids[i] = did(rw.content);
+            xs[i] = rw.rootX; ys[i] = rw.rootY;
         }
         nativeSetRenderList(nativeHandle, ids, xs, ys, n);
     }
@@ -397,14 +400,15 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                     long ahbPtr = g.getHardwareBufferPtr();
                     if (ahbPtr != 0) {
                         if (nativeMode && pixmap.isDirectScanout() && nativeIsScanoutActive(nativeHandle)) {
-                            
-                            
-                            g.unlock();
+
+                            int fence = g.unlock();
                             nativeScanoutSetBuffer(nativeHandle, ahbPtr,
-                                rx, ry, pixmap.width, pixmap.height);
+                                rx, ry, pixmap.width, pixmap.height, fence);
                             g.lock();
                         } else {
-                            nativeUpdateWindowContentAHB(nativeHandle, did(window.getContent()), ahbPtr,
+
+                            long contentId = did(window.getContent());
+                            nativeUpdateWindowContentAHB(nativeHandle, contentId, ahbPtr,
                                 pixmap.width, pixmap.height, rx, ry);
                         }
                         return;
@@ -446,15 +450,13 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         boolean scanoutNow = nativeMode && nativeIsScanoutActive(nativeHandle);
                         if (nativeMode && drawable.isDirectScanout() && scanoutNow) {
                             boolean wasDelivered = nativeIsGameFrameDelivered(nativeHandle);
-                          
-                            
-                            g.unlock();
+
+                            int fence = g.unlock();
                             nativeScanoutSetBuffer(nativeHandle, ahbPtr,
-                                rx, ry, drawable.width, drawable.height);
+                                rx, ry, drawable.width, drawable.height, fence);
                             g.lock();
                             boolean delivered = nativeIsGameFrameDelivered(nativeHandle);
-                            
-                            
+
                             if (!xRenderingPausedForScanout && !wasDelivered && delivered) {
                                 xServer.setRenderingEnabled(false);
                                 xRenderingPausedForScanout = true;
@@ -507,7 +509,9 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public void onDestroyWindow(Window window) {
         final long id = did(window.getContent());
         xServerView.queueEvent(() -> {
-            synchronized (lock) { if (nativeHandle != 0) nativeRemoveWindow(nativeHandle, id); }
+            synchronized (lock) {
+                if (nativeHandle != 0) nativeRemoveWindow(nativeHandle, id);
+            }
             updateScene();
         });
     }
@@ -518,7 +522,9 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public void onUnmapWindow(Window window) {
         final long id = did(window.getContent());
         xServerView.queueEvent(() -> {
-            synchronized (lock) { if (nativeHandle != 0) nativeRemoveWindow(nativeHandle, id); }
+            synchronized (lock) {
+                if (nativeHandle != 0) nativeRemoveWindow(nativeHandle, id);
+            }
             updateScene();
         });
     }
@@ -571,7 +577,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                             .setLayer(scanoutCursorSC, 2)
                             .setVisibility(scanoutGameSC,   true)
                             .setVisibility(scanoutCursorSC, true);
-                        
+
                         if (android.os.Build.VERSION.SDK_INT >= 30) {
                             float targetFps = fpsLimit > 0 ? (float)fpsLimit
                                 : xServerView.getDisplay() != null
@@ -602,7 +608,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             synchronized (lock) {
                 if (nativeHandle != 0) nativeDestroyScanout(nativeHandle);
             }
-            
+
             xServerView.post(() -> {
                 xServer.setRenderingEnabled(true);
                 releaseScanoutSurfaces();
@@ -632,8 +638,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         synchronized (lock) { if (nativeHandle != 0) nativeDumpRendererInfo(nativeHandle); }
     }
 
-
-
     public void setFilterMode(int mode) {
         pendingFilterMode = mode;
         synchronized (lock) { if (nativeHandle != 0) nativeSetFilterMode(nativeHandle, mode); }
@@ -642,9 +646,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public void setSwapRB(boolean enabled) {
         pendingSwapRB = enabled;
         synchronized (lock) { if (nativeHandle != 0) nativeSetSwapRB(nativeHandle, enabled); }
-        
-    }
 
+    }
 
     public void setVkPresentMode(int mode) {
         pendingPresentMode = mode;
