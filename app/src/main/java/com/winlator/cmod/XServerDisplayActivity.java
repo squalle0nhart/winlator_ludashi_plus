@@ -905,6 +905,10 @@ public class XServerDisplayActivity extends AppCompatActivity
                 }
                 drawerLayout.closeDrawers();
                 break;
+            case R.id.main_menu_vibration:
+                showVibrationDialog();
+                drawerLayout.closeDrawers();
+                break;
             case R.id.main_menu_logs:
                 debugDialog.show();
                 drawerLayout.closeDrawers();
