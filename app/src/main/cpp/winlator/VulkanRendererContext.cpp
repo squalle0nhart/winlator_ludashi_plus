@@ -30,7 +30,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     vk_.DeviceWaitIdle(device);
     for (auto& [id, wt] : texMap) destroyWinTex(wt);
     texMap.clear();
-
+    
     for (auto& wt : deleteQueue) {
         if (wt.ds   != VK_NULL_HANDLE) vk_.FreeDescriptorSets(device, winTexPool, 1, &wt.ds);
         if (wt.view != VK_NULL_HANDLE) vk_.DestroyImageView(device, wt.view, nullptr);
@@ -40,7 +40,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     }
     deleteQueue.clear();
     cleanupSwapchain(); cleanupCursorTex();
-
+    
     vk_.DestroySampler(device, sampler, nullptr);
     vk_.DestroyDescriptorPool(device, winTexPool, nullptr);
     vk_.DestroyPipeline(device, pipeline, nullptr);
@@ -326,6 +326,7 @@ void VulkanRendererContext::createDSLayout() {
     ci.bindingCount=1; ci.pBindings=&b;
     if (vk_.CreateDescriptorSetLayout(device,&ci,nullptr,&dsLayout)!=VK_SUCCESS) throw std::runtime_error("dslayout");
 }
+ 
 
 VkShaderModule VulkanRendererContext::makeShader(const uint32_t* code, size_t sz) {
     VkShaderModuleCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -364,6 +365,7 @@ void VulkanRendererContext::createPipeline(bool blend, VkPipeline& out) {
     if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&out)!=VK_SUCCESS) throw std::runtime_error("pipeline");
     vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
 }
+
 
 void VulkanRendererContext::createCursorPipeline() {  }
 void VulkanRendererContext::createFramebuffers() {
@@ -407,6 +409,7 @@ void VulkanRendererContext::createWinTexPool() {
     ci.poolSizeCount=1; ci.pPoolSizes=&ps; ci.maxSets=129;
     if (vk_.CreateDescriptorPool(device,&ci,nullptr,&winTexPool)!=VK_SUCCESS) throw std::runtime_error("wintexpool");
 }
+
 
 void VulkanRendererContext::createCursorDS() {
     VkDescriptorSetAllocateInfo ai{}; ai.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -511,7 +514,6 @@ bool VulkanRendererContext::createWinTexResources(WinTex& wt, int w, int h) {
 }
 
 bool VulkanRendererContext::importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb) {
-
     if (!vk_.GetAndroidHardwareBufferPropertiesANDROID)
         return false;
 
@@ -526,33 +528,24 @@ bool VulkanRendererContext::importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb) 
     AHardwareBuffer_Desc desc{};
     AHardwareBuffer_describe(ahb,&desc);
 
-    bool extFmt = (fmtP.format == VK_FORMAT_UNDEFINED);
-
     VkExternalFormatANDROID ef{};
     ef.sType=VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID;
-
-    ef.externalFormat=extFmt ? fmtP.externalFormat : 0;
+    ef.externalFormat=swapRB ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 
     VkExternalMemoryImageCreateInfo emi{};
     emi.sType=VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
     emi.handleTypes=VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
-
-    if (extFmt) { ef.pNext=const_cast<void*>(emi.pNext); emi.pNext=&ef; }
+    ef.pNext=const_cast<void*>(emi.pNext);
+    emi.pNext=&ef;
 
     VkImageCreateInfo ii{};
     ii.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     ii.pNext=&emi; ii.imageType=VK_IMAGE_TYPE_2D;
-
-    ii.format=extFmt ? VK_FORMAT_UNDEFINED : fmtP.format;
+    ii.format=swapRB ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
     ii.extent={desc.width,desc.height,1};
-    ii.mipLevels=1;
-    ii.arrayLayers=1;
-    ii.samples=VK_SAMPLE_COUNT_1_BIT;
-    ii.tiling=VK_IMAGE_TILING_OPTIMAL;
-    ii.usage=VK_IMAGE_USAGE_SAMPLED_BIT;
-    ii.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
-    ii.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
-
+    ii.mipLevels=1; ii.arrayLayers=1; ii.samples=VK_SAMPLE_COUNT_1_BIT;
+    ii.tiling=VK_IMAGE_TILING_OPTIMAL; ii.usage=VK_IMAGE_USAGE_SAMPLED_BIT;
+    ii.sharingMode=VK_SHARING_MODE_EXCLUSIVE; ii.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
     if (vk_.CreateImage(device,&ii,nullptr,&wt.img)!=VK_SUCCESS)
         return false;
 
@@ -562,35 +555,29 @@ bool VulkanRendererContext::importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb) 
 
     VkMemoryDedicatedAllocateInfo ded{};
     ded.sType=VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
-    ded.pNext=&imp;
-    ded.image=wt.img;
+    ded.pNext=&imp; ded.image=wt.img;
 
     VkMemoryAllocateInfo mai{};
     mai.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    mai.pNext=&ded;
-    mai.allocationSize=props.allocationSize;
+    mai.pNext=&ded; mai.allocationSize=props.allocationSize;
     mai.memoryTypeIndex=findMemType(props.memoryTypeBits,0);
     if (vk_.AllocateMemory(device,&mai,nullptr,&wt.mem)!=VK_SUCCESS){
         vk_.DestroyImage(device,wt.img,nullptr);
         wt.img=VK_NULL_HANDLE;
         return false;
     }
-
     vk_.BindImageMemory(device,wt.img,wt.mem,0);
 
     VkExternalFormatANDROID vef{};
     vef.sType=VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID;
-    vef.externalFormat=extFmt ? fmtP.externalFormat : 0;
+    vef.externalFormat=swapRB ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 
     VkImageViewCreateInfo vi{};
     vi.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-
-    vi.pNext=extFmt ? &vef : nullptr;
-    vi.image=wt.img;
-    vi.viewType=VK_IMAGE_VIEW_TYPE_2D;
-    vi.format=extFmt ? VK_FORMAT_UNDEFINED : fmtP.format;
-
-    vi.components={VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY};
+    vi.pNext=&vef; vi.image=wt.img; vi.viewType=VK_IMAGE_VIEW_TYPE_2D;
+    vi.format=swapRB ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
+    vi.components={VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY,
+                   VK_COMPONENT_SWIZZLE_IDENTITY,VK_COMPONENT_SWIZZLE_IDENTITY};
     vi.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
     if (vk_.CreateImageView(device,&vi,nullptr,&wt.view)!=VK_SUCCESS){
         destroyWinTex(wt);
@@ -599,43 +586,42 @@ bool VulkanRendererContext::importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb) 
 
     VkDescriptorSetAllocateInfo dsai{};
     dsai.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    dsai.descriptorPool=winTexPool;
-    dsai.descriptorSetCount=1;
-    dsai.pSetLayouts=&dsLayout;
-    if (vk_.AllocateDescriptorSets(device,&dsai,&wt.ds)!=VK_SUCCESS){
+    dsai.descriptorPool=winTexPool; dsai.descriptorSetCount=1; dsai.pSetLayouts=&dsLayout;
+    VkResult dsRes=vk_.AllocateDescriptorSets(device,&dsai,&wt.ds);
+    if (dsRes==VK_ERROR_OUT_OF_POOL_MEMORY){
+        RLOG_E("importAHBToWinTex: descriptor pool exhausted for AHB texture");
         destroyWinTex(wt);
         return false;
     }
+    if (dsRes!=VK_SUCCESS){ destroyWinTex(wt); return false; }
 
     VkDescriptorImageInfo dii{};
     dii.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    dii.imageView=wt.view;
-    dii.sampler=sampler;
+    dii.imageView=wt.view; dii.sampler=sampler;
 
     VkWriteDescriptorSet wr{};
     wr.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    wr.dstSet=wt.ds;
-    wr.dstBinding=0;
+    wr.dstSet=wt.ds; wr.dstBinding=0;
     wr.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    wr.descriptorCount=1;
-    wr.pImageInfo=&dii;
+    wr.descriptorCount=1; wr.pImageInfo=&dii;
     vk_.UpdateDescriptorSets(device,1,&wr,0,nullptr);
+
     wt.needsTransition=true;
     wt.isAHB=true;
     wt.w=(int)desc.width;
     wt.h=(int)desc.height;
-
     return true;
 }
 
 void VulkanRendererContext::destroyWinTex(WinTex& wt) {
     if (wt.isAHB) {
 
+
         wt = {};
         return;
     }
     if (wt.img!=VK_NULL_HANDLE || wt.stg!=VK_NULL_HANDLE) {
-
+        
         WinTex deferred = wt;
         deferred.isAHB = false;
         deleteQueue.push_back(deferred);
@@ -691,6 +677,12 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     VkCommandBufferBeginInfo bi{}; bi.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vk_.BeginCommandBuffer(cb,&bi)!=VK_SUCCESS) throw std::runtime_error("begin cb");
 
+
+
+
+
+
+
     ahbTransitions.clear(); preUpload.clear(); postUpload.clear();
 
     for (auto& d : draws) {
@@ -722,6 +714,7 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, (uint32_t)preUpload.size(), preUpload.data());
 
+
     for (auto& d : draws) {
         if (d.isAHB || d.upload==VK_NULL_HANDLE || d.img==VK_NULL_HANDLE) continue;
         VkBufferImageCopy r{}; r.bufferOffset=0; r.bufferRowLength=0; r.bufferImageHeight=0;
@@ -751,6 +744,7 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     if (!postUpload.empty())
         vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0, 0, nullptr, 0, nullptr, (uint32_t)postUpload.size(), postUpload.data());
+
 
     VkRenderPassBeginInfo rpi{}; rpi.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpi.renderPass=renderPass; rpi.framebuffer=swapchainFBs[imgIdx]; rpi.renderArea={{0,0},swapchainExt};
@@ -810,6 +804,7 @@ void VulkanRendererContext::renderLoop() {
 }
 
 void VulkanRendererContext::flushDeleteQueue() {
+
 
     std::lock_guard<std::mutex> lk(renderMutex);
     if (deleteQueue.empty()) return;
@@ -892,6 +887,7 @@ ok=true;}catch(...){}
     {
         std::lock_guard<std::mutex> lk(renderMutex);
 
+
         if (!deleteQueue.empty()) {
             for (auto& wt:deleteQueue) {
                 if (wt.ds  !=VK_NULL_HANDLE) vk_.FreeDescriptorSets(device,winTexPool,1,&wt.ds);
@@ -935,6 +931,7 @@ ok=true;}catch(...){}
             cursorUploadSize = csz;
         }
     }
+
 
     if (hasCurUpload && cursorStgP && !cursorPixels.empty())
         memcpy(cursorStgP, cursorPixels.data(), cursorUploadSize);
@@ -1078,6 +1075,10 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
     if (!ahb) return;
     std::lock_guard<std::mutex> lk(renderMutex);
 
+
+
+
+
     auto cit = ahbImportCache.find(ahb);
     if (cit == ahbImportCache.end()) {
         WinTex tmp{};
@@ -1092,6 +1093,7 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
         RLOG("updateWindowContentAHB: imported new AHB %p for id=%" PRId64 " (%dx%d)",
             (void*)ahb, id, tmp.w, tmp.h);
     }
+
 
     WinTex& src = cit->second;
     WinTex& wt  = texMap[id];
@@ -1121,12 +1123,15 @@ void VulkanRendererContext::setRenderList(const int64_t* ids, const int* xs, con
 void VulkanRendererContext::removeWindow(int64_t id) {
     std::lock_guard<std::mutex> lk(renderMutex);
 
+
+
     auto it = texMap.find(id);
     if (it != texMap.end()) {
         if (!it->second.isAHB) destroyWinTex(it->second);
         else it->second = {};
         texMap.erase(it);
     }
+
 
     auto wit = windowAhbs.find(id);
     if (wit != windowAhbs.end()) {
@@ -1159,6 +1164,7 @@ void VulkanRendererContext::cleanupAllAHBCache() {
     ahbImportCache.clear();
     windowAhbs.clear();
 }
+
 
 void VulkanRendererContext::dumpRendererInfo() {
     VkPhysicalDeviceProperties props{};
@@ -1203,7 +1209,7 @@ void VulkanRendererContext::setFilterMode(int mode) {
         wr.descriptorCount=1; wr.pImageInfo=&dii;
         vk_.UpdateDescriptorSets(device,1,&wr,0,nullptr);
     };
-
+    
     for (auto& [id,wt]:texMap) updateDS(wt.ds, wt.view);
 
     for (auto& [ahb,wt]:ahbImportCache) updateDS(wt.ds, wt.view);
@@ -1215,6 +1221,7 @@ void VulkanRendererContext::setSwapRB(bool enabled) {
     if (swapRB == enabled) return;
     swapRB = enabled;
     RLOG("setSwapRB: %d", (int)swapRB);
+
 
 }
 
