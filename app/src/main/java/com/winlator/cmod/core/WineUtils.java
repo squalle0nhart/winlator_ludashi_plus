@@ -209,41 +209,57 @@ public abstract class WineUtils {
         }
     }
 
-    public static void changeServicesStatus(Container container, String startupSelection) {
-        final String[] services = {"BITS:3", "Eventlog:2", "HTTP:3", "LanmanServer:3", "NDIS:2", "PlugPlay:2", "RpcSs:3", "scardsvr:3", "Schedule:3", "Spooler:3", "StiSvc:3", "TermService:3", "winebus:2", "winehid:2", "Winmgmt:3", "wuauserv:3"};
-        final String[] aggressiveServices = { "BITS:3", "Eventlog:2", "FontCache:3", "FontCache3.0.0.0:3", "HTTP:3", "LanmanServer:3", "MSIServer:3", "NDIS:2", "nsiproxy:3", "PlugPlay:2", "RpcSs:3", "scardsvr:3", "Schedule:3", "SharedGpuResources:2", "Spooler:3", "StiSvc:3", "TermService:3", "TrkWks:3", "W32Time:3", "winebus:2", "winehid:2", "Winmgmt:3", "wuauserv:3"};
-        File systemRegFile = new File(container.getRootDir(), ".wine/system.reg");
+public static void changeServicesStatus(Container container, String startupSelection) {
+    final String[] services = {
+        "BITS:3", "Eventlog:2", "HTTP:3", "LanmanServer:3", "NDIS:2",
+        "PlugPlay:4", "RpcSs:4", "scardsvr:3", "Schedule:3",
+        "Spooler:3", "StiSvc:3", "TermService:3",
+        "winebus:2", "winehid:2", "Winmgmt:3", "wuauserv:3"
+    };
 
-        byte selection = Container.STARTUP_SELECTION_NORMAL;
-        try {
-            selection = Byte.parseByte(startupSelection);
-        }
-        catch (NumberFormatException e) {}
+    final String[] aggressiveServices = {
+        "BITS:3", "Eventlog:2", "FontCache:3", "FontCache3.0.0.0:3",
+        "HTTP:3", "LanmanServer:3", "MountMgr:2", "MSIServer:3",
+        "NDIS:2", "nsiproxy:3", "PlugPlay:2", "RpcSs:3",
+        "scardsvr:3", "Schedule:3", "SharedGpuResources:2",
+        "Spooler:3", "StiSvc:3", "TermService:3",
+        "TrkWks:3", "W32Time:3", "Winmgmt:3", "wuauserv:3"
+    };
 
-        try (WineRegistryEditor registryEditor = new WineRegistryEditor(systemRegFile)) {
-            registryEditor.setCreateKeyIfNotExist(false);
-            List<String> servicesList = Arrays.asList(services);
+    File systemRegFile = new File(container.getRootDir(), ".wine/system.reg");
 
-            for (String service : aggressiveServices) {
-                String name = service.substring(0, service.indexOf(":"));
-                int value = Character.getNumericValue(service.charAt(service.length() - 1));
+    byte selection = Container.STARTUP_SELECTION_NORMAL;
+    try {
+        selection = Byte.parseByte(startupSelection);
+    } catch (NumberFormatException e) {}
 
-                if (selection == Container.STARTUP_SELECTION_ESSENTIAL) {
-                    if (servicesList.contains(service)) {
-                        if (!name.equals("winebus") && !name.equals("winehid") && !name.equals("PlugPlay")) {
-                            value = 4;
-                        }
-                    }
-                } else if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
-                    if (!name.equals("winebus") && !name.equals("winehid") && !name.equals("PlugPlay")) {
-                        value = 4;
-                    }
+    try (WineRegistryEditor registryEditor = new WineRegistryEditor(systemRegFile)) {
+        registryEditor.setCreateKeyIfNotExist(false);
+
+        String[] targetList = (selection == Container.STARTUP_SELECTION_AGGRESSIVE) ? aggressiveServices : services;
+
+        for (String service : targetList) {
+            String name = service.substring(0, service.indexOf(":"));
+            int value = Character.getNumericValue(service.charAt(service.length() - 1));
+
+            if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
+                value = 4;
+                if (name.equalsIgnoreCase("winebus") || name.equalsIgnoreCase("winehid") ||
+                    name.equalsIgnoreCase("MountMgr") || name.equalsIgnoreCase("PlugPlay")) {
+                    value = 2;
                 }
-                registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\" + name, "Start", value);
-                registryEditor.setDwordValue("System\\ControlSet001\\Services\\" + name, "Start", value);
             }
+            if (name.equalsIgnoreCase("NDIS")) {
+                name = "Ndis";
+                value = (selection == Container.STARTUP_SELECTION_AGGRESSIVE) ? 4 : 2;
+            }
+
+            registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\" + name, "Start", value);
+            registryEditor.setDwordValue("System\\ControlSet001\\Services\\" + name, "Start", value);
+            registryEditor.setDwordValue("System\\ControlSet002\\Services\\" + name, "Start", value);
         }
     }
+}
 
     /**
      * Configure Wine DirectInput joystick registry keys for all gamepads.
