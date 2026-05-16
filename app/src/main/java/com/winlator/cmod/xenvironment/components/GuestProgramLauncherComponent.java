@@ -3,6 +3,7 @@ package com.winlator.cmod.xenvironment.components;
 import android.app.Service;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.net.ConnectivityManager;
 import android.os.Process;
 import android.util.Log;
@@ -195,6 +196,27 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
     }
 
+    private static String mergePreloadValue(String baseValue, String overrideValue) {
+        if (overrideValue == null || overrideValue.isEmpty()) {
+            return baseValue == null ? "" : baseValue;
+        }
+        if (baseValue == null || baseValue.isEmpty()) {
+            return overrideValue;
+        }
+        if (overrideValue.equals(baseValue)) {
+            return baseValue;
+        }
+        return baseValue + ":" + overrideValue;
+    }
+    private static String appendFirstExistingPreload(String ldPreload, File[] candidates) {
+        for (File candidate : candidates) {
+            if (candidate.exists()) {
+                return mergePreloadValue(ldPreload, candidate.getAbsolutePath());
+            }
+        }
+        return ldPreload;
+   }
+
     public Callback<Integer> getTerminationCallback() {
         return terminationCallback;
     }
@@ -261,7 +283,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         String renderer = GPUInformation.getRenderer(null, null);
 
-        if (renderer.contains("Mali"))
+        if (renderer.contains("Mali")) //Mali Cope HAHAHAHAHAHA
             envVars.put("BOX64_MMAP32", "0");
 
         if (envVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
@@ -316,14 +338,67 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
         envVars.put("ANDROID_RESOLV_DNS", primaryDNS);
         envVars.put("WINE_NEW_NDIS", "1");
-        
+
         String ld_preload = "";
-        
+
         // Check for specific shared memory libraries
         if ((new File(imageFs.getLibDir(), "libandroid-sysvshm.so")).exists()){
             ld_preload = imageFs.getLibDir() + "/libandroid-sysvshm.so";
         }
 
+        // Copy libfakeinput.so
+        File fakeinputDest = new File(imageFs.getLibDir(), "libfakeinput.so");
+        String nativeLibDir = environment.getContext().getApplicationInfo().nativeLibraryDir;
+        File fakeinputSrc = new File(nativeLibDir, "libfakeinput.so");
+
+        Log.d("GuestLauncher", "nativeLibDir: " + nativeLibDir);
+        Log.d("GuestLauncher", "fakeinputSrc exists: " + fakeinputSrc.exists());
+        Log.d("GuestLauncher", "fakeinputDest: " + fakeinputDest.getAbsolutePath());
+
+        try {
+            if (fakeinputSrc.exists()) {
+                FileUtils.copy(fakeinputSrc, fakeinputDest);
+                Log.d("GuestLauncher", "Copied libfakeinput.so to imagefs");
+            } else {
+                Log.e("GuestLauncher", "libfakeinput.so NOT FOUND in APK: " + fakeinputSrc.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            Log.e("GuestLauncher", "Failed to copy libfakeinput.so: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        Log.d("GuestLauncher", "fakeinputDest exists after copy: " + fakeinputDest.exists());
+        if (fakeinputDest.exists()) {
+            if (!ld_preload.isEmpty()) ld_preload += ":";
+            ld_preload += fakeinputDest.getAbsolutePath();
+        }
+
+        File[] jpegCandidates = new File[] {
+            new File("/system/lib64/libjpeg.so"),
+            new File("/system_ext/lib64/libjpeg.so"),
+        };
+        
+        ld_preload = appendFirstExistingPreload(ld_preload, jpegCandidates);
+
+        File[] cryptoCandidates = new File[] {
+            new File("/system/lib64/libcrypto.so"),
+            new File("/system_ext/lib64/libcrypto.so"),
+            new File(imageFs.getLibDir(), "libcrypto.so.3"),
+        };
+        
+        ld_preload = appendFirstExistingPreload(ld_preload, cryptoCandidates);
+
+        File devInputDir = new File(imageFs.getRootDir(), "dev/input");
+        devInputDir.mkdirs();
+        File event0 = new File(devInputDir, "event0");
+        if (!event0.exists()) {
+                try { event0.createNewFile(); } catch (Exception e) {}
+        }
+
+        envVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
+        envVars.put("FAKE_EVDEV_VIBRATION", "1");
+
+        Log.d("GuestLauncher", "Final LD_PRELOAD: " + ld_preload);
         envVars.put("LD_PRELOAD", ld_preload);
 
         if (this.envVars.has("MANGOHUD")) {
@@ -333,7 +408,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (this.envVars.has("MANGOHUD_CONFIG")) {
             this.envVars.remove("MANGOHUD_CONFIG");
         }
-        
         // Merge any additional environment variables from external sources
         if (this.envVars != null) {
             envVars.putAll(this.envVars);
@@ -359,8 +433,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                     envVars.put("HODLL", "libwow64fex.dll");
                 else
                     envVars.put("HODLL", "wowbox64.dll");
-            }
-            else
+            } else
                 command = imageFs.getBinDir() + "/box64 " + guestExecutable;
         }
 

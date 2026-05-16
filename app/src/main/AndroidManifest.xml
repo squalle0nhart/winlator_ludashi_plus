@@ -107,11 +107,6 @@
             android:screenOrientation="sensor"
             android:exported="false" />
 
-        <activity
-            android:name=".saves.CustomFilePickerActivity"
-            android:theme="@style/AppTheme"
-            android:screenOrientation="sensor"
-            android:exported="false" />
 
         <receiver
             android:name=".ShortcutBroadcastReceiver"
@@ -144,19 +139,11 @@
             </intent-filter>
         </provider>
 
-        <activity
-            android:name=".restore.RestoreActivity"
-            android:process=":restore_process"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:exported="true" />
-
         <meta-data
             android:name="com.samsung.android.multidisplay.keep_process_alive"
             android:value="false"/>
         <meta-data
             android:name="android.allow_multiple_resumed_activities"
             android:value="true" />
-        >
-
     </application>
 </manifest>

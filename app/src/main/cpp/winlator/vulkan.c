@@ -78,6 +78,31 @@ static char *get_library_name(JNIEnv *env, jobject context, const char *driver_n
     return library_name;
 }
 
+static void preload_first_existing(const char **candidates) {
+  for (int i = 0; candidates[i]; i++) {
+    if (dlopen(candidates[i], RTLD_GLOBAL | RTLD_NOW))
+      return;
+  }
+}
+
+static void preload_vendor_icd_deps() {
+  // Keep OEM Vulkan ICD dependencies globally visible before the loader pulls
+  // them in, or DXVK can misreport missing VK_KHR_surface.
+  const char *jpeg_candidates[] = {
+      "/system/lib64/libjpeg.so",
+      "/system_ext/lib64/libjpeg.so",
+      "libjpeg.so",
+      NULL,
+  };
+  preload_first_existing(jpeg_candidates);
+
+  const char *crypto_candidates[] = {
+      "libcrypto.so",
+      NULL,
+  };
+  preload_first_existing(crypto_candidates);
+}
+
 static void init_original_vulkan() {
     vulkan_handle = dlopen("/system/lib64/libvulkan.so", RTLD_LOCAL | RTLD_NOW);
 }
@@ -86,7 +111,7 @@ static void init_vulkan(JNIEnv  *env, jobject context, const char *driver_name) 
     char *tmpdir;
     char *library_name;
     char *native_library_dir;
-
+    preload_vendor_icd_deps();
     const char *driver_path = get_driver_path(env, context, driver_name);
 
     if (driver_path && (access(driver_path, F_OK) == 0)) {
@@ -186,6 +211,7 @@ static VkResult enumerate_physical_devices() {
 
     return VK_SUCCESS;
 }
+
 
 JNIEXPORT jstring JNICALL
 Java_com_winlator_cmod_core_GPUInformation_getVulkanVersion(JNIEnv *env, jclass obj, jstring driverName, jobject context) {

@@ -3,12 +3,15 @@ package com.winlator.cmod;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+
+import android.view.InputDevice;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AccelerateDecelerateInterpolator;
@@ -22,12 +25,14 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -41,6 +46,10 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     private ExternalController controller;
     private RecyclerView recyclerView;
     private ControllerBindingsAdapter adapter;
+
+    // Track trigger state to only register on rising edge
+    private boolean l2WasPressed = false;
+    private boolean r2WasPressed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,28 +83,30 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         updateEmptyTextView();
     }
 
-//    private void updateControllerBinding(int keyCode, Binding binding) {
-//        if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
-//
-//        ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
-//        int position;
-//        if (controllerBinding == null) {
-//            controllerBinding = new ExternalControllerBinding();
-//            controllerBinding.setKeyCode(keyCode);
-//            controllerBinding.setBinding(binding);
-//
-//            controller.addControllerBinding(controllerBinding);
-//            profile.save();
-//            adapter.notifyDataSetChanged();
-//            updateEmptyTextView();
-//            position = controller.getPosition(controllerBinding);
-//        }
-//        else animateItemView(position = controller.getPosition(controllerBinding));
-//        recyclerView.scrollToPosition(position);
-//    }
+    // private void updateControllerBinding(int keyCode, Binding binding) {
+    // if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
+    //
+    // ExternalControllerBinding controllerBinding =
+    // controller.getControllerBinding(keyCode);
+    // int position;
+    // if (controllerBinding == null) {
+    // controllerBinding = new ExternalControllerBinding();
+    // controllerBinding.setKeyCode(keyCode);
+    // controllerBinding.setBinding(binding);
+    //
+    // controller.addControllerBinding(controllerBinding);
+    // profile.save();
+    // adapter.notifyDataSetChanged();
+    // updateEmptyTextView();
+    // position = controller.getPosition(controllerBinding);
+    // }
+    // else animateItemView(position = controller.getPosition(controllerBinding));
+    // recyclerView.scrollToPosition(position);
+    // }
 
     private void updateControllerBinding(int keyCode, Binding binding) {
-        if (keyCode == KeyEvent.KEYCODE_UNKNOWN) return;
+        if (keyCode == KeyEvent.KEYCODE_UNKNOWN)
+            return;
 
         ExternalControllerBinding controllerBinding = controller.getControllerBinding(keyCode);
         int position;
@@ -115,34 +126,37 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         recyclerView.scrollToPosition(position);
     }
 
-
-//    private void processJoystickInput() {
-//        int keyCode = KeyEvent.KEYCODE_UNKNOWN;
-//        Binding binding = Binding.NONE;
-//        final int[] axes = {MotionEvent.AXIS_X, MotionEvent.AXIS_Y, MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ, MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y};
-//        final float[] values = {controller.state.thumbLX, controller.state.thumbLY, controller.state.thumbRX, controller.state.thumbRY, controller.state.getDPadX(), controller.state.getDPadY()};
-//
-//        byte sign;
-//        for (int i = 0; i < axes.length; i++) {
-//            if ((sign = Mathf.sign(values[i])) != 0) {
-//                if (axes[i] == MotionEvent.AXIS_X || axes[i] == MotionEvent.AXIS_Z) {
-//                    binding = sign > 0 ? Binding.MOUSE_MOVE_RIGHT : Binding.MOUSE_MOVE_LEFT;
-//                }
-//                else if (axes[i] == MotionEvent.AXIS_Y || axes[i] == MotionEvent.AXIS_RZ) {
-//                    binding = sign > 0 ? Binding.MOUSE_MOVE_DOWN : Binding.MOUSE_MOVE_UP;
-//                }
-//                else if (axes[i] == MotionEvent.AXIS_HAT_X) {
-//                    binding = sign > 0 ? Binding.KEY_D : Binding.KEY_A;
-//                }
-//                else if (axes[i] == MotionEvent.AXIS_HAT_Y) {
-//                    binding = sign > 0 ? Binding.KEY_S : Binding.KEY_W;
-//                }
-//
-//                keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
-//                updateControllerBinding(keyCode, binding);
-//            }
-//        }
-//    }
+    // private void processJoystickInput() {
+    // int keyCode = KeyEvent.KEYCODE_UNKNOWN;
+    // Binding binding = Binding.NONE;
+    // final int[] axes = {MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
+    // MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ, MotionEvent.AXIS_HAT_X,
+    // MotionEvent.AXIS_HAT_Y};
+    // final float[] values = {controller.state.thumbLX, controller.state.thumbLY,
+    // controller.state.thumbRX, controller.state.thumbRY,
+    // controller.state.getDPadX(), controller.state.getDPadY()};
+    //
+    // byte sign;
+    // for (int i = 0; i < axes.length; i++) {
+    // if ((sign = Mathf.sign(values[i])) != 0) {
+    // if (axes[i] == MotionEvent.AXIS_X || axes[i] == MotionEvent.AXIS_Z) {
+    // binding = sign > 0 ? Binding.MOUSE_MOVE_RIGHT : Binding.MOUSE_MOVE_LEFT;
+    // }
+    // else if (axes[i] == MotionEvent.AXIS_Y || axes[i] == MotionEvent.AXIS_RZ) {
+    // binding = sign > 0 ? Binding.MOUSE_MOVE_DOWN : Binding.MOUSE_MOVE_UP;
+    // }
+    // else if (axes[i] == MotionEvent.AXIS_HAT_X) {
+    // binding = sign > 0 ? Binding.KEY_D : Binding.KEY_A;
+    // }
+    // else if (axes[i] == MotionEvent.AXIS_HAT_Y) {
+    // binding = sign > 0 ? Binding.KEY_S : Binding.KEY_W;
+    // }
+    //
+    // keyCode = ExternalControllerBinding.getKeyCodeForAxis(axes[i], sign);
+    // updateControllerBinding(keyCode, binding);
+    // }
+    // }
+    // }
 
     private void processJoystickInput() {
         final int[] axes = {
@@ -166,12 +180,32 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent event) {
-        if (event.getDeviceId() == controller.getDeviceId() && controller.updateStateFromMotionEvent(event)) {
-            if (controller.state.isPressed(ExternalController.IDX_BUTTON_L2)) updateControllerBinding(KeyEvent.KEYCODE_BUTTON_L2, Binding.NONE);
-            if (controller.state.isPressed(ExternalController.IDX_BUTTON_R2)) updateControllerBinding(KeyEvent.KEYCODE_BUTTON_R2, Binding.NONE);
+        // Accept motion events from any game controller for binding registration
+        InputDevice device = event.getDevice();
+        if (device != null && ExternalController.isGameController(device)
+                && controller.updateStateFromMotionEvent(event)) {
+
+            // Use a higher threshold for binding registration to avoid false triggers
+            float l2Value = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_BRAKE));
+            float r2Value = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_GAS));
+
+            // Only register L2/R2 on rising edge (first press) past 80% threshold
+            boolean l2Pressed = l2Value > 0.8f;
+            if (l2Pressed && !l2WasPressed) {
+                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_L2, Binding.NONE);
+            }
+            l2WasPressed = l2Pressed;
+
+            boolean r2Pressed = r2Value > 0.8f;
+            if (r2Pressed && !r2WasPressed) {
+                updateControllerBinding(KeyEvent.KEYCODE_BUTTON_R2, Binding.NONE);
+            }
+            r2WasPressed = r2Pressed;
+
             processJoystickInput();
             return true;
         }
@@ -179,12 +213,43 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getDeviceId() == controller.getDeviceId() && event.getRepeatCount() == 0) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) updateControllerBinding(event.getKeyCode(), Binding.NONE);
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Accept any gamepad button or D-pad keycode
+        if (isGamepadKeyCode(keyCode)) {
+            updateControllerBinding(keyCode, Binding.NONE);
             return true;
         }
-        else return super.dispatchKeyEvent(event);
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        // Consume the key up for gamepad buttons
+        if (isGamepadKeyCode(keyCode)) {
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
+    }
+
+    private boolean isGamepadKeyCode(int keyCode) {
+        return keyCode == KeyEvent.KEYCODE_BUTTON_A ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_B ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_X ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_Y ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_L1 ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_R1 ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_L2 ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_R2 ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_THUMBL ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_THUMBR ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_START ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_SELECT ||
+                keyCode == KeyEvent.KEYCODE_BUTTON_MODE ||
+                keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_DPAD_CENTER;
     }
 
     @Override
@@ -211,7 +276,8 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
 
         @Override
         public final ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.external_controller_binding_list_item, parent, false));
+            return new ViewHolder(LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.external_controller_binding_list_item, parent, false));
         }
 
         @Override
@@ -249,7 +315,8 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                         break;
                 }
 
-                holder.binding.setAdapter(new ArrayAdapter<>($this, android.R.layout.simple_spinner_dropdown_item, bindingEntries));
+                holder.binding.setAdapter(
+                        new ArrayAdapter<>($this, android.R.layout.simple_spinner_dropdown_item, bindingEntries));
                 AppUtils.setSpinnerSelectionFromValue(holder.binding, item.getBinding().toString());
             };
 
@@ -260,17 +327,16 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             Binding selectedBinding = item.getBinding();
             if (selectedBinding.isKeyboard()) {
                 holder.bindingType.setSelection(0, false);
-            }
-            else if (selectedBinding.isMouse()) {
+            } else if (selectedBinding.isMouse()) {
                 holder.bindingType.setSelection(1, false);
-            }
-            else if (selectedBinding.isGamepad()) {
+            } else if (selectedBinding.isGamepad()) {
                 holder.bindingType.setSelection(2, false);
             }
 
@@ -297,10 +363,12 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {}
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
             });
 
             update.run();
+
         }
     }
 
@@ -309,15 +377,17 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
     }
 
     private void animateItemView(int position) {
-        final ControllerBindingsAdapter.ViewHolder holder = (ControllerBindingsAdapter.ViewHolder)recyclerView.findViewHolderForAdapterPosition(position);
+        final ControllerBindingsAdapter.ViewHolder holder = (ControllerBindingsAdapter.ViewHolder) recyclerView
+                .findViewHolderForAdapterPosition(position);
         if (holder != null) {
             final int color = ContextCompat.getColor(this, R.color.colorAccent);
             final ValueAnimator animator = ValueAnimator.ofFloat(0.4f, 0.0f);
             animator.setDuration(200);
             animator.setInterpolator(new AccelerateDecelerateInterpolator());
             animator.addUpdateListener((animation) -> {
-                float alpha = (float)animation.getAnimatedValue();
-                holder.itemView.setBackgroundColor(Color.argb((int)(alpha * 255), Color.red(color), Color.green(color), Color.blue(color)));
+                float alpha = (float) animation.getAnimatedValue();
+                holder.itemView.setBackgroundColor(
+                        Color.argb((int) (alpha * 255), Color.red(color), Color.green(color), Color.blue(color)));
             });
             animator.start();
         }

@@ -78,7 +78,7 @@ public class Container {
     private String controllerMapping = new String(new char[XrControllerMapping.values().length]);
     private String box64Version;
     private String emulator;
-
+    private boolean exclusiveXInput = true;
     private ContainerManager containerManager;
 
 
@@ -373,6 +373,16 @@ public class Container {
         this.inputType = inputType;
     }
 
+
+    public boolean isExclusiveXInput() {
+        return exclusiveXInput;
+    }
+
+    public void setExclusiveXInput(boolean exclusiveXInput) {
+        this.exclusiveXInput = exclusiveXInput;
+    }
+
+
     public Iterable<String[]> drivesIterator() {
         return drivesIterator(drives);
     }
@@ -433,6 +443,7 @@ public class Container {
             data.put("lc_all", lc_all);
             data.put("primaryController", primaryController);
             data.put("controllerMapping", controllerMapping);
+            data.put("exclusiveXInput", exclusiveXInput);
             if (!WineInfo.isMainWineVersion(wineVersion)) data.put("wineVersion", wineVersion);
             FileUtils.writeString(getConfigFile(), data.toString());
         }
@@ -549,6 +560,9 @@ public class Container {
                     break;
                 case "controllerMapping" :
                     controllerMapping = data.getString(key);
+                    break;
+                case "exclusiveXInput" :
+                    setExclusiveXInput(data.getBoolean(key));
                     break;
             }
         }

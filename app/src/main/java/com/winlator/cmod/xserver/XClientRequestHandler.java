@@ -232,7 +232,6 @@ public class XClientRequestHandler implements RequestHandler {
                 case ClientOpcodes.INTERN_ATOM:
                     AtomRequests.internAtom(client, inputStream, outputStream);
                     break;
-
                 case ClientOpcodes.GET_ATOM_NAME:
                     try (XLock lock = client.xServer.lock(XServer.Lockable.WINDOW_MANAGER, XServer.Lockable.INPUT_DEVICE)) {
                         AtomRequests.getAtomName(client, inputStream, outputStream);

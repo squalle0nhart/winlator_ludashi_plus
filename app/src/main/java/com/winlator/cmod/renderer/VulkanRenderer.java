@@ -224,6 +224,43 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         if (nativeMode) xServerView.post(this::releaseScanoutSurfaces);
     }
 
+    /**
+     * Immediately tears down all native resources and hides scanout surfaces.
+     * Unlike onSurfaceDestroyed(), this runs fully synchronously and explicitly
+     * hides the hardware-composed scanout layers via a SurfaceControl transaction
+     * so the game image disappears from the display pipeline instantly.
+     * Must be called from the UI thread.
+     */
+    public void forceCleanup() {
+        initComplete = false;
+        if (initExecutor != null) {
+            initExecutor.shutdownNow();
+            try { initExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            initExecutor = null;
+        }
+        synchronized (lock) {
+            if (nativeHandle != 0) {
+                if (nativeMode) nativeDestroyScanout(nativeHandle);
+                nativeDestroy(nativeHandle);
+                nativeHandle = 0;
+            }
+        }
+        // Explicitly hide scanout layers via a SurfaceControl transaction before
+        // releasing them. release() alone does not guarantee immediate removal
+        // from the display pipeline — the compositor may keep showing the last
+        // submitted buffer until the next vsync or transaction.
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            try {
+                android.view.SurfaceControl.Transaction txn = new android.view.SurfaceControl.Transaction();
+                if (scanoutGameSC != null) txn.setVisibility(scanoutGameSC, false);
+                if (scanoutCursorSC != null) txn.setVisibility(scanoutCursorSC, false);
+                txn.apply();
+            } catch (Exception ignored) {}
+        }
+        releaseScanoutSurfaces();
+    }
+
     private void releaseScanoutSurfaces() {
         if (scanoutGameSurface   != null) { scanoutGameSurface.release();   scanoutGameSurface   = null; }
         if (scanoutCursorSurface != null) { scanoutCursorSurface.release(); scanoutCursorSurface = null; }

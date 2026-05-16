@@ -76,136 +76,9 @@
             android:min="10"
             android:max="100" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="Gyroscope"
-            android:textColor="@color/colorPrimary"
-            android:layout_marginTop="8dp" />
-
-        <View
-            style="@style/HorizontalLine"
-            android:layout_marginTop="16dp" />
-
-        <CheckBox
-            android:id="@+id/CBGyroEnabled"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Enable Right-Stick Gyroscope (Experimental)"
-            android:layout_marginBottom="16dp" /> <!-- Added margin for better spacing -->
-
-        <!-- Gyro Activator Button Label -->
-        <TextView
-            android:id="@+id/TVGyroTriggerLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Gyro Activator Button:"
-            android:layout_marginBottom="8dp"/> <!-- Add some bottom margin for better spacing -->
-
-        <!-- Spinner for selecting the gyro trigger button -->
-        <Spinner
-            android:id="@+id/SBGyroTriggerButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:entries="@array/button_options"
-            android:layout_marginBottom="16dp" /> <!-- Add bottom margin to separate it from other elements -->
-
-        <!-- RadioGroup for selecting gyro mode (toggle/hold) -->
-        <RadioGroup
-            android:id="@+id/RGyroMode"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <RadioButton
-                android:id="@+id/RBHoldMode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hold Mode"
-                android:layout_marginEnd="16dp" /> <!-- Add end margin for spacing -->
-
-            <RadioButton
-                android:id="@+id/RBToggleMode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Toggle Mode" />
-        </RadioGroup>
-
-        <!-- Configure Gyroscope Button -->
-        <Button
-            style="@style/ButtonNeutral"
-            android:id="@+id/BTConfigureGyro"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Calibrate Gyroscope" /> <!-- Add top margin for spacing -->
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="Trigger"
-            android:textColor="@color/colorPrimary"
-            android:layout_marginTop="8dp" />
-
-        <View
-            style="@style/HorizontalLine"
-            android:layout_marginTop="16dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/trigger_type"
-                android:layout_gravity="center"/>
-
-            <ImageView
-                android:id="@+id/BTHelpTriggerMode"
-                android:layout_gravity="center"
-                style="@style/HelpButton" />
-        </LinearLayout>
 
 
-        <RadioGroup
-            android:id="@+id/RGTriggerType"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <RadioButton
-                android:id="@+id/RBTriggerIsButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/as_button"/>
 
-            <RadioButton
-                android:id="@+id/RBTriggerIsAxis"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/as_axis"/>
-
-            <RadioButton
-                android:id="@+id/RBTriggerIsMixed"
-                android:visibility="gone"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/mixed"/>
-        </RadioGroup>
-
-        <Button
-            style="@style/ButtonNeutral"
-            android:id="@+id/BTConfigureAnalogSticks"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Configure Analog Sticks"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="16dp" />
 
         <View
             style="@style/HorizontalLine"
@@ -242,6 +115,8 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:text="@string/controls_editor" />
+
+
 
         <TextView
             android:layout_width="wrap_content"

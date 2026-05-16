@@ -1,16 +1,26 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
+import android.net.Uri;
 
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.XEnvironment;
+import com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public abstract class WineUtils {
     public static void createDosdevicesSymlinks(Container container) {
@@ -60,13 +70,14 @@ public abstract class WineUtils {
 
         final String[] direct3dLibs = {"d3d8", "d3d9", "d3d10", "d3d10_1", "d3d10core", "d3d11", "d3d12", "d3d12core", "ddraw", "dxgi", "wined3d"};
         final String[] xinputLibs = {"dinput", "dinput8", "xinput1_1", "xinput1_2", "xinput1_3", "xinput1_4", "xinput9_1_0", "xinputuap"};
-
         final String dllOverridesKey = "Software\\Wine\\DllOverrides";
+        final String[] openglLibs = {"opengl32"};
 
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             for (String name : direct3dLibs) registryEditor.setStringValue(dllOverridesKey, name, "native,builtin");
             for (String name : xinputLibs) registryEditor.setStringValue(dllOverridesKey, name, "builtin,native");
             setWindowMetrics(registryEditor);
+            if (wineInfo.isArm64EC() && !GPUInformation.getRenderer(null,null).contains("Mali")) for(String name: openglLibs) registryEditor.setStringValue(dllOverridesKey, name, "native,builtin");
         }
     }
 
@@ -198,17 +209,69 @@ public abstract class WineUtils {
         }
     }
 
-    public static void changeServicesStatus(Container container, boolean onlyEssential) {
-        final String[] services = {"BITS:3", "Eventlog:2", "HTTP:3", "LanmanServer:3", "NDIS:2", "PlugPlay:2", "RpcSs:3", "scardsvr:3", "Schedule:3", "Spooler:3", "StiSvc:3", "TermService:3", "winebus:3", "winehid:3", "Winmgmt:3", "wuauserv:3"};
+    public static void changeServicesStatus(Container container, String startupSelection) {
+        final String[] services = {"BITS:3", "Eventlog:2", "HTTP:3", "LanmanServer:3", "NDIS:2", "PlugPlay:2", "RpcSs:3", "scardsvr:3", "Schedule:3", "Spooler:3", "StiSvc:3", "TermService:3", "winebus:2", "winehid:2", "Winmgmt:3", "wuauserv:3"};
+        final String[] aggressiveServices = { "BITS:3", "Eventlog:2", "FontCache:3", "FontCache3.0.0.0:3", "HTTP:3", "LanmanServer:3", "MSIServer:3", "NDIS:2", "nsiproxy:3", "PlugPlay:2", "RpcSs:3", "scardsvr:3", "Schedule:3", "SharedGpuResources:2", "Spooler:3", "StiSvc:3", "TermService:3", "TrkWks:3", "W32Time:3", "winebus:2", "winehid:2", "Winmgmt:3", "wuauserv:3"};
         File systemRegFile = new File(container.getRootDir(), ".wine/system.reg");
+
+        byte selection = Container.STARTUP_SELECTION_NORMAL;
+        try {
+            selection = Byte.parseByte(startupSelection);
+        }
+        catch (NumberFormatException e) {}
 
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(systemRegFile)) {
             registryEditor.setCreateKeyIfNotExist(false);
+            List<String> servicesList = Arrays.asList(services);
 
-            for (String service : services) {
+            for (String service : aggressiveServices) {
                 String name = service.substring(0, service.indexOf(":"));
-                int value = onlyEssential ? 4 : Character.getNumericValue(service.charAt(service.length()-1));
-                registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\"+name, "Start", value);
+                int value = Character.getNumericValue(service.charAt(service.length() - 1));
+
+                if (selection == Container.STARTUP_SELECTION_ESSENTIAL) {
+                    if (servicesList.contains(service)) {
+                        if (!name.equals("winebus") && !name.equals("winehid") && !name.equals("PlugPlay")) {
+                            value = 4;
+                        }
+                    }
+                } else if (selection == Container.STARTUP_SELECTION_AGGRESSIVE) {
+                    if (!name.equals("winebus") && !name.equals("winehid") && !name.equals("PlugPlay")) {
+                        value = 4;
+                    }
+                }
+                registryEditor.setDwordValue("System\\CurrentControlSet\\Services\\" + name, "Start", value);
+                registryEditor.setDwordValue("System\\ControlSet001\\Services\\" + name, "Start", value);
+            }
+        }
+    }
+
+    /**
+     * Configure Wine DirectInput joystick registry keys for all gamepads.
+     * By default, disables all joysticks in Wine's DirectInput.
+     * When DInput is enabled, sets joysticks to "override" mode to make them visible.
+     * 
+     * @param container The container to configure
+     * @param dinputEnabled Whether DInput is enabled for this container
+     * @param exclusiveXInput Whether Exclusive XInput is enabled (if false, keys are removed)
+     */
+    public static void setJoystickRegistryKeys(Container container, boolean dinputEnabled, boolean exclusiveXInput) {
+        File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
+        final String joysticksKey = "Software\\Wine\\DirectInput\\Joysticks";
+        
+        // The value to set: "disabled" hides from DInput, "override" makes visible
+        final String value = dinputEnabled ? "override" : "disabled";
+        
+        try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
+            // Configure all 4 possible gamepad slots
+            for (int i = 0; i < 4; i++) {
+                if (exclusiveXInput) {
+                    registryEditor.setStringValue(joysticksKey, "Generic HID Gamepad " + i, value);
+                    registryEditor.setStringValue(joysticksKey, "ric HID Gamepad " + i, value);
+                }
+                else {
+                    registryEditor.removeValue(joysticksKey, "Generic HID Gamepad " + i);
+                    registryEditor.removeValue(joysticksKey, "ric HID Gamepad " + i);
+                }
             }
         }
     }

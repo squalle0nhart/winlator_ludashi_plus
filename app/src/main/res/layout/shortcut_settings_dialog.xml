@@ -426,13 +426,13 @@
                     android:background="#ffffff"
                     android:text="@string/box64" />
             </FrameLayout>
-
+            
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:id="@+id/fexcoreFrame"
                 android:layout_marginTop="8dp">
-
+                
                 <LinearLayout style="@style/FieldSet">
                     <TextView
                         android:layout_width="wrap_content"
@@ -454,12 +454,12 @@
                         android:id="@+id/SFEXCorePreset"
                         android:layout_width="match_parent" />
                 </LinearLayout>
-
+                    
                 <TextView
                     style="@style/FieldSetLabel"
                     android:background="#ffffff"
                     android:text="@string/fexcore_config" />
-
+                    
             </FrameLayout>
 
             <FrameLayout
@@ -533,24 +533,6 @@
                 <LinearLayout style="@style/FieldSet">
 
                     <LinearLayout
-                        android:id="@+id/LLDinputMapperType"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/directinput_mapper_type" />
-
-                        <Spinner
-                            style="@style/ComboBox"
-                            android:id="@+id/SDInputType"
-                            android:layout_width="match_parent"
-                            android:entries="@array/dinput_mapper_type_entries" />
-                    </LinearLayout>
-
-                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
@@ -586,6 +568,24 @@
                             style="@style/HelpButton"
                             android:layout_gravity="center" />
                     </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <CheckBox
+                            android:id="@+id/CBExclusiveXInput"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Exclusive Input" />
+                        <ImageView
+                            android:id="@+id/BTExclusiveXInputHelp"
+                            style="@style/HelpButton"
+                            android:layout_gravity="center" />
+                    </LinearLayout>
+
 
                 </LinearLayout>
 

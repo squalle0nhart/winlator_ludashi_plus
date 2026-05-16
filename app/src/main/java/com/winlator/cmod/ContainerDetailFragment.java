@@ -104,18 +104,6 @@ public class ContainerDetailFragment extends Fragment {
         this.containerId = containerId;
     }
 
-    private static final String[] SDL2_ENV_VARS = {
-            "SDL_JOYSTICK_WGI=0",
-            "SDL_XINPUT_ENABLED=1",
-            "SDL_JOYSTICK_RAWINPUT=0",
-            "SDL_JOYSTICK_HIDAPI=1",
-            "SDL_DIRECTINPUT_ENABLED=0",
-            "SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1",
-            "SDL_HINT_FORCE_RAISEWINDOW=0",
-            "SDL_ALLOW_TOPMOST=0",
-            "SDL_MOUSE_FOCUS_CLICKTHROUGH=1"
-    };
-
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -124,12 +112,12 @@ public class ContainerDetailFragment extends Fragment {
 
         try {
             gpuCards = new JSONArray(FileUtils.readString(getContext(), "gpu_cards.json"));
+        } catch (JSONException e) {
         }
-        catch (JSONException e) {}
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-//        Context context = textView.getContext();
+        // Context context = textView.getContext();
 
         if (isDarkMode) {
             // Apply dark mode-specific attributes
@@ -142,67 +130,79 @@ public class ContainerDetailFragment extends Fragment {
         }
     }
 
-
     private void applyDynamicStyles(View view, boolean isDarkMode) {
-
 
         // Update Spinners
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-        sScreenSize.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sScreenSize.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
-        sWineVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sWineVersion.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sGraphicsDriver.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
-        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDXWrapper.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
-        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sAudioDriver.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sEmulator64 = view.findViewById(R.id.SEmulator64);
-        sEmulator64.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sEmulator64.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sEmulator = view.findViewById(R.id.SEmulator);
-        sEmulator.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sEmulator.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         // Update Wine Configuration Tab Spinner styles
         // Desktop
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
-        sDesktopTheme.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDesktopTheme.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sDesktopBackgroundType = view.findViewById(R.id.SDesktopBackgroundType);
-        sDesktopBackgroundType.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sDesktopBackgroundType.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-        sMouseWarpOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMouseWarpOverride.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         // Win Components
         // Handled in createWinComponentsTab
 
         // Update Advanced Tab Spinner styles
-        Spinner SDInputType = view.findViewById(R.id.SDInputType);
-        SDInputType.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
-        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Version.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
-        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCoreVersion.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
         Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
-        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sStartupSelection.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -215,7 +215,8 @@ public class ContainerDetailFragment extends Fragment {
         } else if (view instanceof TextView) {
             TextView textView = (TextView) view;
             if ("desktop".equals(textView.getText().toString())) { // Check for specific text if needed
-                textView.setTextAppearance(getContext(), isDarkMode ? R.style.FieldSetLabel_Dark : R.style.FieldSetLabel);
+                textView.setTextAppearance(getContext(),
+                        isDarkMode ? R.style.FieldSetLabel_Dark : R.style.FieldSetLabel);
             }
         }
     }
@@ -243,34 +244,35 @@ public class ContainerDetailFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        ((AppCompatActivity)getActivity()).getSupportActionBar().setTitle(isEditMode() ? R.string.edit_container : R.string.new_container);
+        ((AppCompatActivity) getActivity()).getSupportActionBar()
+                .setTitle(isEditMode() ? R.string.edit_container : R.string.new_container);
 
         // Find TextViews by ID and apply dynamic styles
         TextView desktopLabel = view.findViewById(R.id.TVDesktop);
-        applyFieldSetLabelStyle(desktopLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(desktopLabel, isDarkMode); // Apply the dark or light mode styles
 
         TextView registryKeysLabel = view.findViewById(R.id.TVDirectInput);
-        applyFieldSetLabelStyle(registryKeysLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(registryKeysLabel, isDarkMode); // Apply the dark or light mode styles
 
         // Win Components TextViews
         TextView directXLabel = view.findViewById(R.id.TVDirectX);
-        applyFieldSetLabelStyle(directXLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(directXLabel, isDarkMode); // Apply the dark or light mode styles
 
         TextView generalLabel = view.findViewById(R.id.TVGeneral);
-        applyFieldSetLabelStyle(generalLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(generalLabel, isDarkMode); // Apply the dark or light mode styles
 
         // Advanced Tab TextViews
         TextView box64Label = view.findViewById(R.id.TVBox64);
-        applyFieldSetLabelStyle(box64Label, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(box64Label, isDarkMode); // Apply the dark or light mode styles
 
         TextView fexCoreLabel = view.findViewById(R.id.TVFEXCore);
         applyFieldSetLabelStyle(fexCoreLabel, isDarkMode);
 
         TextView systemLabel = view.findViewById(R.id.TVSystem);
-        applyFieldSetLabelStyle(systemLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(systemLabel, isDarkMode); // Apply the dark or light mode styles
 
         TextView gameControllerLabel = view.findViewById(R.id.TVGameController);
-        applyFieldSetLabelStyle(gameControllerLabel, isDarkMode);  // Apply the dark or light mode styles
+        applyFieldSetLabelStyle(gameControllerLabel, isDarkMode); // Apply the dark or light mode styles
 
     }
 
@@ -281,7 +283,8 @@ public class ContainerDetailFragment extends Fragment {
     @SuppressLint("SetTextI18n")
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup root, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup root,
+            @Nullable Bundle savedInstanceState) {
         final Context context = getContext();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         final View view = inflater.inflate(R.layout.container_detail_fragment, root, false);
@@ -293,7 +296,7 @@ public class ContainerDetailFragment extends Fragment {
         applyDynamicStyles(view, isDarkMode);
 
         // Apply dynamic styles recursively
-//        applyDynamicStylesRecursively(view, isDarkMode);
+        // applyDynamicStylesRecursively(view, isDarkMode);
 
         manager = new ContainerManager(context);
         container = containerId > 0 ? manager.getContainerById(containerId) : null;
@@ -303,8 +306,6 @@ public class ContainerDetailFragment extends Fragment {
         final EditText etName = view.findViewById(R.id.ETName);
 
         final Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
-
-
 
         // Ensure the Wine version layout is visible
         final LinearLayout llWineVersion = view.findViewById(R.id.LLWineVersion);
@@ -331,57 +332,90 @@ public class ContainerDetailFragment extends Fragment {
         vDXWrapperConfig.setTag(isEditMode() ? container.getDXWrapperConfig() : Container.DEFAULT_DXWRAPPERCONFIG);
 
         final View vGraphicsDriverConfig = view.findViewById(R.id.BTGraphicsDriverConfig);
-        vGraphicsDriverConfig.setTag(isEditMode() ? container.getGraphicsDriverConfig() : Container.DEFAULT_GRAPHICSDRIVERCONFIG);
+        vGraphicsDriverConfig
+                .setTag(isEditMode() ? container.getGraphicsDriverConfig() : Container.DEFAULT_GRAPHICSDRIVERCONFIG);
 
         loadGraphicsDriverSpinner(sGraphicsDriver, sDXWrapper, vGraphicsDriverConfig,
                 isEditMode() ? container.getGraphicsDriver() : Container.DEFAULT_GRAPHICS_DRIVER,
                 isEditMode() ? container.getDXWrapper() : Container.DEFAULT_DXWRAPPER);
 
-        view.findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
+        view.findViewById(R.id.BTHelpDXWrapper)
+                .setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
 
-        // Vulkan renderer options — kept in memory for new containers and saved immediately in edit mode.
-        final com.winlator.cmod.container.Container rendererCfgHolder =
-            isEditMode() ? container : new com.winlator.cmod.container.Container(-1);
+        // Vulkan renderer options — kept in memory for new containers and saved
+        // immediately in edit mode.
+        final com.winlator.cmod.container.Container rendererCfgHolder = isEditMode() ? container
+                : new com.winlator.cmod.container.Container(-1);
         final android.widget.TextView tvRendererMode = view.findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText(rendererCfgHolder.isRendererNative() ? "Native Rendering+" : "Vulkan");
-            tvRendererMode.setOnClickListener(v -> {
-                android.widget.PopupMenu popup = new android.widget.PopupMenu(v.getContext(), v);
-                popup.getMenu().add(0, 0, 0, "Vulkan");
-                popup.getMenu().add(0, 1, 1, "Native Rendering+");
-                popup.setOnMenuItemClickListener(item -> {
-                    boolean nowNative = item.getItemId() == 1;
-                    rendererCfgHolder.setRendererNative(nowNative);
-                    if (isEditMode()) rendererCfgHolder.saveData();
-                    tvRendererMode.setText(nowNative ? "Native Rendering+" : "Vulkan");
-                    return true;
-                });
-                popup.show();
-            });
+            // Renderer mode is not user-configurable; display only
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
         if (btRendererOptions != null) {
             btRendererOptions.setOnClickListener(v -> {
-                new com.winlator.cmod.contentdialog.RendererOptionsDialog(v, new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
-                    public boolean getRendererNative() { return rendererCfgHolder.isRendererNative(); }
-                    public void setRendererNative(boolean val) { rendererCfgHolder.setRendererNative(val); if (isEditMode()) rendererCfgHolder.saveData(); }
-                    public String getRendererPresentMode() { return rendererCfgHolder.getRendererPresentMode(); }
-                    public void setRendererPresentMode(String val) { rendererCfgHolder.setRendererPresentMode(val); if (isEditMode()) rendererCfgHolder.saveData(); }
-                    public String getRendererDriverId() { return rendererCfgHolder.getRendererDriverId(); }
-                    public void setRendererDriverId(String val) { rendererCfgHolder.setRendererDriverId(val); if (isEditMode()) rendererCfgHolder.saveData(); }
-                    public int getRendererFilterMode() { return rendererCfgHolder.getRendererFilterMode(); }
-                    public void setRendererFilterMode(int val) { rendererCfgHolder.setRendererFilterMode(val); if (isEditMode()) rendererCfgHolder.saveData(); }
-                    public boolean getRendererSwapRB() { return rendererCfgHolder.getRendererSwapRB(); }
-                    public void setRendererSwapRB(boolean val) { rendererCfgHolder.setRendererSwapRB(val); if (isEditMode()) rendererCfgHolder.saveData(); }
-                }, rendererCfgHolder.isRendererNative()).show();
+                new com.winlator.cmod.contentdialog.RendererOptionsDialog(v,
+                        new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
+                            public boolean getRendererNative() {
+                                return rendererCfgHolder.isRendererNative();
+                            }
+
+                            public void setRendererNative(boolean val) {
+                                rendererCfgHolder.setRendererNative(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public String getRendererPresentMode() {
+                                return rendererCfgHolder.getRendererPresentMode();
+                            }
+
+                            public void setRendererPresentMode(String val) {
+                                rendererCfgHolder.setRendererPresentMode(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public String getRendererDriverId() {
+                                return rendererCfgHolder.getRendererDriverId();
+                            }
+
+                            public void setRendererDriverId(String val) {
+                                rendererCfgHolder.setRendererDriverId(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public int getRendererFilterMode() {
+                                return rendererCfgHolder.getRendererFilterMode();
+                            }
+
+                            public void setRendererFilterMode(int val) {
+                                rendererCfgHolder.setRendererFilterMode(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public boolean getRendererSwapRB() {
+                                return rendererCfgHolder.getRendererSwapRB();
+                            }
+
+                            public void setRendererSwapRB(boolean val) {
+                                rendererCfgHolder.setRendererSwapRB(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+                        }, rendererCfgHolder.isRendererNative()).show();
             });
         }
 
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
-        AppUtils.setSpinnerSelectionFromIdentifier(sAudioDriver, isEditMode() ? container.getAudioDriver() : Container.DEFAULT_AUDIO_DRIVER);
+        AppUtils.setSpinnerSelectionFromIdentifier(sAudioDriver,
+                isEditMode() ? container.getAudioDriver() : Container.DEFAULT_AUDIO_DRIVER);
 
         Spinner sEmulator = view.findViewById(R.id.SEmulator);
-        AppUtils.setSpinnerSelectionFromIdentifier(sEmulator, isEditMode() ? container.getEmulator() : Container.DEFAULT_EMULATOR);
+        AppUtils.setSpinnerSelectionFromIdentifier(sEmulator,
+                isEditMode() ? container.getEmulator() : Container.DEFAULT_EMULATOR);
 
         Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
         MidiManager.loadSFSpinner(sMIDISoundFont);
@@ -394,13 +428,14 @@ public class ContainerDetailFragment extends Fragment {
         cbFullscreenStretched.setChecked(isEditMode() && container.isFullscreenStretched());
 
         // Existing declarations of UI components and variables
-        final Runnable showInputWarning = () -> ContentDialog.alert(context, R.string.enable_xinput_and_dinput_same_time, null);
+        final Runnable showInputWarning = () -> ContentDialog.alert(context,
+                R.string.enable_xinput_and_dinput_same_time, null);
         final CheckBox cbEnableXInput = view.findViewById(R.id.CBEnableXInput);
         final CheckBox cbEnableDInput = view.findViewById(R.id.CBEnableDInput);
-        final View llDInputType = view.findViewById(R.id.LLDinputMapperType);
+        final CheckBox cbExclusiveXInput = view.findViewById(R.id.CBExclusiveXInput);
         final View btHelpXInput = view.findViewById(R.id.BTXInputHelp);
         final View btHelpDInput = view.findViewById(R.id.BTDInputHelp);
-        final Spinner SDInputType = view.findViewById(R.id.SDInputType);
+        final View btHelpExclusiveXInput = view.findViewById(R.id.BTExclusiveXInputHelp);
 
         // Check if we are in edit mode to set input type accordingly
         int inputType = isEditMode() ? container.getInputType() : WinHandler.DEFAULT_INPUT_TYPE;
@@ -408,30 +443,54 @@ public class ContainerDetailFragment extends Fragment {
         // New logic for enabling XInput and DInput
         cbEnableXInput.setChecked((inputType & WinHandler.FLAG_INPUT_TYPE_XINPUT) == WinHandler.FLAG_INPUT_TYPE_XINPUT);
         cbEnableDInput.setChecked((inputType & WinHandler.FLAG_INPUT_TYPE_DINPUT) == WinHandler.FLAG_INPUT_TYPE_DINPUT);
+        cbExclusiveXInput.setChecked(isEditMode() ? container.isExclusiveXInput() : true);
 
         cbEnableDInput.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            llDInputType.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-            if (isChecked && cbEnableXInput.isChecked())
-                showInputWarning.run();
+            if (cbExclusiveXInput.isChecked()) {
+                if (isChecked && cbEnableXInput.isChecked()) {
+                    cbEnableXInput.setChecked(false);
+                }
+            }
         });
 
         cbEnableXInput.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked && cbEnableDInput.isChecked())
-                showInputWarning.run();
+            if (cbExclusiveXInput.isChecked()) {
+                if (isChecked && cbEnableDInput.isChecked()) {
+                    cbEnableDInput.setChecked(false);
+                }
+            }
         });
 
-        SDInputType.setSelection(((inputType & WinHandler.FLAG_DINPUT_MAPPER_STANDARD) == WinHandler.FLAG_DINPUT_MAPPER_STANDARD) ? 0 : 1);
-        llDInputType.setVisibility(cbEnableDInput.isChecked() ? View.VISIBLE : View.GONE);
+        cbExclusiveXInput.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (!isChecked) {
+                cbEnableXInput.setChecked(true);
+                cbEnableDInput.setChecked(true);
+                cbEnableXInput.setEnabled(false);
+                cbEnableDInput.setEnabled(false);
+            } else {
+                cbEnableXInput.setEnabled(true);
+                cbEnableDInput.setEnabled(true);
+                if (cbEnableXInput.isChecked() && cbEnableDInput.isChecked())
+                    cbEnableDInput.setChecked(false);
+            }
+        });
+
+        // Trigger initial state logic
+        if (!cbExclusiveXInput.isChecked()) {
+            cbEnableXInput.setChecked(true);
+            cbEnableDInput.setChecked(true);
+            cbEnableXInput.setEnabled(false);
+            cbEnableDInput.setEnabled(false);
+        }
 
         btHelpXInput.setOnClickListener(v -> AppUtils.showHelpBox(context, v, R.string.help_xinput));
         btHelpDInput.setOnClickListener(v -> AppUtils.showHelpBox(context, v, R.string.help_dinput));
-
-        final CheckBox cbSdl2Toggle = view.findViewById(R.id.CBSdl2Toggle);
-        cbSdl2Toggle.setChecked(isEditMode() && container.getEnvVars().contains("SDL_XINPUT_ENABLED=1"));
+        btHelpExclusiveXInput.setOnClickListener(v -> AppUtils.showHelpBox(context, v, R.string.help_exclusive_xinput));
 
         final EditText etLC_ALL = view.findViewById(R.id.ETlcall);
         Locale systemLocal = Locale.getDefault();
-        etLC_ALL.setText(isEditMode() ? container.getLC_ALL() : systemLocal.getLanguage() + '_' + systemLocal.getCountry() + ".UTF-8");
+        etLC_ALL.setText(isEditMode() ? container.getLC_ALL()
+                : systemLocal.getLanguage() + '_' + systemLocal.getCountry() + ".UTF-8");
 
         final View btShowLCALL = view.findViewById(R.id.BTShowLCALL);
         btShowLCALL.setOnClickListener(v -> {
@@ -448,48 +507,65 @@ public class ContainerDetailFragment extends Fragment {
 
         final Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
         byte previousStartupSelection = isEditMode() ? container.getStartupSelection() : -1;
-        sStartupSelection.setSelection(previousStartupSelection != -1 ? previousStartupSelection : Container.STARTUP_SELECTION_ESSENTIAL);
+        sStartupSelection.setSelection(
+                previousStartupSelection != -1 ? previousStartupSelection : Container.STARTUP_SELECTION_ESSENTIAL);
 
         final Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        Box64PresetManager.loadSpinner("box64", sBox64Preset, isEditMode() ? container.getBox64Preset() : preferences.getString("box64_preset", Box64Preset.COMPATIBILITY));
+        Box64PresetManager.loadSpinner("box64", sBox64Preset, isEditMode() ? container.getBox64Preset()
+                : preferences.getString("box64_preset", Box64Preset.COMPATIBILITY));
 
         final Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
-        FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion, isEditMode() ? container.getFEXCoreVersion() : DefaultVersion.FEXCORE);
+        FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion,
+                isEditMode() ? container.getFEXCoreVersion() : DefaultVersion.FEXCORE);
 
         final Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        FEXCorePresetManager.loadSpinner(sFEXCorePreset, isEditMode() ? container.getFEXCorePreset() : preferences.getString("fexcore_preset", FEXCorePreset.INTERMEDIATE));
+        FEXCorePresetManager.loadSpinner(sFEXCorePreset, isEditMode() ? container.getFEXCorePreset()
+                : preferences.getString("fexcore_preset", FEXCorePreset.INTERMEDIATE));
 
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
-        List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sGraphicsItemsList));
+        List<String> sGraphicsItemsList = new ArrayList<>(
+                Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
+        sGraphicsDriver.setAdapter(
+                new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sGraphicsItemsList));
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
-
 
         final CPUListView cpuListView = view.findViewById(R.id.CPUListView);
         final CPUListView cpuListViewWoW64 = view.findViewById(R.id.CPUListViewWoW64);
 
         cpuListView.setCheckedCPUList(isEditMode() ? container.getCPUList(true) : Container.getFallbackCPUList());
-        cpuListViewWoW64.setCheckedCPUList(isEditMode() ? container.getCPUListWoW64(true) : Container.getFallbackCPUListWoW64());
+        cpuListViewWoW64.setCheckedCPUList(
+                isEditMode() ? container.getCPUListWoW64(true) : Container.getFallbackCPUListWoW64());
 
         final Spinner sPrimaryController = view.findViewById(R.id.SPrimaryController);
         sPrimaryController.setSelection(isEditMode() ? container.getPrimaryController() : 1);
-        setControllerMapping(view.findViewById(R.id.SButtonA), Container.XrControllerMapping.BUTTON_A, XKeycode.KEY_A.ordinal());
-        setControllerMapping(view.findViewById(R.id.SButtonB), Container.XrControllerMapping.BUTTON_B, XKeycode.KEY_B.ordinal());
-        setControllerMapping(view.findViewById(R.id.SButtonX), Container.XrControllerMapping.BUTTON_X, XKeycode.KEY_X.ordinal());
-        setControllerMapping(view.findViewById(R.id.SButtonY), Container.XrControllerMapping.BUTTON_Y, XKeycode.KEY_Y.ordinal());
-        setControllerMapping(view.findViewById(R.id.SButtonGrip), Container.XrControllerMapping.BUTTON_GRIP, XKeycode.KEY_SPACE.ordinal());
-        setControllerMapping(view.findViewById(R.id.SButtonTrigger), Container.XrControllerMapping.BUTTON_TRIGGER, XKeycode.KEY_ENTER.ordinal());
-        setControllerMapping(view.findViewById(R.id.SThumbstickUp), Container.XrControllerMapping.THUMBSTICK_UP, XKeycode.KEY_UP.ordinal());
-        setControllerMapping(view.findViewById(R.id.SThumbstickDown), Container.XrControllerMapping.THUMBSTICK_DOWN, XKeycode.KEY_DOWN.ordinal());
-        setControllerMapping(view.findViewById(R.id.SThumbstickLeft), Container.XrControllerMapping.THUMBSTICK_LEFT, XKeycode.KEY_LEFT.ordinal());
-        setControllerMapping(view.findViewById(R.id.SThumbstickRight), Container.XrControllerMapping.THUMBSTICK_RIGHT, XKeycode.KEY_RIGHT.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonA), Container.XrControllerMapping.BUTTON_A,
+                XKeycode.KEY_A.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonB), Container.XrControllerMapping.BUTTON_B,
+                XKeycode.KEY_B.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonX), Container.XrControllerMapping.BUTTON_X,
+                XKeycode.KEY_X.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonY), Container.XrControllerMapping.BUTTON_Y,
+                XKeycode.KEY_Y.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonGrip), Container.XrControllerMapping.BUTTON_GRIP,
+                XKeycode.KEY_SPACE.ordinal());
+        setControllerMapping(view.findViewById(R.id.SButtonTrigger), Container.XrControllerMapping.BUTTON_TRIGGER,
+                XKeycode.KEY_ENTER.ordinal());
+        setControllerMapping(view.findViewById(R.id.SThumbstickUp), Container.XrControllerMapping.THUMBSTICK_UP,
+                XKeycode.KEY_UP.ordinal());
+        setControllerMapping(view.findViewById(R.id.SThumbstickDown), Container.XrControllerMapping.THUMBSTICK_DOWN,
+                XKeycode.KEY_DOWN.ordinal());
+        setControllerMapping(view.findViewById(R.id.SThumbstickLeft), Container.XrControllerMapping.THUMBSTICK_LEFT,
+                XKeycode.KEY_LEFT.ordinal());
+        setControllerMapping(view.findViewById(R.id.SThumbstickRight), Container.XrControllerMapping.THUMBSTICK_RIGHT,
+                XKeycode.KEY_RIGHT.ordinal());
 
         createWineConfigurationTab(view);
         final EnvVarsView envVarsView = createEnvVarsTab(view);
         createWinComponentsTab(view, isEditMode() ? container.getWinComponents() : Container.DEFAULT_WINCOMPONENTS);
         createDrivesTab(view);
 
-        AppUtils.setupTabLayout(view, R.id.TabLayout, R.id.LLTabWineConfiguration, R.id.LLTabWinComponents, R.id.LLTabEnvVars, R.id.LLTabDrives, R.id.LLTabAdvanced, R.id.LLTabXR);
+        AppUtils.setupTabLayout(view, R.id.TabLayout, R.id.LLTabWineConfiguration, R.id.LLTabWinComponents,
+                R.id.LLTabEnvVars, R.id.LLTabDrives, R.id.LLTabAdvanced, R.id.LLTabXR);
 
         TabLayout tabLayout = view.findViewById(R.id.TabLayout);
 
@@ -508,9 +584,13 @@ public class ContainerDetailFragment extends Fragment {
                 String envVars = envVarsView.getEnvVars();
                 String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
                 String graphicsDriverConfig = vGraphicsDriverConfig.getTag().toString();
-                HashMap<String, String> config = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
+                HashMap<String, String> config = GraphicsDriverConfigDialog
+                        .parseGraphicsDriverConfig(graphicsDriverConfig);
                 if (config.get("version").isEmpty()) {
-                    config.put("version", GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context) ? DefaultVersion.WRAPPER_ADRENO : DefaultVersion.WRAPPER);
+                    config.put("version",
+                            GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context)
+                                    ? DefaultVersion.WRAPPER_ADRENO
+                                    : DefaultVersion.WRAPPER);
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
@@ -521,6 +601,7 @@ public class ContainerDetailFragment extends Fragment {
                 String drives = getDrives(view);
                 boolean showFPS = cbShowFPS.isChecked();
                 boolean fullscreenStretched = cbFullscreenStretched.isChecked();
+                boolean exclusiveXInput = cbExclusiveXInput.isChecked();
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 String cpuListWoW64 = cpuListViewWoW64.getCheckedCPUListAsString();
                 byte startupSelection = (byte) sStartupSelection.getSelectedItemPosition();
@@ -530,7 +611,8 @@ public class ContainerDetailFragment extends Fragment {
                 String box64Preset = Box64PresetManager.getSpinnerSelectedId(sBox64Preset);
                 String desktopTheme = getDesktopTheme(view);
                 // Capture missing properties
-                String midiSoundFont = sMIDISoundFont.getSelectedItemPosition() == 0 ? "" : sMIDISoundFont.getSelectedItem().toString();
+                String midiSoundFont = sMIDISoundFont.getSelectedItemPosition() == 0 ? ""
+                        : sMIDISoundFont.getSelectedItem().toString();
                 String lc_all = etLC_ALL.getText().toString();
                 int primaryController = sPrimaryController.getSelectedItemPosition();
                 String controllerMapping = getControllerMapping(view);
@@ -539,24 +621,6 @@ public class ContainerDetailFragment extends Fragment {
                 int finalInputType = 0;
                 finalInputType |= cbEnableXInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_XINPUT : 0;
                 finalInputType |= cbEnableDInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_DINPUT : 0;
-                finalInputType |= SDInputType.getSelectedItemPosition() == 0 ? WinHandler.FLAG_DINPUT_MAPPER_STANDARD : WinHandler.FLAG_DINPUT_MAPPER_XINPUT;
-
-                // Handle SDL2 environment variables based on the toggle state
-                if (cbSdl2Toggle.isChecked()) {
-                    // Add SDL2 environment variables if the toggle is enabled
-                    for (String envVar : SDL2_ENV_VARS) {
-                        if (!envVars.contains(envVar)) {
-                            envVars += (envVars.isEmpty() ? "" : " ") + envVar;
-                        }
-                    }
-                } else {
-                    // Remove SDL2 environment variables if the toggle is disabled
-                    for (String envVar : SDL2_ENV_VARS) {
-                        envVars = envVars.replace(envVar, "").replaceAll("\\s{2,}", " ").trim();
-                    }
-                }
-
-
 
                 if (isEditMode()) {
                     // Update existing container properties
@@ -580,6 +644,7 @@ public class ContainerDetailFragment extends Fragment {
                     container.setDrives(drives);
                     container.setShowFPS(showFPS);
                     container.setFullscreenStretched(fullscreenStretched);
+                    container.setExclusiveXInput(exclusiveXInput);
                     container.setInputType(finalInputType);
                     container.setStartupSelection(startupSelection);
                     container.setBox64Version(box64Version);
@@ -607,9 +672,12 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("dxwrapper", dxwrapper);
                     data.put("rendererNative", rendererCfgHolder.isRendererNative());
                     data.put("rendererPresentMode", rendererCfgHolder.getRendererPresentMode());
-                    if (!rendererCfgHolder.getRendererDriverId().isEmpty()) data.put("rendererDriverId", rendererCfgHolder.getRendererDriverId());
-                    if (rendererCfgHolder.getRendererFilterMode() != 0) data.put("rendererFilterMode", rendererCfgHolder.getRendererFilterMode());
-                    if (rendererCfgHolder.getRendererSwapRB()) data.put("rendererSwapRB", true);
+                    if (!rendererCfgHolder.getRendererDriverId().isEmpty())
+                        data.put("rendererDriverId", rendererCfgHolder.getRendererDriverId());
+                    if (rendererCfgHolder.getRendererFilterMode() != 0)
+                        data.put("rendererFilterMode", rendererCfgHolder.getRendererFilterMode());
+                    if (rendererCfgHolder.getRendererSwapRB())
+                        data.put("rendererSwapRB", true);
                     data.put("dxwrapperConfig", dxwrapperConfig);
                     data.put("audioDriver", audioDriver);
                     data.put("emulator", emulator);
@@ -617,6 +685,7 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("drives", drives);
                     data.put("showFPS", showFPS);
                     data.put("fullscreenStretched", fullscreenStretched);
+                    data.put("exclusiveXInput", exclusiveXInput);
                     data.put("inputType", finalInputType);
                     data.put("startupSelection", startupSelection);
                     data.put("box64Version", box64Version);
@@ -635,7 +704,6 @@ public class ContainerDetailFragment extends Fragment {
                     // Initialize ImageFs
                     File imageFsRoot = new File(context.getFilesDir(), "imagefs");
                     imageFs = ImageFs.find(imageFsRoot);
-
 
                     manager.createContainerAsync(data, contentsManager, (container) -> {
                         if (container != null) {
@@ -657,14 +725,16 @@ public class ContainerDetailFragment extends Fragment {
         File userRegFile = new File(container.getRootDir(), ".wine/user.reg");
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            registryEditor.setStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", sMouseWarpOverride.getSelectedItem().toString().toLowerCase(Locale.ENGLISH));
+            registryEditor.setStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride",
+                    sMouseWarpOverride.getSelectedItem().toString().toLowerCase(Locale.ENGLISH));
         }
     }
 
     private void createWineConfigurationTab(View view) {
         Context context = getContext();
 
-        WineThemeManager.ThemeInfo desktopTheme = new WineThemeManager.ThemeInfo(isEditMode() ? container.getDesktopTheme() : WineThemeManager.DEFAULT_DESKTOP_THEME);
+        WineThemeManager.ThemeInfo desktopTheme = new WineThemeManager.ThemeInfo(
+                isEditMode() ? container.getDesktopTheme() : WineThemeManager.DEFAULT_DESKTOP_THEME);
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
         sDesktopTheme.setSelection(desktopTheme.theme.ordinal());
         final ImagePickerView ipvDesktopBackgroundImage = view.findViewById(R.id.IPVDesktopBackgroundImage);
@@ -681,14 +751,14 @@ public class ContainerDetailFragment extends Fragment {
 
                 if (type == WineThemeManager.BackgroundType.IMAGE) {
                     ipvDesktopBackgroundImage.setVisibility(View.VISIBLE);
-                }
-                else if (type == WineThemeManager.BackgroundType.COLOR) {
+                } else if (type == WineThemeManager.BackgroundType.COLOR) {
                     cpvDesktopBackgroundColor.setVisibility(View.VISIBLE);
                 }
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
         });
         sDesktopBackgroundType.setSelection(desktopTheme.backgroundType.ordinal());
 
@@ -696,10 +766,13 @@ public class ContainerDetailFragment extends Fragment {
         File userRegFile = new File(containerDir, ".wine/user.reg");
 
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
-            List<String> mouseWarpOverrideList = Arrays.asList(context.getString(R.string.disable), context.getString(R.string.enable), context.getString(R.string.force));
+            List<String> mouseWarpOverrideList = Arrays.asList(context.getString(R.string.disable),
+                    context.getString(R.string.enable), context.getString(R.string.force));
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            sMouseWarpOverride.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, mouseWarpOverrideList));
-            AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride, registryEditor.getStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", "disable"));
+            sMouseWarpOverride.setAdapter(
+                    new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, mouseWarpOverrideList));
+            AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride,
+                    registryEditor.getStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", "disable"));
         }
     }
 
@@ -710,11 +783,12 @@ public class ContainerDetailFragment extends Fragment {
         try {
             for (int i = 0; i < gpuCards.length(); i++) {
                 JSONObject item = gpuCards.getJSONObject(i);
-                if (item.getInt("deviceID") == selectedDeviceID) selectedPosition = i;
+                if (item.getInt("deviceID") == selectedDeviceID)
+                    selectedPosition = i;
                 values.add(item.getString("name"));
             }
+        } catch (JSONException e) {
         }
-        catch (JSONException e) {}
 
         spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
         spinner.setSelection(selectedPosition);
@@ -725,12 +799,13 @@ public class ContainerDetailFragment extends Fragment {
         String value = sScreenSize.getSelectedItem().toString();
         if (value.equalsIgnoreCase("custom")) {
             value = Container.DEFAULT_SCREEN_SIZE;
-            String strWidth = ((EditText)view.findViewById(R.id.ETScreenWidth)).getText().toString().trim();
-            String strHeight = ((EditText)view.findViewById(R.id.ETScreenHeight)).getText().toString().trim();
+            String strWidth = ((EditText) view.findViewById(R.id.ETScreenWidth)).getText().toString().trim();
+            String strHeight = ((EditText) view.findViewById(R.id.ETScreenHeight)).getText().toString().trim();
             if (strWidth.matches("[0-9]+") && strHeight.matches("[0-9]+")) {
                 int width = Integer.parseInt(strWidth);
                 int height = Integer.parseInt(strHeight);
-                if ((width % 2) == 0 && (height % 2) == 0) return width+"x"+height;
+                if ((width % 2) == 0 && (height % 2) == 0)
+                    return width + "x" + height;
             }
         }
         return StringUtils.parseIdentifier(value);
@@ -738,15 +813,16 @@ public class ContainerDetailFragment extends Fragment {
 
     private String getDesktopTheme(View view) {
         Spinner sDesktopBackgroundType = view.findViewById(R.id.SDesktopBackgroundType);
-        WineThemeManager.BackgroundType type = WineThemeManager.BackgroundType.values()[sDesktopBackgroundType.getSelectedItemPosition()];
+        WineThemeManager.BackgroundType type = WineThemeManager.BackgroundType.values()[sDesktopBackgroundType
+                .getSelectedItemPosition()];
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
         ColorPickerView cpvDesktopBackground = view.findViewById(R.id.CPVDesktopBackgroundColor);
         WineThemeManager.Theme theme = WineThemeManager.Theme.values()[sDesktopTheme.getSelectedItemPosition()];
 
-        String desktopTheme = theme+","+type+","+cpvDesktopBackground.getColorAsString();
+        String desktopTheme = theme + "," + type + "," + cpvDesktopBackground.getColorAsString();
         if (type == WineThemeManager.BackgroundType.IMAGE) {
             File userWallpaperFile = WineThemeManager.getUserWallpaperFile(getContext());
-            desktopTheme += ","+(userWallpaperFile.isFile() ? userWallpaperFile.lastModified() : "0");
+            desktopTheme += "," + (userWallpaperFile.isFile() ? userWallpaperFile.lastModified() : "0");
         }
         return desktopTheme;
     }
@@ -777,7 +853,8 @@ public class ContainerDetailFragment extends Fragment {
     }
 
     // New method: Adds support for the GraphicsDriverConfigDialog
-    public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
+    public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper,
+            final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
 
         // Update the spinner with the available graphics driver options
@@ -791,7 +868,8 @@ public class ContainerDetailFragment extends Fragment {
             for (String value : context.getResources().getStringArray(R.array.dxwrapper_entries)) {
                 items.add(value);
             }
-            sDXWrapper.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items.toArray()));
+            sDXWrapper.setAdapter(
+                    new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items.toArray()));
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
 
             vGraphicsDriverConfig.setOnClickListener((v) -> {
@@ -807,7 +885,8 @@ public class ContainerDetailFragment extends Fragment {
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
         });
 
         // Set the spinner's initial selection
@@ -821,7 +900,8 @@ public class ContainerDetailFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
                 if (dxwrapper.contains("dxvk")) {
-                    vDXWrapperConfig.setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
+                    vDXWrapperConfig
+                            .setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }
@@ -829,7 +909,8 @@ public class ContainerDetailFragment extends Fragment {
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
         };
 
         sDXWrapper.setOnItemSelectedListener(listener);
@@ -840,8 +921,7 @@ public class ContainerDetailFragment extends Fragment {
                     sDXWrapper,
                     sDXWrapper.getSelectedView(),
                     selectedPosition,
-                    sDXWrapper.getSelectedItemId()
-            );
+                    sDXWrapper.getSelectedItemId());
         }
     }
 
@@ -852,8 +932,8 @@ public class ContainerDetailFragment extends Fragment {
         String[] wincomponents = new String[views.size()];
 
         for (int i = 0; i < views.size(); i++) {
-            Spinner spinner = (Spinner)views.get(i);
-            wincomponents[i] = spinner.getTag()+"="+spinner.getSelectedItemPosition();
+            Spinner spinner = (Spinner) views.get(i);
+            wincomponents[i] = spinner.getTag() + "=" + spinner.getSelectedItemPosition();
         }
         return String.join(",", wincomponents);
     }
@@ -868,20 +948,23 @@ public class ContainerDetailFragment extends Fragment {
         for (String[] wincomponent : new KeyValueSet(wincomponents)) {
             ViewGroup parent = wincomponent[0].startsWith("direct") ? directxSectionView : generalSectionView;
             View itemView = inflater.inflate(R.layout.wincomponent_list_item, parent, false);
-            ((TextView)itemView.findViewById(R.id.TextView)).setText(StringUtils.getString(context, wincomponent[0]));
+            ((TextView) itemView.findViewById(R.id.TextView)).setText(StringUtils.getString(context, wincomponent[0]));
             Spinner spinner = itemView.findViewById(R.id.Spinner);
             spinner.setSelection(Integer.parseInt(wincomponent[1]), false);
             spinner.setTag(wincomponent[0]);
 
-            // Set the background color of the spinners dynamically based on the current theme
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark: R.drawable.content_dialog_background);
+            // Set the background color of the spinners dynamically based on the current
+            // theme
+            spinner.setPopupBackgroundResource(
+                    isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
             parent.addView(itemView);
 
         }
     }
 
-    public static void createWinComponentsTabFromShortcut(ShortcutSettingsDialog dialog, View view, String wincomponents, boolean isDarkMode) {
+    public static void createWinComponentsTabFromShortcut(ShortcutSettingsDialog dialog, View view,
+            String wincomponents, boolean isDarkMode) {
         Context context = dialog.getContext();
         LayoutInflater inflater = LayoutInflater.from(context);
         ViewGroup tabView = view.findViewById(R.id.LLTabWinComponents);
@@ -896,8 +979,10 @@ public class ContainerDetailFragment extends Fragment {
             spinner.setSelection(Integer.parseInt(wincomponent[1]), false);
             spinner.setTag(wincomponent[0]);
 
-            // Set the background color of the spinners dynamically based on the current theme
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            // Set the background color of the spinners dynamically based on the current
+            // theme
+            spinner.setPopupBackgroundResource(
+                    isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
             parent.addView(itemView);
         }
@@ -914,7 +999,8 @@ public class ContainerDetailFragment extends Fragment {
         envVarsView.setDarkMode(isDarkMode); // New setter method
 
         envVarsView.setEnvVars(new EnvVars(isEditMode() ? container.getEnvVars() : Container.DEFAULT_ENV_VARS));
-        view.findViewById(R.id.BTAddEnvVar).setOnClickListener((v) -> (new AddEnvVarDialog(context, envVarsView)).show());
+        view.findViewById(R.id.BTAddEnvVar)
+                .setOnClickListener((v) -> (new AddEnvVarDialog(context, envVarsView)).show());
         return envVarsView;
     }
 
@@ -927,7 +1013,8 @@ public class ContainerDetailFragment extends Fragment {
             Spinner spinner = child.findViewById(R.id.Spinner);
             EditText editText = child.findViewById(R.id.EditText);
             String path = editText.getText().toString().trim();
-            if (!path.isEmpty()) drives += spinner.getSelectedItem()+path;
+            if (!path.isEmpty())
+                drives += spinner.getSelectedItem() + path;
         }
         return drives;
     }
@@ -940,16 +1027,19 @@ public class ContainerDetailFragment extends Fragment {
         LayoutInflater inflater = LayoutInflater.from(context);
         final String drives = isEditMode() ? container.getDrives() : Container.DEFAULT_DRIVES;
         final String[] driveLetters = new String[Container.MAX_DRIVE_LETTERS];
-        for (int i = 0; i < driveLetters.length; i++) driveLetters[i] = ((char)(i + 68))+":";
+        for (int i = 0; i < driveLetters.length; i++)
+            driveLetters[i] = ((char) (i + 68)) + ":";
 
         Callback<String[]> addItem = (drive) -> {
             final View itemView = inflater.inflate(R.layout.drive_list_item, parent, false);
             Spinner spinner = itemView.findViewById(R.id.Spinner);
-            spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, driveLetters));
-            AppUtils.setSpinnerSelectionFromValue(spinner, drive[0]+":");
+            spinner.setAdapter(
+                    new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, driveLetters));
+            AppUtils.setSpinnerSelectionFromValue(spinner, drive[0] + ":");
 
             // Apply dark theme to the spinner popup background
-            spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(
+                    isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
 
             final EditText editText = itemView.findViewById(R.id.EditText);
             editText.setText(drive[1]);
@@ -967,28 +1057,33 @@ public class ContainerDetailFragment extends Fragment {
                     editText.setText(path);
                 };
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.fromFile(Environment.getExternalStorageDirectory()));
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI,
+                        Uri.fromFile(Environment.getExternalStorageDirectory()));
                 getActivity().startActivityFromFragment(this, intent, MainActivity.OPEN_DIRECTORY_REQUEST_CODE);
             });
 
             itemView.findViewById(R.id.BTRemove).setOnClickListener((v) -> {
                 parent.removeView(itemView);
-                if (parent.getChildCount() == 0) emptyTextView.setVisibility(View.VISIBLE);
+                if (parent.getChildCount() == 0)
+                    emptyTextView.setVisibility(View.VISIBLE);
             });
             parent.addView(itemView);
 
             // Hide empty text view if there are items
             emptyTextView.setVisibility(View.GONE);
         };
-        for (String[] drive : Container.drivesIterator(drives)) addItem.call(drive);
+        for (String[] drive : Container.drivesIterator(drives))
+            addItem.call(drive);
 
         view.findViewById(R.id.BTAddDrive).setOnClickListener((v) -> {
-            if (parent.getChildCount() >= Container.MAX_DRIVE_LETTERS) return;
+            if (parent.getChildCount() >= Container.MAX_DRIVE_LETTERS)
+                return;
             final String nextDriveLetter = String.valueOf(driveLetters[parent.getChildCount()].charAt(0));
-            addItem.call(new String[]{nextDriveLetter, ""});
+            addItem.call(new String[] { nextDriveLetter, "" });
         });
 
-        if (drives.isEmpty()) emptyTextView.setVisibility(View.VISIBLE);
+        if (drives.isEmpty())
+            emptyTextView.setVisibility(View.VISIBLE);
     }
 
     // Helper method to apply dark theme to EditText
@@ -1011,8 +1106,8 @@ public class ContainerDetailFragment extends Fragment {
 
     private void loadWineVersionSpinner(final View view, Spinner sWineVersion, Spinner sBox64Version) {
         final Context context = getContext();
-        sWineVersion.setEnabled(!isEditMode());
-//
+        // Wine version is always editable (both create and edit mode)
+        //
         sWineVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
@@ -1028,9 +1123,9 @@ public class ContainerDetailFragment extends Fragment {
                     fexcoreFL.setVisibility(View.VISIBLE);
                     sEmulator.setEnabled(true);
                     sEmulator64.setSelection(0);
-                    if (!isEditMode()) sEmulator.setSelection(0);
-                }
-                else {
+                    if (!isEditMode())
+                        sEmulator.setSelection(0);
+                } else {
                     fexcoreFL.setVisibility(View.GONE);
                     sEmulator.setEnabled(false);
                     sEmulator.setSelection(1);
@@ -1039,11 +1134,11 @@ public class ContainerDetailFragment extends Fragment {
                 loadBox64VersionSpinner(context, container, contentsManager, sBox64Version, wineInfo.isArm64EC());
                 setupDXWrapperSpinner(sDXWrapper, vDXWrapperConfig, wineInfo.isArm64EC());
             }
+
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
-
 
         view.findViewById(R.id.LLWineVersion).setVisibility(View.VISIBLE);
         String[] versions = getResources().getStringArray(R.array.wine_entries);
@@ -1053,19 +1148,21 @@ public class ContainerDetailFragment extends Fragment {
             wineVersions.add(ContentsManager.getEntryName(profile));
         for (ContentProfile profile : contentsManager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_PROTON))
             wineVersions.add(ContentsManager.getEntryName(profile));
-        sWineVersion.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wineVersions));
-        if (isEditMode()) AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
+        sWineVersion
+                .setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wineVersions));
+        if (isEditMode())
+            AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
     }
 
     public String getControllerMapping(View view) {
-        //The order has to be the same like Container.XrControllerMapping
+        // The order has to be the same like Container.XrControllerMapping
         int[] ids = {
                 R.id.SButtonA, R.id.SButtonB, R.id.SButtonX, R.id.SButtonY, R.id.SButtonGrip, R.id.SButtonTrigger,
                 R.id.SThumbstickUp, R.id.SThumbstickDown, R.id.SThumbstickLeft, R.id.SThumbstickRight
         };
         byte[] controllerMapping = new byte[ids.length];
         for (int i = 0; i < ids.length; i++) {
-            int index =  ((Spinner)view.findViewById(ids[i])).getSelectedItemPosition();
+            int index = ((Spinner) view.findViewById(ids[i])).getSelectedItemPosition();
             byte value = XKeycode.values()[index].id;
             controllerMapping[i] = value;
         }
@@ -1078,7 +1175,8 @@ public class ContainerDetailFragment extends Fragment {
         for (XKeycode value : values) {
             array.add(value.name());
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, array);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(spinner.getContext(),
+                android.R.layout.simple_spinner_dropdown_item, array);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
 
@@ -1096,18 +1194,17 @@ public class ContainerDetailFragment extends Fragment {
     public static void updateGraphicsDriverSpinner(Context context, Spinner spinner) {
         String[] originalItems = context.getResources().getStringArray(R.array.graphics_driver_entries);
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
-
         // Set the adapter with the combined list
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
     }
 
-    public static void loadBox64VersionSpinner(Context context, Container container, ContentsManager manager, Spinner spinner, boolean isArm64EC) {
+    public static void loadBox64VersionSpinner(Context context, Container container, ContentsManager manager,
+            Spinner spinner, boolean isArm64EC) {
         List<String> itemList;
         if (isArm64EC) {
             String[] originalItems = context.getResources().getStringArray(R.array.wowbox64_version_entries);
             itemList = new ArrayList<>(Arrays.asList(originalItems));
-        }
-        else {
+        } else {
             String[] originalItems = context.getResources().getStringArray(R.array.box64_version_entries);
             itemList = new ArrayList<>(Arrays.asList(originalItems));
         }
@@ -1128,9 +1225,8 @@ public class ContainerDetailFragment extends Fragment {
         if (container != null)
             AppUtils.setSpinnerSelectionFromValue(spinner, container.getBox64Version());
         else
-            AppUtils.setSpinnerSelectionFromValue(spinner, (isArm64EC) ? DefaultVersion.WOWBOX64 : DefaultVersion.BOX64);
+            AppUtils.setSpinnerSelectionFromValue(spinner,
+                    (isArm64EC) ? DefaultVersion.WOWBOX64 : DefaultVersion.BOX64);
     }
 
 }
-
-
