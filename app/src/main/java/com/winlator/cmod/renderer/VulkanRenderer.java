@@ -7,8 +7,8 @@ import android.view.Surface;
 import android.widget.Toast;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.WinlatorHUD;
-import com.winlator.cmod.widget.HudDataSource;
 import com.winlator.cmod.widget.XServerView;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Cursor;
@@ -224,13 +224,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         if (nativeMode) xServerView.post(this::releaseScanoutSurfaces);
     }
 
-    /**
-     * Immediately tears down all native resources and hides scanout surfaces.
-     * Unlike onSurfaceDestroyed(), this runs fully synchronously and explicitly
-     * hides the hardware-composed scanout layers via a SurfaceControl transaction
-     * so the game image disappears from the display pipeline instantly.
-     * Must be called from the UI thread.
-     */
+  
     public void forceCleanup() {
         initComplete = false;
         if (initExecutor != null) {
@@ -246,10 +240,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 nativeHandle = 0;
             }
         }
-        // Explicitly hide scanout layers via a SurfaceControl transaction before
-        // releasing them. release() alone does not guarantee immediate removal
-        // from the display pipeline — the compositor may keep showing the last
-        // submitted buffer until the next vsync or transaction.
         if (android.os.Build.VERSION.SDK_INT >= 29) {
             try {
                 android.view.SurfaceControl.Transaction txn = new android.view.SurfaceControl.Transaction();
@@ -292,8 +282,12 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     private void updateTransform() {
         if (nativeHandle == 0) return;
+        float zoom = magnifierZoom;
+        float cx = surfaceWidth / 2f;
+        float cy = surfaceHeight / 2f;
         if (fullscreen) {
-            nativeSetTransform(nativeHandle, 0, 0, 1.0f, 1.0f);
+            nativeSetTransform(nativeHandle,
+                cx * (1f - zoom), cy * (1f - zoom), zoom, zoom);
             viewTransformation.update(surfaceWidth, surfaceHeight,
                 xServer.screenInfo.width, xServer.screenInfo.height);
             nativeScanoutSetDst(nativeHandle,
@@ -307,11 +301,15 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 short halfH = (short)(xServer.screenInfo.height / 2);
                 py = Math.max(0, Math.min(xServer.pointer.getY() - halfH / 2.0f, halfH));
             }
+            float baseOx = viewTransformation.sceneOffsetX;
+            float baseOy = viewTransformation.sceneOffsetY - py;
+            float baseSx = viewTransformation.sceneScaleX;
+            float baseSy = viewTransformation.sceneScaleY;
             nativeSetTransform(nativeHandle,
-                viewTransformation.sceneOffsetX,
-                viewTransformation.sceneOffsetY - py,
-                viewTransformation.sceneScaleX,
-                viewTransformation.sceneScaleY);
+                baseOx * zoom + cx * (1f - zoom),
+                baseOy * zoom + cy * (1f - zoom),
+                baseSx * zoom,
+                baseSy * zoom);
             nativeScanoutSetDst(nativeHandle,
                 viewTransformation.viewOffsetX,
                 viewTransformation.viewOffsetY,
@@ -424,9 +422,9 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public void onUpdateWindowContentDirect(Window window, Drawable pixmap, short xOff, short yOff) {
-        if (hudRef != null && !nativeMode) {
-            hudRef.setIsNative(false);
-            hudRef.onFrame();
+        if (!nativeMode && window.id == fpsWindowId) {
+            if (hudRef != null) hudRef.onFrame();
+            if (classicHudRef != null) classicHudRef.update();
         }
         synchronized (lock) {
             if (nativeHandle == 0 || pixmap == null) return;
@@ -469,7 +467,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     @Override
     public void onUpdateWindowContent(Window window) {
-        if (hudRef != null) hudRef.update();
+        // FPS is counted only via XServerDisplayActivity's listener (filtered by
+        // frameRatingWindowId) — counting here would double-count every frame.
         synchronized (lock) {
             if (nativeHandle == 0) return;
             Drawable drawable = window.getContent();
@@ -502,6 +501,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                                 hudRef.onFrame();
                                 hudRef.setIsNative(delivered);
                             }
+                            if (classicHudRef != null) classicHudRef.update();
                         } else if (!scanoutNow) {
                             nativeUpdateWindowContentAHB(nativeHandle, did(drawable), ahbPtr,
                                 drawable.width, drawable.height, rx, ry);
@@ -701,18 +701,24 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public int getNativeColorFormat() { return 0; }
 
     private WinlatorHUD hudRef = null;
+    private FrameRating classicHudRef = null;
+    private int fpsWindowId = -1;
 
-    public void setHudDataSource(com.winlator.cmod.widget.HudDataSource ds) {}
+    public void setFpsWindowId(int id) { fpsWindowId = id; }
 
     public void setFrameRating(Object fr) {
         if (fr instanceof WinlatorHUD) hudRef = (WinlatorHUD) fr;
+        else if (fr instanceof FrameRating) classicHudRef = (FrameRating) fr;
     }
 
     public boolean isFullscreen() { return fullscreen; }
     public void toggleFullscreen() { fullscreen = !fullscreen; synchronized (lock) { updateTransform(); } xServerView.queueEvent(this::updateScene); }
     public void setScreenOffsetYRelativeToCursor(boolean b) { screenOffsetYRelativeToCursor = b; synchronized (lock) { updateTransform(); } }
     public boolean isScreenOffsetYRelativeToCursor() { return screenOffsetYRelativeToCursor; }
-    public void setMagnifierZoom(float zoom) { magnifierZoom = zoom; }
+    public void setMagnifierZoom(float zoom) {
+        magnifierZoom = zoom;
+        synchronized (lock) { updateTransform(); }
+    }
     public float getMagnifierZoom() { return magnifierZoom; }
     public void setUnviewableWMClasses(String... classes) { this.unviewableWMClasses = classes; }
     private int fpsLimit = 0;

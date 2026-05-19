@@ -75,7 +75,6 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-// For YouTube Playback
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -109,7 +108,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
     private MediaPlayer mediaPlayer;
 
-    // Declare constants for the request code and preferences key
     private static final int REQUEST_CODE_SELECT_WALLPAPER = 1080;
     private static final String WALLPAPER_PREF_KEY = "custom_wallpaper_path";
     private static final String WALLPAPER_DISPLAY_PREF_KEY = "wallpaper_display_mode";
@@ -139,14 +137,6 @@ public class BigPictureActivity extends AppCompatActivity {
         getSupportActionBar().hide();  // Hide the action bar for full-screen mode
         setContentView(R.layout.big_picture_activity);
 
-//        // Set the background to ImageView for the tiled animation background
-//        ImageView parallaxBackgroundView = findViewById(R.id.parallaxBackgroundView);
-//        parallaxBackgroundView.setBackgroundResource(R.drawable.animated_background); // Use animation as background
-//
-//        // Get the AnimationDrawable and start it directly
-//        animatedBackground = (AnimationDrawable) parallaxBackgroundView.getBackground();
-//        animatedBackground.setOneShot(false); // Loop the animation
-//        parallaxBackgroundView.post(() -> animatedBackground.start());
 
 
 
@@ -174,32 +164,24 @@ public class BigPictureActivity extends AppCompatActivity {
         }
 
 
-        // In onCreate, after inflating views:
         SeekBar frameSpeedSeekBar = findViewById(R.id.frameSpeedSeekBar);
         bgView = findViewById(R.id.parallaxBackgroundView);
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-// 1) Restore the previous SeekBar progress
         int storedSeekBarProgress = prefs.getInt(SEEK_BAR_PROGRESS_KEY, 66); // default 66
-// 2) Set the SeekBar position
         frameSpeedSeekBar.setProgress(storedSeekBarProgress);
 
-// 3) Convert that storedSeekBarProgress to actual frameDuration
         int reversedProgress = frameSpeedSeekBar.getMax() - storedSeekBarProgress;
         bgView.setFrameDuration(reversedProgress);
 
-// Now attach the listener
         TiledBackgroundView finalBgView = bgView;
         SharedPreferences finalPrefs = prefs;
         frameSpeedSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                // Because you’re reversing the direction:
                 int reversed = seekBar.getMax() - progress;
-                // Apply to the TiledBackgroundView
                 finalBgView.setFrameDuration(reversed);
 
-                // Store the *raw* SeekBar progress so we can restore next time
                 finalPrefs.edit().putInt(SEEK_BAR_PROGRESS_KEY, progress).apply();
             }
 
@@ -213,10 +195,8 @@ public class BigPictureActivity extends AppCompatActivity {
         RadioGroup animationSelectorGroup = findViewById(R.id.animationSelectorGroup);
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
 
-// Temporarily disable listener to avoid unintended triggers
         animationSelectorGroup.setOnCheckedChangeListener(null);
 
-// Restore the selected animation state for the RadioGroup
         String savedAnimation = preferences.getString("selected_animation", "ab"); // Default to "ab" or your preferred default
         if (savedAnimation.equals("custom_wallpaper")) {
             ((RadioButton) findViewById(R.id.rbCustomWallpaper)).setChecked(true);
@@ -237,7 +217,6 @@ public class BigPictureActivity extends AppCompatActivity {
             ((RadioButton) findViewById(R.id.rbDefaultAnimation)).setChecked(true);
         }
 
-// Re-enable and attach the listener after setting the state
         animationSelectorGroup.setOnCheckedChangeListener((group, checkedId) -> {
             SharedPreferences.Editor editor = preferences.edit();
             if (checkedId == R.id.rbCustomWallpaper) {
@@ -248,7 +227,6 @@ public class BigPictureActivity extends AppCompatActivity {
                 selectWallpaperButton.setVisibility(View.GONE);
                 backgroundView.setVisibility(View.VISIBLE);
 
-                // Handle other animation options here
                 if (checkedId == R.id.rbGearAnimation) {
                     backgroundView.setAnimation("ab_gear");
                     editor.putString("selected_animation", "ab_gear");
@@ -271,7 +249,6 @@ public class BigPictureActivity extends AppCompatActivity {
             backgroundView.startAnimation();
         });
 
-// Handle the saved animation for the TiledBackgroundView
         if (savedAnimation.equals("ab_gear")) {
             backgroundView.setAnimation("ab_gear");
         } else if (savedAnimation.equals("ab_quilt")) {
@@ -290,7 +267,6 @@ public class BigPictureActivity extends AppCompatActivity {
         }
         backgroundView.startAnimation();
 
-        // Launch file picker when button is clicked
         selectWallpaperButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("image/*");
@@ -311,7 +287,6 @@ public class BigPictureActivity extends AppCompatActivity {
                 }
             }
         } else {
-            // Apply other animation options as per the selected animation value
             applyAnimationBasedOnState(backgroundView, savedAnimation);
         }
 
@@ -319,7 +294,6 @@ public class BigPictureActivity extends AppCompatActivity {
         RadioGroup parallaxModeGroup = findViewById(R.id.parallaxModeGroup);
 
         String savedParallaxMode = preferences.getString("parallax_mode", "default");
-// Pre-check whichever is saved
         switch (savedParallaxMode) {
             case "off":
                 ((RadioButton) findViewById(R.id.rbParallaxOff)).setChecked(true);
@@ -355,24 +329,20 @@ public class BigPictureActivity extends AppCompatActivity {
             }
             preferences.edit().putString("parallax_mode", mode).apply();
 
-            // Immediately apply to TiledBackgroundView:
             applyParallaxMode(mode);
         });
 
 
 
-        // Find the YouTube URL input and Load Video button
         EditText youtubeUrlInput = findViewById(R.id.youtubeUrlInput);
         Button loadVideoButton = findViewById(R.id.loadVideoButton);
 
-        // Set default video (this will be used if no custom URL is provided)
         final String defaultVideoId = "yNwKYgM6SkM"; // Wii shop channel music extended
 
 
         LinearLayout settingsLayout = findViewById(R.id.settingsLayout);
 
 
-        // Override API key if custom key is set
         boolean isCustomApiKeyEnabled = preferences.getBoolean("enable_custom_api_key", false);
         if (isCustomApiKeyEnabled) {
             String customApiKey = preferences.getString("custom_api_key", "");
@@ -381,16 +351,12 @@ public class BigPictureActivity extends AppCompatActivity {
             }
         }
 
-        // Find the "Disable BG Music" button
         Button disableBgMusicButton = findViewById(R.id.disableBgMusicButton);
 
-        // Load the saved BG music state from SharedPreferences
         boolean isBgMusicEnabled = preferences.getBoolean("bg_music_enabled", true);
 
-        // Update the button text based on the current state
         updateBgMusicButtonText(disableBgMusicButton, isBgMusicEnabled);
 
-        // Set the listener for the "Disable BG Music" button
         disableBgMusicButton.setOnClickListener(v -> {
             boolean currentBgMusicState = preferences.getBoolean("bg_music_enabled", true);
             boolean newBgMusicState = !currentBgMusicState;
@@ -401,7 +367,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
             updateBgMusicButtonText(disableBgMusicButton, newBgMusicState);
 
-            // Enable or disable music based on the new state
             if (newBgMusicState) {
                 onResume(); // Restart music based on the current selection (MP3 or YouTube)
             } else {
@@ -424,29 +389,23 @@ public class BigPictureActivity extends AppCompatActivity {
         RadioButton youtubeRadioButton = findViewById(R.id.youtubeRadioButton);
         RadioButton mp3RadioButton = findViewById(R.id.mp3RadioButton);
 
-        // Initialize the Reset MP3 button
         Button resetMp3Button = findViewById(R.id.resetMp3Button);
         resetMp3Button.setOnClickListener(v -> {
             stopBackgroundMusic();
 
-            // Reset the selected MP3 path in SharedPreferences
             SharedPreferences.Editor editor = preferences.edit();
             editor.remove("selected_mp3_path");
             editor.putString("music_source", "mp3"); // Ensure the music source is set to MP3
             editor.apply();
 
-            // Update the RadioButton to reflect the change
             mp3RadioButton.setChecked(true);
 
-            // Play the default MP3 from assets
             playDefaultMp3FromAssets();
 
-            // Provide feedback to the user
             Toast.makeText(this, "MP3 reset to default", Toast.LENGTH_SHORT).show();
         });
 
 
-        // Load saved preference
         String musicSource = preferences.getString("music_source", "mp3");
 
         if ("mp3".equals(musicSource)) {
@@ -455,7 +414,6 @@ public class BigPictureActivity extends AppCompatActivity {
             youtubeRadioButton.setChecked(true);
         }
 
-        // Save the selection to SharedPreferences
         musicSourceGroup.setOnCheckedChangeListener((group, checkedId) -> {
             SharedPreferences.Editor editor = preferences.edit();
             if (checkedId == R.id.youtubeRadioButton) {
@@ -471,18 +429,13 @@ public class BigPictureActivity extends AppCompatActivity {
         webView.getSettings().setJavaScriptEnabled(true); // Enable JavaScript
         webView.setWebViewClient(new WebViewClient()); // Prevent redirecting to external browser
 
-        // Load saved preference for music source
         String selectedMp3Path = preferences.getString("selected_mp3_path", null);
 
-        // Start music based on the selected source, only if BG music is enabled
         if (isBgMusicEnabled) {
             if ("mp3".equals(musicSource)) {
-                // If selectedMp3Path is null, use the default mp3 from assets
                 if (selectedMp3Path != null) {
-                    // Get the MP3 file from internal storage
                     File mp3File = new File(selectedMp3Path);
 
-                    // Play the selected MP3 if the user chose MP3
                     if (mp3File.exists()) {
                         playMp3(mp3File);  // Pass the File object to playMp3 method
                     } else {
@@ -490,11 +443,9 @@ public class BigPictureActivity extends AppCompatActivity {
                         playDefaultMp3FromAssets();
                     }
                 } else {
-                    // No mp3 selected, play default mp3 from assets
                     playDefaultMp3FromAssets();
                 }
             } else if ("youtube".equals(musicSource)) {
-                // Play the YouTube video if the user chose YouTube
                 String savedUrl = preferences.getString("saved_youtube_url", "");
                 String videoId = savedUrl.isEmpty() ? defaultVideoId : extractYouTubeId(savedUrl);
 
@@ -502,7 +453,6 @@ public class BigPictureActivity extends AppCompatActivity {
                     loadYouTubeVideo(videoId);
                     youtubeUrlInput.setText(savedUrl);  // Populate the input field with the saved URL
                 } else {
-                    // If no saved URL or invalid, use the default video
                     loadYouTubeVideo(defaultVideoId);
                     youtubeUrlInput.setText("");  // Clear the input field if invalid or default video is used
                 }
@@ -512,7 +462,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
 
-        // Set the listener for the "Load Video" button
         loadVideoButton.setOnClickListener(v -> {
             String userUrl = youtubeUrlInput.getText().toString();
             if (userUrl != null && !userUrl.isEmpty()) {
@@ -520,34 +469,27 @@ public class BigPictureActivity extends AppCompatActivity {
                 if (videoId != null) {
                     loadYouTubeVideo(videoId);  // Load the user-specified video
 
-                    // Save the YouTube URL to SharedPreferences
                     SharedPreferences.Editor editor = preferences.edit();
                     editor.putString("saved_youtube_url", userUrl);
                     editor.apply();
                 } else {
-                    // Show an error message if the URL is invalid
                     youtubeUrlInput.setError("Invalid YouTube URL");
                 }
             } else {
-                // Load the default video if no URL is entered
                 loadYouTubeVideo(defaultVideoId);
             }
         });
 
-        // Set immersive mode
         enableImmersiveMode();
 
-        // Find the settings button
         ImageButton settingsButton = findViewById(R.id.settingsButton);
 
-        // Tint the settings button icon to white
         Drawable settingsIcon = settingsButton.getDrawable();
         if (settingsIcon != null) {
             settingsIcon.mutate();  // Ensure it doesn't affect other instances
             settingsIcon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);  // Apply the white color filter
         }
 
-        // Set the click listener for the settings button
         settingsButton.setOnClickListener(v -> {
             if (findViewById(R.id.settingsLayout).getVisibility() == View.VISIBLE) {
                 hideSettingsView();
@@ -556,17 +498,14 @@ public class BigPictureActivity extends AppCompatActivity {
             }
         });
 
-        // Find the back button
         ImageButton backButton = findViewById(R.id.backButton);
 
-        // Tint the settings button icon to white
         Drawable backIcon = backButton.getDrawable();
         if (backIcon != null) {
             backIcon.mutate();  // Ensure it doesn't affect other instances
             backIcon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);  // Apply the white color filter
         }
 
-        // Set the click listener for the settings button
         backButton.setOnClickListener(v -> {
             if (findViewById(R.id.settingsLayout).getVisibility() == View.VISIBLE) {
                 hideSettingsView();
@@ -589,28 +528,22 @@ public class BigPictureActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.RecyclerView);
         playButton = findViewById(R.id.playButton);
 
-        // Tint the play button icon to white
         Drawable playIcon = playButton.getDrawable();
         if (playIcon != null) {
             playIcon.mutate();  // Ensure it doesn't affect other instances
             playIcon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);  // Apply the white color filter
         }
 
-        // Add item decoration for reduced spacing
         recyclerView.addItemDecoration(new CarouselItemDecoration(15));  // Reduced space between items
 
-        // Initialize ContainerManager
         manager = new ContainerManager(this);
 
-        // Load the list of shortcuts
         loadShortcutsList();
 
-        // Setup snapping for RecyclerView to center the items
         SnapHelper snapHelper = new LinearSnapHelper();
         snapHelper.attachToRecyclerView(recyclerView);
 
 
-        // Set the click listener for the play button
         playButton.setOnClickListener(v -> {
             if (currentShortcut != null) {
                 runFromShortcut(currentShortcut);  // Use the loaded shortcut
@@ -620,10 +553,8 @@ public class BigPictureActivity extends AppCompatActivity {
         coverArtView.setOnClickListener(v -> {
             if (currentShortcut != null) {
                 if (currentShortcut.getCustomCoverArtPath() != null) {
-                    // Custom cover art exists, show the dialog
                     showCoverArtOptionsDialog();
                 } else {
-                    // No custom cover art, directly prompt for uploading a new one
                     promptForCustomCoverArtUpload();
                 }
             }
@@ -693,10 +624,8 @@ public class BigPictureActivity extends AppCompatActivity {
         if (youtubeUrl.matches(videoIdPattern)) {
             String[] splitUrl = youtubeUrl.split("v=");
             if (splitUrl.length > 1) {
-                // Video ID is after "v=" in standard URLs
                 return splitUrl[1].split("&")[0]; // Split off any extra parameters
             } else if (youtubeUrl.contains("youtu.be/")) {
-                // Handle short URLs (e.g., https://youtu.be/video_id)
                 return youtubeUrl.substring(youtubeUrl.lastIndexOf("/") + 1);
             }
         }
@@ -713,7 +642,6 @@ public class BigPictureActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                // Trigger the native touch event on the WebView when the page is fully loaded
                 simulateTouchOnWebView(webView);
                 webView.setVisibility(View.INVISIBLE);
             }
@@ -722,51 +650,30 @@ public class BigPictureActivity extends AppCompatActivity {
         webView.loadData(html, "text/html", "UTF-8");
     }
 
-//    private void moveWebViewToBottom() {
-//        // Get the parent of the WebView
-//        FrameLayout parent = (FrameLayout) webView.getParent();
-//
-//        if (parent != null) {
-//            // Remove the WebView from its parent
-//            parent.removeView(webView);
-//
-//            // Add the WebView back to the parent at index 0 (bottom of the stack)
-//            parent.addView(webView, 0);
-//        }
-//    }
 
 
-    // Simulate a touch event at the center of the WebView
     private void simulateTouchOnWebView(WebView webView) {
-        // Delay to allow WebView to fully load the content
         new Handler().postDelayed(() -> {
-            // Get the WebView's dimensions
             int webViewWidth = webView.getWidth();
             int webViewHeight = webView.getHeight();
 
-            // Calculate the center coordinates (YouTube player is usually in the center)
             float x = webViewWidth / 2f;
             float y = webViewHeight / 2f;
 
-            // Create MotionEvent to simulate touch at the calculated position
             long downTime = System.currentTimeMillis();
             long eventTime = System.currentTimeMillis() + 100;
 
-            // Simulate the touch press event
             MotionEvent touchDown = MotionEvent.obtain(
                     downTime, eventTime, MotionEvent.ACTION_DOWN, x, y, 0
             );
 
-            // Simulate the touch release event
             MotionEvent touchUp = MotionEvent.obtain(
                     downTime, eventTime + 100, MotionEvent.ACTION_UP, x, y, 0
             );
 
-            // Dispatch the events to the WebView
             webView.dispatchTouchEvent(touchDown);
             webView.dispatchTouchEvent(touchUp);
 
-            // Recycle the events to free up memory
             touchDown.recycle();
             touchUp.recycle();
 
@@ -784,7 +691,6 @@ public class BigPictureActivity extends AppCompatActivity {
             @Override
             public boolean onPreDraw() {
                 settingsLayout.getViewTreeObserver().removeOnPreDrawListener(this);
-                // Start your animations here
                 ObjectAnimator mainSlideOut = ObjectAnimator.ofFloat(mainLayout, "translationX", 0f, -mainLayout.getWidth());
                 mainSlideOut.setInterpolator(new AccelerateDecelerateInterpolator());
                 mainSlideOut.setDuration(500);
@@ -803,13 +709,11 @@ public class BigPictureActivity extends AppCompatActivity {
         LinearLayout mainLayout = findViewById(R.id.mainLayout);
         LinearLayout settingsLayout = findViewById(R.id.settingsLayout);
 
-        // Slide the main layout back into view
         ObjectAnimator mainSlideIn = ObjectAnimator.ofFloat(mainLayout, "translationX", -mainLayout.getWidth(), 0f);
         mainSlideIn.setInterpolator(new AccelerateDecelerateInterpolator());
         mainSlideIn.setDuration(500);
         mainSlideIn.start();
 
-        // Slide the settings layout off-screen to the right
         ObjectAnimator settingsSlideOut = ObjectAnimator.ofFloat(settingsLayout, "translationX", 0f, settingsLayout.getWidth());
         settingsSlideOut.setInterpolator(new AccelerateDecelerateInterpolator());
         settingsSlideOut.setDuration(500);
@@ -824,7 +728,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
     private void showCoverArtOptionsDialog() {
-        // Create an AlertDialog to show the options
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Cover Art Options")
                 .setItems(new CharSequence[]{"Remove Custom Cover Art", "Upload New Cover Art"}, (dialog, which) -> {
@@ -846,10 +749,8 @@ public class BigPictureActivity extends AppCompatActivity {
             Log.d("BigPictureActivity", "Removing cover art for shortcut: " + currentShortcut.name);
             Log.d("BigPictureActivity", "Current custom cover art path: " + currentShortcut.getCustomCoverArtPath());
 
-            // Remove custom cover art from the shortcut
             currentShortcut.removeCustomCoverArt();
 
-            // Clear cached cover art if exists
             File cachedFile = new File(getCacheDir(), "coverArtCache/" + currentShortcut.name + ".png");
             if (cachedFile.exists() && cachedFile.delete()) {
                 Log.d("BigPictureActivity", "Cached cover art deleted successfully.");
@@ -857,13 +758,11 @@ public class BigPictureActivity extends AppCompatActivity {
                 Log.e("BigPictureActivity", "Failed to delete cached cover art or it doesn't exist.");
             }
 
-            // Update UI
             coverArtView.setImageResource(R.drawable.icon_action_bar_import); // Default placeholder image
             coverArtView.setBackgroundColor(Color.parseColor("#99000000")); // Semi-transparent background
 
             Log.d("BigPictureActivity", "Custom cover art removed and data saved.");
 
-            // Reload the shortcut data to reflect the changes
             loadShortcutData(currentShortcut);
             Log.d("BigPictureActivity", "Shortcut data reloaded after removal.");
         }
@@ -871,11 +770,9 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
 
-    // Prompt user to select a custom cover art image from gallery
     private void promptForCustomCoverArtUpload() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
-//        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
         startActivityForResult(intent, REQUEST_CODE_UPLOAD_CUSTOM_COVER);
     }
 
@@ -929,23 +826,18 @@ public class BigPictureActivity extends AppCompatActivity {
         List<Shortcut> shortcuts = manager.loadShortcuts();
         emptyStateTextView = findViewById(R.id.TVEmptyState);
 
-        // Check if the shortcuts list is empty
         if (shortcuts.isEmpty()) {
-            // Show the empty state message
             recyclerView.setVisibility(View.GONE);
             playButton.setVisibility(View.GONE);
             emptyStateTextView.setVisibility(View.VISIBLE);
         } else {
-            // Hide the empty state message and show the RecyclerView
             recyclerView.setVisibility(View.VISIBLE);
             emptyStateTextView.setVisibility(View.GONE);
 
-            // Initialize and set the adapter
             adapter = new BigPictureAdapter(shortcuts, recyclerView); // Pass the RecyclerView reference
             recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
             recyclerView.setAdapter(adapter);
 
-            // Preload first shortcut details
             loadShortcutData(shortcuts.get(0));
         }
     }
@@ -954,20 +846,16 @@ public class BigPictureActivity extends AppCompatActivity {
     public void loadShortcutData(Shortcut shortcut) {
         currentShortcut = shortcut;
 
-        // Log the current cover art path
         Log.d("BigPictureActivity", "Loaded cover art path: " + shortcut.getCustomCoverArtPath());
 
-        // Set the game title
         gameTitleView.setText(shortcut.name);
 
-        // Set play count and playtime (unchanged)
         SharedPreferences playtimePrefs = getSharedPreferences("playtime_stats", Context.MODE_PRIVATE);
         long totalPlaytime = playtimePrefs.getLong(shortcut.name + "_playtime", 0);
         int playCount = playtimePrefs.getInt(shortcut.name + "_play_count", 0);
         playCountView.setText("Times Played: " + playCount);
         playtimeView.setText("Playtime: " + formatPlaytime(totalPlaytime));
 
-        // Get the associated container for this shortcut (unchanged)
         Container container = manager.getContainerForShortcut(shortcut);
         String graphicsDriver = shortcut.getExtra("graphicsDriver");
         
@@ -978,14 +866,12 @@ public class BigPictureActivity extends AppCompatActivity {
         setTextOrPlaceholder(audioDriverView, shortcut.getExtra("audioDriver"), container.getAudioDriver());
         setTextOrPlaceholder(box64PresetView, shortcut.getExtra("box64Preset"), container.getBox64Preset());
 
-        // Handle cover art loading
         Bitmap coverArt = null;
         if (shortcut.getCustomCoverArtPath() != null && !shortcut.getCustomCoverArtPath().isEmpty()) {
             coverArt = BitmapFactory.decodeFile(shortcut.getCustomCoverArtPath());
         }
 
         if (coverArt == null) {
-            // Check for cached cover art if custom cover art is not found or removed
             coverArt = loadCachedCoverArt(shortcut.name);
         }
 
@@ -996,13 +882,10 @@ public class BigPictureActivity extends AppCompatActivity {
             fetchCoverArt(shortcut); // Fetch from remote if not available locally
         }
 
-        // Update the click listener to reflect the current state of custom cover art
         coverArtView.setOnClickListener(v -> {
             if (currentShortcut.getCustomCoverArtPath() != null) {
-                // Custom cover art exists, show the dialog
                 showCoverArtOptionsDialog();
             } else {
-                // No custom cover art, directly prompt for uploading a new one
                 promptForCustomCoverArtUpload();
             }
         });
@@ -1010,12 +893,10 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
     private void runFromShortcut(Shortcut shortcut) {
-        // Launch XServerDisplayActivity with the necessary extras
         Intent intent = new Intent(this, XServerDisplayActivity.class);
         intent.putExtra("container_id", shortcut.container.id);
         intent.putExtra("shortcut_path", shortcut.file.getPath());
         intent.putExtra("shortcut_name", shortcut.name); // Pass the shortcut name for display
-        // Check if the shortcut has the disableXinput value; if not, default to false.
         String disableXinputValue = shortcut.getExtra("disableXinput", "0"); // Get value from shortcut or use "0" (false) by default
         intent.putExtra("disableXinput", disableXinputValue); // Use the actual value from the shortcut
         startActivity(intent);
@@ -1077,17 +958,14 @@ public class BigPictureActivity extends AppCompatActivity {
         });
     }
 
-    // Display upload custom cover art option if no cover art found
     private void showCustomCoverArtUploadOption(Shortcut shortcut) {
         runOnUiThread(() -> {
             coverArtView.setImageResource(android.R.color.transparent); // Remove existing placeholder
             coverArtView.setBackgroundColor(Color.parseColor("#99000000")); // Semi-transparent gray background
 
-            // Set the image resource to show upload icon and update the click listener
             coverArtView.setImageResource(R.drawable.cover_art_placeholder);
             coverArtView.setOnClickListener(v -> promptForCustomCoverArtUpload());
 
-            // Display message indicating no cover art found
             if (uploadText != null) {
                 ViewGroup parent = (ViewGroup) uploadText.getParent();
                 if (parent != null) {
@@ -1103,7 +981,6 @@ public class BigPictureActivity extends AppCompatActivity {
             uploadText.setGravity(Gravity.CENTER);
             uploadText.setBackgroundColor(Color.parseColor("#99000000")); // Semi-transparent gray background
 
-            // Add the text view as a sibling to cover art view
             ViewGroup parent = (ViewGroup) coverArtView.getParent();
             parent.addView(uploadText);
         });
@@ -1151,10 +1028,8 @@ public class BigPictureActivity extends AppCompatActivity {
                 InputStream input = connection.getInputStream();
                 Bitmap coverArt = BitmapFactory.decodeStream(input);
 
-                // Cache the downloaded cover art
                 cacheCoverArt(coverArt, shortcut.name);
 
-                // Set cover art in the shortcut and update the UI
                 shortcut.setCoverArt(coverArt);
                 runOnUiThread(() -> coverArtView.setImageBitmap(coverArt));
             } catch (Exception e) {
@@ -1200,7 +1075,6 @@ public class BigPictureActivity extends AppCompatActivity {
             Uri selectedImageUri = data.getData();
 
             try {
-                // Save the selected wallpaper as custom_bg.png
                 InputStream inputStream = getContentResolver().openInputStream(selectedImageUri);
                 Bitmap wallpaper = BitmapFactory.decodeStream(inputStream);
                 if (wallpaper != null) {
@@ -1210,22 +1084,18 @@ public class BigPictureActivity extends AppCompatActivity {
                     outputStream.flush();
                     outputStream.close();
 
-                    // Save the path to SharedPreferences
                     SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
                     SharedPreferences.Editor editor = preferences.edit();
                     editor.putString(WALLPAPER_PREF_KEY, wallpaperFile.getAbsolutePath());
                     editor.apply();
 
-                    // Show dialog for display preference (center, stretch, tile)
                     String[] displayOptions = {"Center", "Stretch", "Tile"};
                     new AlertDialog.Builder(this)
                             .setTitle("Select Display Mode")
                             .setItems(displayOptions, (dialog, which) -> {
-                                // Save display mode
                                 editor.putString(WALLPAPER_DISPLAY_PREF_KEY, displayOptions[which].toLowerCase());
                                 editor.apply();
 
-                                // Apply wallpaper based on the chosen mode
                                 try {
                                     applyWallpaper(Uri.fromFile(wallpaperFile), displayOptions[which].toLowerCase());
                                 } catch (FileNotFoundException e) {
@@ -1243,19 +1113,15 @@ public class BigPictureActivity extends AppCompatActivity {
         if (requestCode == REQUEST_CODE_SELECT_MP3 && resultCode == RESULT_OK && data != null && data.getData() != null) {
             selectedMp3Uri = data.getData();
 
-            // Get the internal storage directory
             File appStorageDir = getFilesDir();
             File musicFile = new File(appStorageDir, "bigpicturemode_bgmusic.mp3");
 
-            // Use FileUtils to copy the selected MP3 to internal storage and rename it
             if (FileUtils.copy(this, selectedMp3Uri, musicFile, null)) {
-                // Save the file path to SharedPreferences
                 SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
                 SharedPreferences.Editor editor = preferences.edit();
                 editor.putString("selected_mp3_path", musicFile.getAbsolutePath()); // Store the file path instead of URI
                 editor.apply();
 
-                // Play the copied MP3 file using the updated playMp3 method
                 playMp3(musicFile);  // Pass the File object
             } else {
                 Log.e("BigPictureActivity", "Failed to copy the MP3 file.");
@@ -1266,28 +1132,21 @@ public class BigPictureActivity extends AppCompatActivity {
                 InputStream inputStream = getContentResolver().openInputStream(selectedImageUri);
                 Bitmap customCoverArt = BitmapFactory.decodeStream(inputStream);
 
-                // Save custom cover art in shortcut and cache it
                 if (currentShortcut != null) {
                     currentShortcut.saveCustomCoverArt(customCoverArt);  // Save custom cover art
 
-                    // Cache the custom cover art
                     cacheCoverArt(customCoverArt, currentShortcut.name);
 
-                    // Set the custom cover art in the view
                     coverArtView.setImageBitmap(customCoverArt);
 
-                    // Hide the upload text once the cover art is uploaded
                     if (uploadText != null) {
                         uploadText.setVisibility(View.GONE);
                     }
 
-                    // Update the click listener to reflect that custom cover art is now present
                     coverArtView.setOnClickListener(v -> {
                         if (currentShortcut.getCustomCoverArtPath() != null) {
-                            // Custom cover art exists, show the dialog
                             showCoverArtOptionsDialog();
                         } else {
-                            // No custom cover art, directly prompt for uploading a new one
                             promptForCustomCoverArtUpload();
                         }
                     });
@@ -1300,21 +1159,18 @@ public class BigPictureActivity extends AppCompatActivity {
         if (requestCode == REQUEST_CODE_SELECT_PNG_FOLDER && resultCode == RESULT_OK) {
             if (data != null) {
                 Uri folderUri = data.getData();
-                // Take persistable permissions:
                 final int takeFlags = data.getFlags()
                         & (Intent.FLAG_GRANT_READ_URI_PERMISSION
                         | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
 
                 getContentResolver().takePersistableUriPermission(folderUri, takeFlags);
 
-                // 1) Save to SharedPreferences
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
                 prefs.edit()
                         .putString("png_folder_uri", folderUri.toString())
                         .putString("selected_animation", "folder")   // <-- store that we’re now using a folder-based animation
                         .apply();
 
-                // 2) Load the frames
                 loadFramesFromFolder(folderUri);
             }
         }
@@ -1349,9 +1205,6 @@ public class BigPictureActivity extends AppCompatActivity {
                     backgroundView.setVisibility(View.GONE); // Hide the view when animation is stopped
                     return; // Exit early since there's no animation to start
                 case "folder":
-                    // Do NOT call setAnimation(...) with "ab" or "ab_gear"
-                    // Instead, do nothing special here, because we’ll load PNG frames from the folder in onResume or onCreate
-                    // Possibly just stopAnimation if you want, or call start if frames are loaded
                     break;
                 default:
                     if (!"folder".equals(animationState)) {
@@ -1386,24 +1239,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
 
-//    private String saveCustomCoverArt(Bitmap coverArt, String shortcutName) {
-//        try {
-//            File coverArtDir = new File(currentShortcut.container.getRootDir(), "app_data/cover_arts"); // Match path with Shortcut class
-//            if (!coverArtDir.exists()) {
-//                coverArtDir.mkdirs(); // Create directory if not exist
-//            }
-//
-//            File coverFile = new File(coverArtDir, shortcutName + ".png");
-//            FileOutputStream outputStream = new FileOutputStream(coverFile);
-//            coverArt.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
-//            outputStream.flush();
-//            outputStream.close();
-//            return coverFile.getAbsolutePath(); // Return the file path for storing in shortcut
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
 
 
     private String formatPlaytime(long playtimeInMillis) {
@@ -1426,11 +1261,9 @@ public class BigPictureActivity extends AppCompatActivity {
                         playButton.requestFocus(); // Move focus to playButton when UP is pressed from RecyclerView
                         return true;
                     } else if (currentFocus == playButton) {
-                        // Move focus to the first TextView (e.g., graphicsDriverView) when UP is pressed from playButton
                         graphicsDriverView.requestFocus();
                         return true;
                     } else if (currentFocus != coverArtView) {
-                        // Default behavior: Move focus to playButton from anywhere else (except coverArt)
                         playButton.requestFocus();
                         return true;
                     }
@@ -1438,7 +1271,6 @@ public class BigPictureActivity extends AppCompatActivity {
 
                 case KeyEvent.KEYCODE_DPAD_DOWN:
                     if (currentFocus == playButton) {
-                        // Focus the closest carousel item to the center or playButton
                         focusClosestCarouselItem();
                         return true;
                     }
@@ -1450,11 +1282,9 @@ public class BigPictureActivity extends AppCompatActivity {
 
                 case KeyEvent.KEYCODE_BUTTON_A:
                     if (currentFocus == playButton) {
-                        // Simulate a click on the play button if A is pressed
                         playButton.performClick();
                         return true;
                     } else if (currentFocus == coverArtView) {
-                        // Simulate a click on the cover art if A is pressed
                         coverArtView.performClick();
                         return true;
                     }
@@ -1482,10 +1312,8 @@ public class BigPictureActivity extends AppCompatActivity {
         int closestPosition = RecyclerView.NO_POSITION;
         float closestDistance = Float.MAX_VALUE;
 
-        // Get the center of the recyclerView or use a constant for where the playButton is (center of screen)
         int recyclerViewCenter = recyclerView.getWidth() / 2;
 
-        // Iterate over visible items to find the closest one to the center
         for (int i = firstVisibleItemPosition; i <= lastVisibleItemPosition; i++) {
             if (i >= 0) {
                 View itemView = layoutManager.findViewByPosition(i);
@@ -1501,7 +1329,6 @@ public class BigPictureActivity extends AppCompatActivity {
             }
         }
 
-        // Focus the closest item in the carousel
         if (closestPosition != RecyclerView.NO_POSITION) {
             recyclerView.scrollToPosition(closestPosition);
             layoutManager.findViewByPosition(closestPosition).requestFocus();
@@ -1516,7 +1343,6 @@ public class BigPictureActivity extends AppCompatActivity {
         String musicSource = preferences.getString("music_source", "mp3"); // Default to "mp3"
         String selectedMp3Path = preferences.getString("selected_mp3_path", null); // Use the file path instead of URI
 
-        // Restore the selected animation state for the RadioGroup
         String savedAnimation = preferences.getString("selected_animation", "ab");
         if (savedAnimation.equals("custom_wallpaper")) {
             ((RadioButton) findViewById(R.id.rbCustomWallpaper)).setChecked(true);
@@ -1537,13 +1363,11 @@ public class BigPictureActivity extends AppCompatActivity {
             return; // Exit early if background music is disabled
         }
 
-        // Handle WebView visibility based on music source
         if ("mp3".equals(musicSource)) {
             if (webView != null) {
                 webView.setVisibility(View.INVISIBLE); // Hide WebView when MP3 is selected
             }
 
-            // Play MP3 if file exists
             if (selectedMp3Path != null) {
                 File mp3File = new File(selectedMp3Path);
                 if (mp3File.exists() && (mediaPlayer == null || !mediaPlayer.isPlaying())) {
@@ -1586,12 +1410,10 @@ public class BigPictureActivity extends AppCompatActivity {
 
 
     private void stopBackgroundMusic() {
-        // Stop YouTube WebView
         if (webView != null) {
             webView.loadUrl("about:blank");
         }
 
-        // Stop MP3 playback
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
             mediaPlayer.stop();
             mediaPlayer.release(); // Release resources
@@ -1606,12 +1428,10 @@ public class BigPictureActivity extends AppCompatActivity {
         stopBackgroundMusic(); // Ensure MP3 or YouTube stops when activity is paused
     }
 
-    // Import Animations:
     private static final int REQUEST_CODE_SELECT_PNG_FOLDER = 1090;
 
     private void selectPngFolder() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        // Optionally, set some flags or extras if needed
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
@@ -1620,14 +1440,12 @@ public class BigPictureActivity extends AppCompatActivity {
     }
 
     private void loadFramesFromFolder(Uri folderUri) {
-        // 1. DocumentFile from the tree URI
         DocumentFile docFolder = DocumentFile.fromTreeUri(this, folderUri);
         if (docFolder == null || !docFolder.isDirectory()) {
             Toast.makeText(this, "Invalid folder selected!", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 2. Iterate children
         DocumentFile[] docFiles = docFolder.listFiles();
         if (docFiles == null || docFiles.length == 0) {
             Toast.makeText(this, "No files in folder!", Toast.LENGTH_SHORT).show();
@@ -1654,7 +1472,6 @@ public class BigPictureActivity extends AppCompatActivity {
         }
 
         Log.d("AnimationCheck", "Loaded " + bitmaps.size() + " PNG frames from folder.");
-        // 3. Pass these bitmaps to the TiledBackgroundView
         TiledBackgroundView backgroundView = findViewById(R.id.parallaxBackgroundView);
         backgroundView.loadFramesFromBitmaps(bitmaps);  // A new method we’ll create below
     }

@@ -95,7 +95,6 @@ public class TiledBackgroundView extends View {
         super.onDraw(canvas);
 
         if (staticWallpaper != null) {
-            // Draw static wallpaper
             if (paint.getShader() != null) {
                 canvas.drawPaint(paint);
             } else {
@@ -103,7 +102,6 @@ public class TiledBackgroundView extends View {
                         (getHeight() - staticWallpaper.getHeight()) / 2f, paint);
             }
         } else {
-            // Draw animated frames
             Matrix matrix = new Matrix();
             if (enableParallax) {
                 matrix.setTranslate(-scrollX, -scrollY);
@@ -116,9 +114,7 @@ public class TiledBackgroundView extends View {
     }
 
     public void setStaticWallpaper(Bitmap wallpaper, String mode) {
-        // Ensure the view has been laid out
         if (getWidth() == 0 || getHeight() == 0) {
-            // Wait for the view to be laid out
             Bitmap finalWallpaper = wallpaper;
             getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
@@ -162,21 +158,17 @@ public class TiledBackgroundView extends View {
 
         for (int i = 0; i < pngFiles.length; i++) {
             frames[i] = BitmapFactory.decodeFile(pngFiles[i].getAbsolutePath());
-            // Optionally scale or check for null
         }
 
-        // Optionally re-enable parallax or any defaults
         enableParallax = true;
         currentFrame = 0;
         updateShader();   // set up initial frame in the Paint
         startAnimation(); // start the animation loop
     }
 
-    // In your TiledBackgroundView:
     public void loadFramesFromBitmaps(List<Bitmap> bitmapList) {
         stopAnimation();
 
-        // Convert to array or store in a field
         frames = new Bitmap[bitmapList.size()];
         for (int i = 0; i < bitmapList.size(); i++) {
             frames[i] = bitmapList.get(i);
@@ -192,14 +184,10 @@ public class TiledBackgroundView extends View {
         this.enableParallax = enable;
         this.scrollSpeedX = speedX;
         this.scrollSpeedY = speedY;
-        // Possibly reset scrollX/scrollY if you like
-        // scrollX = 0;
-        // scrollY = 0;
         invalidate();
     }
 
     public void setFrameDuration(int durationMillis) {
-        // Avoid zero or negative
         if (durationMillis < 10) durationMillis = 10;
         this.frameDuration = durationMillis;
     }

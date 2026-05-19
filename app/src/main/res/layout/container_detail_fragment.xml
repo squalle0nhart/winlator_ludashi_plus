@@ -260,6 +260,17 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="HUD" />
+
+            <Spinner
+                style="@style/ComboBox"
+                android:id="@+id/SHudMode"
+                android:layout_width="match_parent" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:text="@string/midi_sound_font" />
 
             <Spinner
@@ -291,13 +302,6 @@
                     android:layout_gravity="center"
                     android:src="@drawable/icon_menu" />
             </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/CBShowFPS"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/show_fps"
-                android:layout_marginTop="8dp" />
 
             <CheckBox
                 android:id="@+id/CBFullscreenStretched"

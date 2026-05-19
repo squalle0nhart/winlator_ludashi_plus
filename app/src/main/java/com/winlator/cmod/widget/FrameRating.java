@@ -1,10 +1,9 @@
 package com.winlator.cmod.widget;
 
-import android.app.ActivityManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -17,6 +16,8 @@ import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.StringUtils;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -31,6 +32,10 @@ public class FrameRating extends FrameLayout implements Runnable {
     private final TextView tvGPU;
     private final TextView tvRAM;
     private HashMap graphicsDriverConfig;
+    private static final String PREFS = "winlator_hud";
+    private static final String KEY_VIS = "hud_vis";
+    private final SharedPreferences prefs;
+    private boolean userEnabled = false;
 
     public FrameRating(Context context, HashMap graphicsDriverConfig) {
         this(context, graphicsDriverConfig ,null);
@@ -43,10 +48,11 @@ public class FrameRating extends FrameLayout implements Runnable {
     public FrameRating(Context context, HashMap graphicsDriverConfig, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         this.context = context;
+        prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         View view = LayoutInflater.from(context).inflate(R.layout.frame_rating, this, false);
         tvFPS = view.findViewById(R.id.TVFPS);
         tvRenderer = view.findViewById(R.id.TVRenderer);
-        tvRenderer.setText("OpenGL");
+        tvRenderer.setText("Vulkan");
         tvGPU = view.findViewById(R.id.TVGPU);
         tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
         tvRAM = view.findViewById(R.id.TVRAM);
@@ -56,22 +62,37 @@ public class FrameRating extends FrameLayout implements Runnable {
     }
     
     private String getTotalRAM() {
-        String totalRAM = "";
-        ActivityManager activityManager = (ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
-        ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
-        activityManager.getMemoryInfo(memoryInfo);
-        totalRAM = StringUtils.formatBytes(memoryInfo.totalMem);
-        return totalRAM;
+        long[] mem = readMeminfo();
+        return mem[0] > 0 ? StringUtils.formatBytes(mem[0] * 1024L) : "N/A";
     }
+
     
+
+
+
+
+    private long[] readMeminfo() {
+        long total = -1, avail = -1;
+        try (BufferedReader r = new BufferedReader(new FileReader("/proc/meminfo"))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("MemTotal:"))          total = parseMeminfoKb(line);
+                else if (line.startsWith("MemAvailable:")) { avail = parseMeminfoKb(line); break; }
+            }
+        } catch (Exception ignored) {}
+        return new long[]{total, avail};
+    }
+
+    private long parseMeminfoKb(String line) {
+        try { return Long.parseLong(line.trim().split("\\s+")[1]); }
+        catch (Exception e) { return -1; }
+    }
+
     private String getAvailableRAM() {
-        String availableRAM = "";
-        ActivityManager activityManager = (ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE);
-        ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
-        activityManager.getMemoryInfo(memoryInfo);
-        long usedMem = memoryInfo.totalMem - memoryInfo.availMem;
-        availableRAM = StringUtils.formatBytes(usedMem, false);
-        return availableRAM;
+        long[] mem = readMeminfo();
+        if (mem[0] <= 0 || mem[1] < 0) return "N/A";
+        long usedKb = mem[0] - mem[1];
+        return StringUtils.formatBytes(usedKb * 1024L, false);
     }
 
     public void setRenderer(String renderer) {
@@ -83,11 +104,39 @@ public class FrameRating extends FrameLayout implements Runnable {
     }
 
     public void reset() {
-        tvRenderer.setText("OpenGL");
+        tvRenderer.setText("Vulkan");
         tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
     }
 
+    public boolean hasSavedPref() {
+        return prefs.contains(KEY_VIS);
+    }
+
+    public boolean isSavedVisible() {
+        return prefs.getBoolean(KEY_VIS, false);
+    }
+
+    public void enableByUser() {
+        userEnabled = true;
+        prefs.edit().putBoolean(KEY_VIS, true).apply();
+    }
+
+    public void disableByUser() {
+        disableByUser(true);
+    }
+
+    public void disableByUser(boolean savePrefs) {
+        userEnabled = false;
+        if (savePrefs) prefs.edit().putBoolean(KEY_VIS, false).apply();
+        setVisibility(View.GONE);
+    }
+
+    public boolean isUserEnabled() {
+        return userEnabled;
+    }
+
     public void update() {
+        if (!userEnabled) return;
         if (lastTime == 0) lastTime = SystemClock.elapsedRealtime();
         long time = SystemClock.elapsedRealtime();
         if (time >= lastTime + 500) {
@@ -101,6 +150,7 @@ public class FrameRating extends FrameLayout implements Runnable {
 
     @Override
     public void run() {
+        if (!userEnabled) return;
         if (getVisibility() == GONE) setVisibility(View.VISIBLE);
         tvFPS.setText(String.format(Locale.ENGLISH, "%.1f", lastFPS));
         tvRAM.setText(getAvailableRAM() + " GB Used / " + totalRAM + " Total");

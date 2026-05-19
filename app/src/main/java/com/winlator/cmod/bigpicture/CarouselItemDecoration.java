@@ -14,7 +14,6 @@ public class CarouselItemDecoration extends RecyclerView.ItemDecoration {
 
     @Override
     public void getItemOffsets(Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
-        // Apply padding to only the left and right of the items
         outRect.left = spacing / 2;
         outRect.right = spacing / 2;
     }

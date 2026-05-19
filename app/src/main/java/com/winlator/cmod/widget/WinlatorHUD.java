@@ -1,19 +1,27 @@
 package com.winlator.cmod.widget;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.winlator.cmod.core.CPUStatus;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -31,7 +39,6 @@ public class WinlatorHUD extends View {
     public static final int SHOW_GPU      = 1<<1;
     public static final int SHOW_CPU      = 1<<2;
     public static final int SHOW_BATT     = 1<<3;
-    public static final int SHOW_GRAPH    = 1<<4;
     public static final int SHOW_RENDERER = 1<<5;
     public static final int SHOW_RAM      = 1<<6;
     private static final int SHOW_DEFAULT = 0x6F;
@@ -48,7 +55,7 @@ public class WinlatorHUD extends View {
     private static final int C_RAM  = Color.rgb(0xB0,0xFF,0xB0);
     private static final int C_SEP  = Color.rgb(0x60,0x60,0x60);
 
-    private float TS, TSR, PAD, GRAW, CORNER;
+    private float TS, TSR, PAD, CORNER;
 
     private static final int TEXT_FLAGS = Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG | Paint.LINEAR_TEXT_FLAG;
     private final Paint pBg      = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -62,8 +69,6 @@ public class WinlatorHUD extends View {
     private final Paint pRam     = new Paint(TEXT_FLAGS);
     private final Paint pSep     = new Paint(TEXT_FLAGS);
     private final Paint pChg     = new Paint(TEXT_FLAGS);
-    private final Paint pGraph   = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint pGraphBg = new Paint();
 
     private final RectF bgRect = new RectF();
 
@@ -82,7 +87,6 @@ public class WinlatorHUD extends View {
 
     private final SharedPreferences prefs;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
-    private HudDataSource dataSource;
 
     private final AtomicInteger frameAccum = new AtomicInteger(0);
     private long lastFpsNs = 0;
@@ -92,10 +96,6 @@ public class WinlatorHUD extends View {
     private String rendererLabel = "Vulkan";
     private boolean isNative = false;
 
-    private static final int GBUF = 40;
-    private final float[] graph = new float[GBUF];
-    private int gHead = 0;
-    private float gMax = 60f;
 
     private int showMask = SHOW_DEFAULT;
     private float hudAlpha = 1f;
@@ -106,17 +106,41 @@ public class WinlatorHUD extends View {
     private boolean dragging = false;
     private static final float DRAG_THRESH = 10f;
     private long touchDownMs = 0;
+    private boolean multiTouchActive = false;
 
     private boolean redrawScheduled = false;
-    private Path cachedPath = null;
-    private int lastGHead = -1;
+
+    
+    private final BatteryManager batteryManager;
+    private long lastStatsNs = 0;
+    private static final long STATS_INTERVAL_NS = 1_500_000_000L;
+
+    
+    private Intent cachedBatteryIntent = null;
+    private long lastBatteryRegisterNs = 0;
+    private static final long BATT_REGISTER_INTERVAL_NS = 5_000_000_000L; 
+    private static final String[] GPU_PATHS = {
+        "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+        "/sys/class/kgsl/kgsl-3d0/devfreq/gpu_load",
+        "/sys/class/misc/mali0/device/utilisation",
+        "/sys/kernel/gpu/gpu_busy",
+        "/sys/class/misc/pvrsrvkm/device/utilisation",
+        "/sys/class/devfreq/gpu/load",
+    };
+    private static final String GPU_BUSY = "/sys/class/kgsl/kgsl-3d0/gpubusy";
+    private String gpuPath = null;
+    private boolean gpuFailed = false;
+    private long prevGpuBusy = 0, prevGpuTotal = 0;
+    private boolean cpuFailed = false;
+    private boolean battFailed = false;
+    
+
     private final Runnable redrawRunnable = () -> {
         redrawScheduled = false;
         try {
             snapshot();
             invalidate();
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
         if (getVisibility() == VISIBLE) scheduleRedraw();
     };
 
@@ -125,15 +149,26 @@ public class WinlatorHUD extends View {
     public WinlatorHUD(Context context, AttributeSet attrs) {
         super(context, attrs);
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        batteryManager = (BatteryManager) context.getSystemService(Context.BATTERY_SERVICE);
         float d = context.getResources().getDisplayMetrics().density;
         TS     = 12f * d;
         TSR    = 11f * d;
         PAD    = 6f * d;
-        GRAW   = 70f * d;
         CORNER = 5f * d;
         initPaints();
+        detectGpuPathOnce();
         loadPrefs();
         setLayerType(LAYER_TYPE_HARDWARE, null);
+    }
+
+    
+    private void detectGpuPathOnce() {
+        for (String p : GPU_PATHS) {
+            if (new File(p).canRead()) { gpuPath = p; return; }
+        }
+        
+        if (new File(GPU_BUSY).canRead()) gpuPath = GPU_BUSY;
+        
     }
 
     private void initPaints() {
@@ -151,8 +186,6 @@ public class WinlatorHUD extends View {
         pRam.setTextSize(TS);       pRam.setTypeface(mono);  pRam.setColor(C_RAM);
         pSep.setTextSize(TS);       pSep.setTypeface(mono);  pSep.setColor(C_SEP);
         pChg.setTextSize(TS);       pChg.setTypeface(mono);  pChg.setColor(C_CHG);
-        pGraph.setStyle(Paint.Style.STROKE); pGraph.setStrokeWidth(1.5f); pGraph.setColor(C_FPS);
-        pGraphBg.setStyle(Paint.Style.FILL); pGraphBg.setColor(Color.argb(80,20,20,20));
 
         wLabelGpu  = pGpu.measureText("GPU ");
         wLabelCpu  = pCpu.measureText("CPU ");
@@ -167,9 +200,14 @@ public class WinlatorHUD extends View {
         wValTemp   = pVal.measureText("99°C");
     }
 
-    public void setDataSource(HudDataSource ds) { this.dataSource = ds; }
+    
+    public void onFrame() {
+        if (!rendererActive) return; 
+        frameAccum.incrementAndGet();
+    }
 
-    public void onFrame() { frameAccum.incrementAndGet(); }
+    
+    public void update() { onFrame(); }
 
     public void setIsNative(boolean n) {
         isNative = n;
@@ -177,7 +215,161 @@ public class WinlatorHUD extends View {
         layoutDirty = true;
     }
 
-    public void update() {}
+    
+
+    private void readStats() {
+        if ((showMask & SHOW_GPU) != 0)  readGpu();
+        if ((showMask & SHOW_CPU) != 0)  readCpu();
+        if ((showMask & SHOW_RAM) != 0)  readRam();
+        if ((showMask & SHOW_BATT) != 0) readBattery();
+    }
+
+    private void readGpu() {
+        if (gpuFailed) return;
+        int v = -1;
+
+        if (gpuPath != null) {
+            v = gpuPath.equals(GPU_BUSY) ? readGpuBusy() : readPercent(gpuPath);
+            if (v < 0) {
+                
+                gpuFailed = true;
+            }
+        } else {
+            gpuFailed = true; 
+        }
+
+        if (v != snapGpu) {
+            snapGpu = v;
+            strGpu = v >= 0 ? v + "%" : "N/A";
+        }
+    }
+
+    private int readPercent(String path) {
+        try (BufferedReader r = new BufferedReader(new FileReader(path))) {
+            String l = r.readLine();
+            if (l == null) return -1;
+            return Math.min(100, Math.max(0, Integer.parseInt(l.trim().replaceAll("[^0-9]", ""))));
+        } catch (Exception e) { return -1; }
+    }
+
+    private int readGpuBusy() {
+        try (BufferedReader r = new BufferedReader(new FileReader(GPU_BUSY))) {
+            String l = r.readLine();
+            if (l == null) return -1;
+            String[] p = l.trim().split("\\s+");
+            if (p.length < 2) return -1;
+            long busy = Long.parseLong(p[0]), total = Long.parseLong(p[1]);
+            long dB = busy - prevGpuBusy, dT = total - prevGpuTotal;
+            prevGpuBusy = busy; prevGpuTotal = total;
+            return dT > 0 ? (int) Math.min(100, dB * 100L / dT) : 0;
+        } catch (Exception e) { return -1; }
+    }
+
+    private void readCpu() {
+        if (cpuFailed) return;
+        try {
+            short[] clocks = CPUStatus.getCurrentClockSpeeds();
+            long cur = 0, max = 0;
+            for (int i = 0; i < clocks.length; i++) {
+                cur += clocks[i];
+                max += CPUStatus.getMaxClockSpeed(i);
+            }
+            int v = max > 0 ? (int) Math.min(100, cur * 100L / max) : -1;
+            if (v != snapCpu) { snapCpu = v; strCpu = v >= 0 ? v + "%" : "N/A"; }
+        } catch (Exception e) {
+            cpuFailed = true;
+            Log.w("WinlatorHUD", "CPU read unavailable");
+        }
+    }
+
+    private void readRam() {
+        try (BufferedReader r = new BufferedReader(new FileReader("/proc/meminfo"))) {
+            long total = -1, avail = -1;
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("MemTotal:"))     total = parseMeminfoKb(line);
+                else if (line.startsWith("MemAvailable:")) { avail = parseMeminfoKb(line); break; }
+            }
+            int v = (total > 0 && avail >= 0) ? (int)(100L * (total - avail) / total) : -1;
+            if (v != snapRam) { snapRam = v; strRam = v >= 0 ? v + "%" : "N/A"; }
+        } catch (Exception e) {
+            if (snapRam != -1) { snapRam = -1; strRam = "N/A"; }
+        }
+    }
+
+    private long parseMeminfoKb(String line) {
+        try { return Long.parseLong(line.trim().split("\\s+")[1]); }
+        catch (Exception e) { return -1; }
+    }
+
+    private void readBattery() {
+        if (battFailed) return;
+        try {
+            
+            long now = System.nanoTime();
+            if (cachedBatteryIntent == null || now - lastBatteryRegisterNs >= BATT_REGISTER_INTERVAL_NS) {
+                cachedBatteryIntent = getContext().registerReceiver(null,
+                    new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                lastBatteryRegisterNs = now;
+            }
+            Intent batt = cachedBatteryIntent;
+            if (batt == null) return;
+
+            int temp = batt.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0);
+            int tm = temp > 0 ? temp / 10 : -1;
+            if (tm != snapTmp) { snapTmp = tm; strTmp = tm > 0 ? tm + "°C" : ""; }
+
+            int pct = batt.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+            snapPct = pct;
+
+            int status = batt.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+                            || status == BatteryManager.BATTERY_STATUS_FULL;
+
+            int mw;
+            if (charging) {
+                mw = -2;
+            } else {
+                int mv = batt.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
+                float amps = getBatteryCurrentAmps();
+                mw = (mv > 0 && amps > 0) ? (int)((mv / 1000f) * amps * 1000) : -1;
+            }
+
+            if (mw != snapMw) {
+                snapMw = mw;
+                snapCharging = (mw == -2);
+                if (snapCharging)        strPwr = "CHG";
+                else if (mw > 0)         strPwr = String.format(Locale.US, "%.1fW", mw / 1000f);
+                else                     strPwr = "N/A";
+            }
+        } catch (Exception e) {
+            battFailed = true;
+            Log.w("WinlatorHUD", "Battery read unavailable");
+        }
+    }
+
+    private float getBatteryCurrentAmps() {
+        long raw = 0;
+        if (batteryManager != null)
+            raw = batteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW);
+        if (raw == 0 || raw == Long.MIN_VALUE)
+            raw = readSysFsLong("/sys/class/power_supply/battery/current_now");
+        if (raw == 0 || raw == Long.MIN_VALUE)
+            raw = readSysFsLong("/sys/class/power_supply/bms/current_now");
+        if (raw == 0 || raw == Long.MIN_VALUE) return -1f;
+        raw = Math.abs(raw);
+        
+        return raw < 20000 ? raw / 1000f : raw / 1000000f;
+    }
+
+    private long readSysFsLong(String path) {
+        try (BufferedReader r = new BufferedReader(new FileReader(path))) {
+            String l = r.readLine();
+            return l != null ? Long.parseLong(l.trim()) : 0;
+        } catch (Exception e) { return 0; }
+    }
+
+    
 
     private void snapshot() {
         long now = System.nanoTime();
@@ -187,35 +379,17 @@ public class WinlatorHUD extends View {
             int f = frameAccum.getAndSet(0);
             snapFps = f * 1_000_000_000f / dt;
             lastFpsNs = now;
-            graph[gHead % GBUF] = snapFps;
-            gHead++;
-            cachedPath = null;
-            float targetMax = Math.max(30f, snapFps * 1.2f);
-            gMax = gMax + (targetMax - gMax) * 0.15f;
             strFps = String.format(Locale.US, "%.0f", snapFps);
         }
-        if (dataSource != null) {
-            int g  = dataSource.gpuLoad.get();
-            int cp = dataSource.cpuLoad.get();
-            int mw = dataSource.batteryMw.get();
-            int tm = dataSource.batteryTempC.get();
-            int pc = dataSource.batteryPct.get();
-            int rm = dataSource.ramUsagePct.get();
 
-            if (g != snapGpu)   { snapGpu = g;  strGpu = g  >= 0 ? g  + "%" : "N/A"; }
-            if (cp != snapCpu)  { snapCpu = cp; strCpu = cp >= 0 ? cp + "%" : "N/A"; }
-            if (rm != snapRam)  { snapRam = rm; strRam = rm >= 0 ? rm + "%" : "N/A"; }
-            if (tm != snapTmp)  { snapTmp = tm; strTmp = tm > 0 ? tm + "°C" : ""; }
-            if (pc != snapPct)  { snapPct = pc; }
-            if (mw != snapMw) {
-                snapMw = mw;
-                snapCharging = (mw == -2);
-                if (snapCharging)   strPwr = "CHG";
-                else if (mw > 0)    strPwr = String.format(Locale.US, "%.1fW", mw / 1000f);
-                else                strPwr = "N/A";
-            }
+        
+        if (now - lastStatsNs >= STATS_INTERVAL_NS) {
+            readStats();
+            lastStatsNs = now;
         }
     }
+
+    
 
     @Override
     protected void onDraw(Canvas c) {
@@ -228,8 +402,7 @@ public class WinlatorHUD extends View {
             }
             if (vertical) drawVertical(c);
             else          drawHorizontal(c);
-        } catch (Exception e) {
-        }
+        } catch (Exception e) {}
     }
 
     private void drawHorizontal(Canvas c) {
@@ -274,11 +447,7 @@ public class WinlatorHUD extends View {
         if ((showMask & SHOW_FPS) != 0) {
             float fb = baseline + (pFps.getTextSize() - TS) / 2f;
             c.drawText("FPS ", x, fb, pFps); x += wLabelFps;
-            c.drawText(strFps, x, fb, pFps); x += pFps.measureText(strFps);
-            if ((showMask & SHOW_GRAPH) != 0) {
-                x += PAD;
-                drawInlineGraph(c, x, PAD, GRAW, TS + PAD);
-            }
+            c.drawText(strFps, x, fb, pFps);
         }
     }
 
@@ -293,23 +462,19 @@ public class WinlatorHUD extends View {
 
         float y = PAD;
         if ((showMask & SHOW_RENDERER) != 0) {
-            c.drawText(strRend, PAD, y + TS, pRend);
-            y += lineH;
+            c.drawText(strRend, PAD, y + TS, pRend); y += lineH;
         }
         if ((showMask & SHOW_GPU) != 0) {
             c.drawText("GPU ", PAD, y + TS, pGpu);
-            c.drawText(strGpu, PAD + wLabelGpu, y + TS, pVal);
-            y += lineH;
+            c.drawText(strGpu, PAD + wLabelGpu, y + TS, pVal); y += lineH;
         }
         if ((showMask & SHOW_CPU) != 0) {
             c.drawText("CPU ", PAD, y + TS, pCpu);
-            c.drawText(strCpu, PAD + wLabelCpu, y + TS, pVal);
-            y += lineH;
+            c.drawText(strCpu, PAD + wLabelCpu, y + TS, pVal); y += lineH;
         }
         if ((showMask & SHOW_RAM) != 0) {
             c.drawText("RAM ", PAD, y + TS, pRam);
-            c.drawText(strRam, PAD + wLabelRam, y + TS, pVal);
-            y += lineH;
+            c.drawText(strRam, PAD + wLabelRam, y + TS, pVal); y += lineH;
         }
         if ((showMask & SHOW_BATT) != 0) {
             c.drawText("PWR ", PAD, y + TS, pBat);
@@ -317,8 +482,7 @@ public class WinlatorHUD extends View {
             y += lineH;
             if (!strTmp.isEmpty()) {
                 c.drawText("TMP ", PAD, y + TS, pTmp);
-                c.drawText(strTmp, PAD + wLabelTmp, y + TS, pVal);
-                y += lineH;
+                c.drawText(strTmp, PAD + wLabelTmp, y + TS, pVal); y += lineH;
             }
         }
         if ((showMask & SHOW_FPS) != 0) {
@@ -341,25 +505,6 @@ public class WinlatorHUD extends View {
         return wSep;
     }
 
-    private void drawInlineGraph(Canvas c, float x, float y, float w, float h) {
-        c.drawRect(x, y, x + w, y + h, pGraphBg);
-        int count = Math.min(gHead, GBUF);
-        if (count < 2) return;
-        if (cachedPath == null || lastGHead != gHead) {
-            cachedPath = new Path();
-            float bw = w / GBUF;
-            boolean first = true;
-            for (int i = 0; i < count; i++) {
-                float v  = graph[(gHead - count + i) % GBUF];
-                float px = x + i * bw;
-                float py = y + h - (v / gMax) * h;
-                if (first) { cachedPath.moveTo(px, py); first = false; }
-                else        { cachedPath.lineTo(px, py); }
-            }
-            lastGHead = gHead;
-        }
-        c.drawPath(cachedPath, pGraph);
-    }
 
     private float measureHorizontal() {
         float w = PAD;
@@ -367,11 +512,8 @@ public class WinlatorHUD extends View {
         if ((showMask & SHOW_GPU)      != 0) w += wLabelGpu + wVal100pct + wSep;
         if ((showMask & SHOW_CPU)      != 0) w += wLabelCpu + wVal100pct + wSep;
         if ((showMask & SHOW_RAM)      != 0) w += wLabelRam + wVal100pct + wSep;
-        if ((showMask & SHOW_BATT)     != 0) {
-            w += wLabelPwr + wValWatt + wSep + wLabelTmp + wValTemp + wSep;
-        }
-        if ((showMask & SHOW_FPS)   != 0) w += wLabelFps + wValFps;
-        if ((showMask & SHOW_GRAPH) != 0) w += PAD + GRAW;
+        if ((showMask & SHOW_BATT)     != 0) w += wLabelPwr + wValWatt + wSep + wLabelTmp + wValTemp + wSep;
+        if ((showMask & SHOW_FPS)      != 0) w += wLabelFps + wValFps;
         return w + PAD;
     }
 
@@ -405,32 +547,50 @@ public class WinlatorHUD extends View {
         return Math.max(1, r);
     }
 
+    
+
     @Override
     public boolean onTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                if (e.getPointerCount() > 1) return true;
+                multiTouchActive = false;
                 touchX = e.getRawX(); touchY = e.getRawY();
                 startX = getX();      startY = getY();
                 dragging = false;
                 touchDownMs = System.currentTimeMillis();
                 return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                multiTouchActive = true;
+                dragging = false;
+                touchDownMs = 0;
+                return true;
             case MotionEvent.ACTION_MOVE:
+                if (multiTouchActive || e.getPointerCount() > 1) return true;
                 float dx = e.getRawX() - touchX, dy = e.getRawY() - touchY;
                 if (!dragging && Math.hypot(dx, dy) > DRAG_THRESH) dragging = true;
-                if (dragging) { setX(startX + dx); setY(startY + dy); }
+                if (dragging) { setX(startX + dx); setY(startY + dy); clampToParentBounds(); }
                 return true;
             case MotionEvent.ACTION_POINTER_UP:
+                multiTouchActive = true;
                 dragging = false;
                 touchDownMs = 0;
                 return true;
             case MotionEvent.ACTION_CANCEL:
+                multiTouchActive = false;
                 dragging = false;
                 touchDownMs = 0;
+                ensureVisible();
                 return true;
             case MotionEvent.ACTION_UP:
-                if (e.getPointerCount() > 1) { dragging = false; return true; }
+                if (multiTouchActive || e.getPointerCount() > 1) {
+                    multiTouchActive = false;
+                    dragging = false;
+                    touchDownMs = 0;
+                    ensureVisible();
+                    return true;
+                }
                 if (dragging) {
+                    clampToParentBounds();
                     savePosition();
                 } else if (touchDownMs > 0 && System.currentTimeMillis() - touchDownMs < 300) {
                     vertical = !vertical;
@@ -439,10 +599,13 @@ public class WinlatorHUD extends View {
                     uiHandler.postDelayed(this::ensureVisible, 250);
                 }
                 dragging = false;
+                touchDownMs = 0;
                 return true;
         }
         return false;
     }
+
+    
 
     @Override
     protected void onAttachedToWindow() {
@@ -464,12 +627,29 @@ public class WinlatorHUD extends View {
 
     private void ensureVisible() {
         if (userEnabled && rendererActive) {
+            clampToParentBounds();
             if (getVisibility() != VISIBLE) setVisibility(VISIBLE);
             scheduleRedraw();
         }
     }
 
+    private void clampToParentBounds() {
+        View parent = getParent() instanceof View ? (View) getParent() : null;
+        int pw = parent != null ? parent.getWidth() : 0;
+        int ph = parent != null ? parent.getHeight() : 0;
+        int w = getWidth() > 0 ? getWidth() : getMeasuredWidth();
+        int h = getHeight() > 0 ? getHeight() : getMeasuredHeight();
+        if (pw <= 0 || ph <= 0 || w <= 0 || h <= 0) return;
+        float maxX = Math.max(0, pw - w);
+        float maxY = Math.max(0, ph - h);
+        float nx = Math.max(0, Math.min(getX(), maxX));
+        float ny = Math.max(0, Math.min(getY(), maxY));
+        if (nx != getX()) setX(nx);
+        if (ny != getY()) setY(ny);
+    }
+
     private void savePosition() {
+        clampToParentBounds();
         prefs.edit().putFloat(KEY_X, getX()).putFloat(KEY_Y, getY()).apply();
     }
 
@@ -484,25 +664,25 @@ public class WinlatorHUD extends View {
     protected void onVisibilityChanged(View v, int vis) {
         super.onVisibilityChanged(v, vis);
         if (vis == VISIBLE) {
-            scheduleRedraw();
+            if (userEnabled && rendererActive) scheduleRedraw();
         } else {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
-            if (userEnabled) {
-                uiHandler.postDelayed(this::ensureVisible, 300);
-            }
+            if (userEnabled && rendererActive) uiHandler.postDelayed(this::ensureVisible, 300);
         }
     }
 
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
-        if (visibility == VISIBLE && userEnabled) {
+        if (visibility == VISIBLE && userEnabled && rendererActive) {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
             uiHandler.postDelayed(this::ensureVisible, 150);
         }
     }
+
+    
 
     private void loadPrefs() {
         showMask = prefs.getInt(KEY_SHOW, SHOW_DEFAULT);
@@ -516,7 +696,7 @@ public class WinlatorHUD extends View {
         setVisibility(GONE);
     }
 
-    private boolean rendererActive = false;
+    private volatile boolean rendererActive = false;
 
     public boolean hasSavedPref()   { return prefs.contains(KEY_VIS); }
     public boolean isSavedVisible() { return prefs.getBoolean(KEY_VIS, false); }
@@ -524,16 +704,17 @@ public class WinlatorHUD extends View {
     public void enableByUser() {
         userEnabled = true;
         prefs.edit().putBoolean(KEY_VIS, true).apply();
-        if (dataSource != null) dataSource.start();
         uiHandler.removeCallbacks(redrawRunnable);
         redrawScheduled = false;
-        setVisibility(VISIBLE);
-        scheduleRedraw();
+        if (rendererActive) {
+            setVisibility(VISIBLE);
+            scheduleRedraw();
+        } else {
+            setVisibility(GONE);
+        }
     }
 
-    public void disableByUser() {
-        disableByUser(true);
-    }
+    public void disableByUser() { disableByUser(true); }
 
     public void disableByUser(boolean savePrefs) {
         userEnabled = false;
@@ -547,27 +728,19 @@ public class WinlatorHUD extends View {
         uiHandler.post(() -> {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
-            frameAccum.set(0);
-            snapFps = 0;
-            gHead = 0;
-            lastFpsNs = 0;
-            if (userEnabled) {
-                setVisibility(VISIBLE);
-                scheduleRedraw();
-            } else {
-                setVisibility(GONE);
-            }
+            frameAccum.set(0); snapFps = 0; lastFpsNs = 0;
+            lastStatsNs = 0;
+            if (userEnabled && rendererActive) { setVisibility(VISIBLE); scheduleRedraw(); }
+            else setVisibility(GONE);
         });
     }
 
     public void onRendererDetected(String name) {
-        uiHandler.post(() -> {
-            rendererActive = true;
-            if (name != null && !name.isEmpty()) rendererLabel = name;
-            strRend = (isNative ? "+" : "") + rendererLabel;
-            layoutDirty = true;
-            if (userEnabled) { setVisibility(VISIBLE); scheduleRedraw(); }
-        });
+        rendererActive = true;
+        if (name != null && !name.isEmpty()) rendererLabel = name;
+        strRend = (isNative ? "+" : "") + rendererLabel;
+        layoutDirty = true;
+        if (userEnabled) { setVisibility(VISIBLE); scheduleRedraw(); }
     }
 
     public void onRendererGone() {
@@ -576,13 +749,19 @@ public class WinlatorHUD extends View {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
             setVisibility(GONE);
-            frameAccum.set(0); snapFps = 0; gHead = 0; lastFpsNs = 0;
+            frameAccum.set(0); snapFps = 0; lastFpsNs = 0;
         });
     }
 
     public void setRenderer(String name) {
-        if (name != null && !name.isEmpty()) rendererLabel = name;
+        if (name != null && !name.isEmpty()) {
+            rendererLabel = name;
+            strRend = (isNative ? "+" : "") + rendererLabel;
+            layoutDirty = true;
+            if (userEnabled && rendererActive) invalidate();
+        }
     }
+
     public void setGpuName(String name) {}
 
     public void toggleElement(int idx, boolean on) {
@@ -594,16 +773,21 @@ public class WinlatorHUD extends View {
         try { requestLayout(); invalidate(); } catch (Exception ignored) {}
     }
 
+    
     public void syncCheckboxes(android.widget.CheckBox cbFps, android.widget.CheckBox cbGpu,
             android.widget.CheckBox cbCpuRam, android.widget.CheckBox cbBattTemp,
-            android.widget.CheckBox cbGraph, android.widget.CheckBox cbRenderer) {
-        if (cbFps      != null) cbFps.setChecked((showMask & SHOW_FPS)       != 0);
-        if (cbGpu      != null) cbGpu.setChecked((showMask & SHOW_GPU)       != 0);
-        if (cbCpuRam   != null) cbCpuRam.setChecked((showMask & SHOW_CPU)    != 0);
-        if (cbBattTemp != null) cbBattTemp.setChecked((showMask & SHOW_BATT) != 0);
-        if (cbGraph    != null) cbGraph.setChecked((showMask & SHOW_GRAPH)   != 0);
-        if (cbRenderer != null) cbRenderer.setChecked((showMask & SHOW_RENDERER) != 0);
+            android.widget.CheckBox cbGraph,
+            android.widget.CheckBox cbRenderer) {
+        if (cbFps      != null) cbFps.setChecked((showMask & SHOW_FPS)          != 0);
+        if (cbGpu      != null) cbGpu.setChecked((showMask & SHOW_GPU)          != 0);
+        if (cbCpuRam   != null) cbCpuRam.setChecked((showMask & SHOW_CPU)       != 0);
+        if (cbBattTemp != null) cbBattTemp.setChecked((showMask & SHOW_BATT)    != 0);
+        
+        if (cbRenderer != null) cbRenderer.setChecked((showMask & SHOW_RENDERER)!= 0);
     }
+
+    
+    public void setDataSource(Object dataSource) {}
 
     public void setHudScale(float scale) {
         setScaleX(scale); setScaleY(scale);
@@ -617,23 +801,46 @@ public class WinlatorHUD extends View {
     }
 
     public void reset() {
-        rendererLabel = "Vulkan"; frameAccum.set(0); snapFps = 0; gHead = 0; lastFpsNs = 0;
+        rendererLabel = "Vulkan";
+        strRend = (isNative ? "+" : "") + rendererLabel;
+        frameAccum.set(0); snapFps = 0; lastFpsNs = 0;
+        lastStatsNs = 0;
+        layoutDirty = true;
     }
 
     public void forceReset() {
         uiHandler.post(() -> {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
-            frameAccum.set(0);
-            snapFps = 0; gHead = 0; lastFpsNs = 0;
-            cachedPath = null; lastGHead = -1;
-            dragging = false; touchDownMs = 0;
-            rendererActive = true;
+            frameAccum.set(0); snapFps = 0; lastFpsNs = 0;
+            lastStatsNs = 0;
+            dragging = false; touchDownMs = 0; multiTouchActive = false;
+            rendererLabel = "Vulkan";
+            strRend = (isNative ? "+" : "") + rendererLabel;
+            showMask = SHOW_DEFAULT;
+            hudAlpha = 1f;
+            vertical = false;
             userEnabled = true;
-            prefs.edit().putBoolean(KEY_VIS, true).apply();
-            if (dataSource != null) dataSource.start();
-            setVisibility(VISIBLE);
-            scheduleRedraw();
+            setScaleX(1f); setScaleY(1f);
+            setX(16f); setY(16f);
+            prefs.edit()
+                    .putBoolean(KEY_VIS, true)
+                    .putInt(KEY_SHOW, showMask)
+                    .putInt(KEY_ALPHA, 100)
+                    .putBoolean(KEY_VERT, false)
+                    .putFloat(KEY_SCALE, 1f)
+                    .putFloat(KEY_X, 16f)
+                    .putFloat(KEY_Y, 16f)
+                    .apply();
+            layoutDirty = true;
+            try { requestLayout(); invalidate(); } catch (Exception ignored) {}
+            if (rendererActive) {
+                setVisibility(VISIBLE);
+                scheduleRedraw();
+                uiHandler.postDelayed(this::ensureVisible, 250);
+            } else {
+                setVisibility(GONE);
+            }
         });
     }
 
@@ -643,7 +850,6 @@ public class WinlatorHUD extends View {
             case 2: return SHOW_GPU;
             case 3: return SHOW_CPU;
             case 4: return SHOW_BATT;
-            case 5: return SHOW_GRAPH;
             case 6: return SHOW_RENDERER;
             case 7: return SHOW_RAM;
             default: return 0;

@@ -17,14 +17,12 @@ public class SteamGridGridsResponseDeserializer implements JsonDeserializer<Stea
         SteamGridGridsResponse response = new SteamGridGridsResponse();
         JsonObject jsonObject = json.getAsJsonObject();
 
-        // Null check for success field
         if (jsonObject.has("success") && !jsonObject.get("success").isJsonNull()) {
             response.success = jsonObject.get("success").getAsBoolean();
         } else {
             response.success = false;  // Default value if not present
         }
 
-        // Null check for page, total, and limit fields
         if (jsonObject.has("page") && !jsonObject.get("page").isJsonNull()) {
             response.page = jsonObject.get("page").getAsInt();
         } else {
@@ -43,7 +41,6 @@ public class SteamGridGridsResponseDeserializer implements JsonDeserializer<Stea
             response.limit = 0;  // Default value if not present
         }
 
-        // Check if data is an array or an object
         JsonElement dataElement = jsonObject.get("data");
         if (dataElement != null && dataElement.isJsonArray()) {
             response.data = new ArrayList<>();
@@ -53,7 +50,6 @@ public class SteamGridGridsResponseDeserializer implements JsonDeserializer<Stea
                 response.data.add(grid);
             }
         } else if (dataElement != null && dataElement.isJsonObject()) {
-            // Handle case where data is a single object
             response.data = new ArrayList<>();
             SteamGridGridsResponse.Grid grid = context.deserialize(dataElement, SteamGridGridsResponse.Grid.class);
             response.data.add(grid);

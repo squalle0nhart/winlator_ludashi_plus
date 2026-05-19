@@ -421,8 +421,23 @@ public class ContainerDetailFragment extends Fragment {
         MidiManager.loadSFSpinner(sMIDISoundFont);
         AppUtils.setSpinnerSelectionFromValue(sMIDISoundFont, isEditMode() ? container.getMIDISoundFont() : "");
 
-        final CheckBox cbShowFPS = view.findViewById(R.id.CBShowFPS);
-        cbShowFPS.setChecked(isEditMode() && container.isShowFPS());
+        Spinner sHudMode = view.findViewById(R.id.SHudMode);
+        ArrayAdapter<String> hudAdapter = new ArrayAdapter<>(context,
+                android.R.layout.simple_spinner_item,
+                new String[]{"Off", "Classic", "Modern"});
+        hudAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        sHudMode.setAdapter(hudAdapter);
+        // Carrega modo: tenta extra "hudMode", senão converte showFPS antigo
+        int savedHudMode = 0;
+        if (isEditMode()) {
+            String hudModeExtra = container.getExtra("hudMode");
+            if (!hudModeExtra.isEmpty()) {
+                savedHudMode = Integer.parseInt(hudModeExtra);
+            } else if (container.isShowFPS()) {
+                savedHudMode = 1; // backward compat: showFPS=true → Classic
+            }
+        }
+        sHudMode.setSelection(savedHudMode);
 
         final CheckBox cbFullscreenStretched = view.findViewById(R.id.CBFullscreenStretched);
         cbFullscreenStretched.setChecked(isEditMode() && container.isFullscreenStretched());
@@ -599,7 +614,8 @@ public class ContainerDetailFragment extends Fragment {
                 String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
                 String wincomponents = getWinComponents(view);
                 String drives = getDrives(view);
-                boolean showFPS = cbShowFPS.isChecked();
+                int hudMode = sHudMode.getSelectedItemPosition(); // 0=Off 1=Classic 2=Modern
+                boolean showFPS = hudMode != 0;
                 boolean fullscreenStretched = cbFullscreenStretched.isChecked();
                 boolean exclusiveXInput = cbExclusiveXInput.isChecked();
                 String cpuList = cpuListView.getCheckedCPUListAsString();
@@ -643,6 +659,7 @@ public class ContainerDetailFragment extends Fragment {
                     container.setWinComponents(wincomponents);
                     container.setDrives(drives);
                     container.setShowFPS(showFPS);
+                    container.putExtra("hudMode", String.valueOf(hudMode));
                     container.setFullscreenStretched(fullscreenStretched);
                     container.setExclusiveXInput(exclusiveXInput);
                     container.setInputType(finalInputType);
@@ -684,6 +701,7 @@ public class ContainerDetailFragment extends Fragment {
                     data.put("wincomponents", wincomponents);
                     data.put("drives", drives);
                     data.put("showFPS", showFPS);
+                    data.put("hudMode", hudMode);
                     data.put("fullscreenStretched", fullscreenStretched);
                     data.put("exclusiveXInput", exclusiveXInput);
                     data.put("inputType", finalInputType);

@@ -14,7 +14,6 @@ public interface SteamGridDBApi {
             @Path("term") String searchTerm
     );
 
-    // Updated method to fetch grids by game ID with filters
     @GET("grids/game/{gameId}")
     Call<SteamGridGridsResponse> getGridsByGameId(
             @Header("Authorization") String authToken,
