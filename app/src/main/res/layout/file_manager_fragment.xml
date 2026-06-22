@@ -42,7 +42,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:src="@drawable/icon_wine"
-                    app:tint="?attr/colorPrimary"/>
+                    app:tint="#2196F3"/>
 
                 <TextView
                     android:id="@+id/TVDriveName"
@@ -50,7 +50,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:text="Drive D:"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="#2196F3"
                     android:textStyle="bold"
                     android:textSize="14sp"/>
                 

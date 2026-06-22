@@ -24,7 +24,7 @@ import java.util.Map;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
-    public static final String REMOTE_PROFILES = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/contents.json";
+    public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -279,6 +279,17 @@ public class ContentsManager {
         if (profilesMap != null)
             return profilesMap.get(type);
         return null;
+    }
+
+    public List<ContentProfile> getInstalledProfiles(ContentProfile.ContentType type) {
+        List<ContentProfile> installedProfiles = new ArrayList<>();
+        List<ContentProfile> profiles = getProfiles(type);
+        if (profiles == null) return installedProfiles;
+
+        for (ContentProfile profile : profiles) {
+            if (profile.remoteUrl == null) installedProfiles.add(profile);
+        }
+        return installedProfiles;
     }
 
     public static File getInstallDir(Context context, ContentProfile profile) {

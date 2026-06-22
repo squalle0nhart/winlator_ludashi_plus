@@ -1,12 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    DrawerLayout — two children:
-      1. FLXServerDisplay  — main game surface (no gravity = content)
-      2. ScrollView        — custom left sidebar (gravity="start" = drawer)
-
-    NavigationView + main_menu_header (big banner) + xserver_menu.xml were removed.
-    The Activity wires everything via BTItem* / LLSub* IDs in left_sidebar.xml.
--->
 <androidx.drawerlayout.widget.DrawerLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -14,27 +6,24 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- ── Main content (game surface) ── -->
     <FrameLayout
         android:id="@+id/FLXServerDisplay"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- ── Left sidebar drawer ── -->
     <ScrollView
         android:id="@+id/SidebarScrollView"
-        android:layout_width="240dp"
+        android:layout_width="320dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="#1A1A1A"
+        android:background="#E6060F19"
         android:scrollbars="none"
-        android:fillViewport="false">
+        android:fillViewport="true">
 
         <include layout="@layout/left_sidebar" />
 
     </ScrollView>
 
-    <!-- Hidden EditText for XR/IME text input (zero-size, off-screen) -->
     <EditText
         android:id="@+id/XRTextInput"
         android:layout_width="0dp"

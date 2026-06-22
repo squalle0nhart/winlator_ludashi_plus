@@ -116,15 +116,13 @@
                 android:layout_weight="1"
                 android:id="@+id/SGraphicsDriver"
                 android:entries="@array/graphics_driver_entries" />
-
-            <!-- ImageButton for configuring graphics driver version -->
-            <ImageButton
+<ImageButton
                 style="@style/ListMenuButton"
                 android:id="@+id/BTGraphicsDriverConfig"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:padding="8dp"
-                android:src="@drawable/icon_settings"
+                android:src="@drawable/icon_monitor"
                 android:visibility="visible" />
         </LinearLayout>
 
@@ -189,7 +187,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:padding="8dp"
-                android:src="@drawable/icon_settings"
+                android:src="@drawable/icon_monitor"
                 android:visibility="visible" />
         </LinearLayout>
 
@@ -209,7 +207,7 @@
                 android:id="@+id/TVRendererMode"
                 style="@style/ComboBox"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="42dp"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:paddingStart="12dp"
@@ -218,10 +216,8 @@
             <ImageButton
                 android:id="@+id/BTRendererOptions"
                 style="@style/ListMenuButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:padding="8dp"
-                android:src="@drawable/icon_settings" />
+                android:padding="6dp"
+                android:src="@drawable/icon_monitor" />
         </LinearLayout>
 
         <TextView
@@ -238,27 +234,49 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:id="@+id/LLEmulator">
-            <TextView
-                android:layout_width="wrap_content"
+
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="64bit Emulator" />
-            <Spinner
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:id="@+id/SEmulator64"
-                android:entries="@array/emulator_entries"/>
-            <TextView
-                android:layout_width="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/TVEmulator64Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="64bit Emulator" />
+
+                <Spinner
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:id="@+id/SEmulator64"
+                    android:entries="@array/emulator_entries" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/dll_emulator" />
-            <Spinner
-                style="@style/ComboBox"
-                android:layout_width="match_parent"
-                android:id="@+id/SEmulator"
-                android:entries="@array/emulator_entries"/>
-        </LinearLayout>
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/TVEmulator32Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dll_emulator" />
+
+                <Spinner
+                    style="@style/ComboBox"
+                    android:layout_width="match_parent"
+                    android:id="@+id/SEmulator"
+                    android:entries="@array/emulator_entries" />
+            </LinearLayout>
+            </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -338,7 +356,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/directx" />
             </FrameLayout>
 
@@ -353,7 +370,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/general" />
             </FrameLayout>
         </LinearLayout>
@@ -402,12 +418,30 @@
                         android:layout_height="wrap_content"
                         android:text="@string/box64_version" />
 
-                    <Spinner
-                        style="@style/ComboBox"
-                        android:id="@+id/SBox64Version"
+                    <LinearLayout
                         android:layout_width="match_parent"
-                        android:entries="@array/box64_version_entries"
-                        android:spinnerMode="dialog" />
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <Spinner
+                            style="@style/ComboBox"
+                            android:id="@+id/SBox64Version"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:entries="@array/box64_version_entries"
+                            android:spinnerMode="dialog" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTBox64VersionRemove"
+                            android:src="@drawable/icon_popup_menu_remove" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTBox64VersionDownload"
+                            android:src="@drawable/icon_popup_menu_download" />
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -439,10 +473,28 @@
                         android:layout_height="wrap_content"
                         android:text="@string/fexcore_version" />
 
-                    <Spinner
-                        style="@style/ComboBox"
-                        android:id="@+id/SFEXCoreVersion"
-                        android:layout_width="match_parent" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <Spinner
+                            style="@style/ComboBox"
+                            android:id="@+id/SFEXCoreVersion"
+                            android:layout_width="0dp"
+                            android:layout_weight="1" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTFEXCoreVersionRemove"
+                            android:src="@drawable/icon_popup_menu_remove" />
+
+                        <ImageButton
+                            style="@style/ListMenuButton"
+                            android:id="@+id/BTFEXCoreVersionDownload"
+                            android:src="@drawable/icon_popup_menu_download" />
+                    </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -457,7 +509,6 @@
                     
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/fexcore_config" />
                     
             </FrameLayout>
@@ -521,7 +572,6 @@
 
                 <TextView
                     style="@style/FieldSetLabel"
-                    android:background="#ffffff"
                     android:text="@string/input_controls" />
             </FrameLayout>
 
@@ -729,6 +779,13 @@
                 android:layout_height="wrap_content"
                 android:text="@string/processor_affinity"
                 android:layout_marginTop="8dp" />
+
+            <CheckBox
+                android:id="@+id/CBSyncCpuTopology"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sync_cpu_topology"
+                android:layout_marginTop="4dp" />
 
             <com.winlator.cmod.widget.CPUListView
                 android:id="@+id/CPUListView"

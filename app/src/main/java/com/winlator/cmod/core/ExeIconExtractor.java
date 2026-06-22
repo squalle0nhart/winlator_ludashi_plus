@@ -83,7 +83,14 @@ public class ExeIconExtractor {
         if (raw == null) {
             Log.w(TAG, "[extractAndSave:" + label + "] PE extraction returned null for: " + exeFile.getName()
                     + " — no icon found or format not supported");
-            return false;
+            if (!isCover) return false;
+            // Cover fallback: generate a 32x32 solid-color placeholder so the cover
+            // pipeline still produces an image (dark blurred background + no icon).
+            // getDominantColor / darkenColor are unused by the caller but kept for
+            // possible future use.
+            Log.d(TAG, "[extractAndSave:cover] Generating fallback solid-color cover");
+            raw = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888);
+            raw.eraseColor(0xFF1A1A2E);
         }
         Log.d(TAG, "[extractAndSave:" + label + "] Raw bitmap obtained: "
                 + raw.getWidth() + "x" + raw.getHeight());

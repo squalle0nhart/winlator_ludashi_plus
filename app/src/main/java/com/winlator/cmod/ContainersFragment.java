@@ -31,7 +31,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
-import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -82,7 +81,6 @@ public class ContainersFragment extends Fragment {
         recyclerView = frameLayout.findViewById(R.id.RecyclerView);
         emptyTextView = frameLayout.findViewById(R.id.TVEmptyText);
         recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-        recyclerView.addItemDecoration(new DividerItemDecoration(recyclerView.getContext(), DividerItemDecoration.VERTICAL));
         return frameLayout;
     }
 
@@ -143,12 +141,16 @@ public class ContainersFragment extends Fragment {
             private final ImageView menuButton; // Changed to ImageButton
             private final ImageView imageView;
             private final TextView title;
+            private final TextView subtitle;
+            private final TextView meta;
 
             private ViewHolder(View view) {
                 super(view);
                 this.runButton = view.findViewById(R.id.BTRun); // Find by correct ID
                 this.imageView = view.findViewById(R.id.ImageView);
                 this.title = view.findViewById(R.id.TVTitle);
+                this.subtitle = view.findViewById(R.id.TVSubtitle);
+                this.meta = view.findViewById(R.id.TVMeta);
                 this.menuButton = view.findViewById(R.id.BTMenu);
             }
         }
@@ -172,8 +174,10 @@ public class ContainersFragment extends Fragment {
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
             final Container item = data.get(position); // Use 'item' instead of undefined 'container'
-            holder.imageView.setImageResource(R.drawable.icon_container);
+            holder.imageView.setImageResource(R.drawable.icon_menu_container);
             holder.title.setText(item.getName());
+            holder.subtitle.setText(item.getWineVersion());
+            holder.meta.setText(item.getScreenSize());
 
             holder.runButton.setOnClickListener(view -> runContainer(item)); // Correct item reference
 

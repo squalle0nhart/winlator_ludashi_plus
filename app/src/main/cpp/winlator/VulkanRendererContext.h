@@ -111,7 +111,18 @@ struct VkTable {
 
 static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
-struct WindowPushConstants { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAlpha; };
+struct WindowPushConstants      { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAlpha; };
+struct WindowPushConstantsSGSR  { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAlpha;
+                                  float invSrcW, invSrcH, srcW, srcH;
+                                  int   effectId;   
+                                  float resW;       
+                                  float sharpness; };
+struct WindowPushConstantsStretch { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAlpha; float strength; float profile; };
+
+struct WindowPushConstantsPostFX  { float ndcX0, ndcY0, ndcX1, ndcY1;
+                                    int   effectId;   
+                                    float sharpness;
+                                    float resW, resH; };
 
 class VulkanRendererContext {
 public:
@@ -161,9 +172,16 @@ public:
     void loadDeviceDispatch();
 
     void setFilterMode(int mode);
+    void setStretchMode(int mode);
+    void setPostFXMode(int mode);    
+    void setSharpness(float s);      
     void setSwapRB(bool enabled);
     void setPresentMode(VkPresentModeKHR mode);
     std::vector<int> getSupportedPresentModes() const;
+    VkExtent2D getSwapchainExtent() const { return swapchainExt; }
+
+    void setCustomScissor(int x, int y, int w, int h);
+    void clearCustomScissor();
 
 private:
     struct WinTex {
@@ -196,10 +214,14 @@ private:
     ANativeWindow* window;
     int surfaceWidth, surfaceHeight, containerWidth, containerHeight;
     void* adrenotoolsHandle = nullptr;
-    int filterMode = 0;
+    int filterMode  = 0;
+    int stretchMode = 0;
+    int postFXMode  = 0;  
+    float stretchStrength = 0.40f;
+    float stretchProfile  = 0.60f;
+    float sharpness = 0.5f;
     bool swapRB = false;
     float maxAnisotropy           = 1.0f;
-    bool  cubicSupported          = false;
     VkPhysicalDeviceMemoryProperties memProperties{};
     VkPresentModeKHR requestedPresentMode = VK_PRESENT_MODE_FIFO_KHR;
     uint32_t graphicsQueueFamilyIndex = 0;
@@ -294,6 +316,9 @@ private:
     VkPipelineLayout      pipeLayout  = VK_NULL_HANDLE;
 
     VkPipeline            pipeline    = VK_NULL_HANDLE;
+    VkPipeline            sgsrPipeline   = VK_NULL_HANDLE;
+    VkPipeline            stretchPipeline= VK_NULL_HANDLE;
+    VkPipeline            postfxPipeline = VK_NULL_HANDLE;
 
     VkCommandPool                cmdPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> cmdBufs;
@@ -316,6 +341,9 @@ private:
     std::condition_variable dirtyCV;
     std::shared_mutex frameMutex;
 
+    VkRect2D          customScissor    = {{0,0},{0,0}};
+    bool              hasCustomScissor = false;
+
     void createInstance();
     void createSurface();
     void pickPhysicalDevice();
@@ -324,6 +352,9 @@ private:
     void createRenderPass();
     void createDSLayout();
     void createPipeline(bool blend, VkPipeline& out);
+    void createSgsrPipeline();
+    void createStretchPipeline();
+    void createPostFXPipeline();
     void createFramebuffers();
     void createCmdPool();
     void createSampler();
@@ -351,7 +382,8 @@ private:
         VkBuffer cursorUpload, bool hasCursorUpload,
         float ox, float oy, float sx, float sy, float cw, float ch,
         short ptrX, short ptrY, short curHotX, short curHotY,
-        short curW, short curH, bool curVis);
+        short curW, short curH, bool curVis,
+        VkRect2D scissorRect);
     void renderLoop();
     void renderFrame();
 

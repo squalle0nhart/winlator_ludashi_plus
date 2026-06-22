@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="3dp"
+    android:layout_marginBottom="3dp"
+    android:background="@drawable/adrenotools_card_background"
+    android:minHeight="50dp"
+    android:padding="7dp">
+
+    <TextView
+        android:id="@+id/TVIcon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="#07111f"
+        android:gravity="center"
+        android:text="⬇"
+        android:textColor="#0066ff"
+        android:textSize="16sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TVName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:maxLines="1"
+        android:textColor="#ffffff"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toStartOf="@+id/BTMenu"
+        app:layout_constraintStart_toEndOf="@+id/TVIcon"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/TVVersion"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="10dp"
+        android:maxLines="1"
+        android:textColor="#b0b0b0"
+        android:textSize="13sp"
+        app:layout_constraintEnd_toStartOf="@+id/BTMenu"
+        app:layout_constraintStart_toEndOf="@+id/TVIcon"
+        app:layout_constraintTop_toBottomOf="@+id/TVName" />
+
+    <TextView
+        android:id="@+id/TVBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="4dp"
+        android:background="#263238"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:textColor="#b0b0b0"
+        android:textSize="12sp"
+        app:layout_constraintStart_toEndOf="@+id/TVIcon"
+        app:layout_constraintTop_toBottomOf="@+id/TVVersion" />
+
+    <ImageButton
+        android:id="@+id/BTMenu"
+        style="@style/ListMenuButton"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

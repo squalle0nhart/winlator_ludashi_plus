@@ -125,13 +125,14 @@ public class SettingsFragment extends Fragment {
         preferences = PreferenceManager.getDefaultSharedPreferences(context);
 
         // Check for Dark Mode preference
-        isDarkMode = preferences.getBoolean("dark_mode", false);
+        isDarkMode = preferences.getBoolean("dark_mode", true);
         // Apply dynamic styles
         applyDynamicStyles(view, isDarkMode);
 
         // Initialize the Dark Mode checkbox
         cbDarkMode = view.findViewById(R.id.CBDarkMode);
-        cbDarkMode.setChecked(preferences.getBoolean("dark_mode", false));
+        cbDarkMode.setChecked(preferences.getBoolean("dark_mode", true));
+        cbDarkMode.setVisibility(View.GONE);
 
         cbDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
             // Save dark mode preference
@@ -299,12 +300,21 @@ public class SettingsFragment extends Fragment {
 
         final CheckBox cbShareClipboard = view.findViewById(R.id.CBShareAndroidClipboard);
         cbShareClipboard.setChecked(preferences.getBoolean("share_android_clipboard", false));
+        
+        final CheckBox cbPauseWine = view.findViewById(R.id.CBPauseResumeWine);
+        cbPauseWine.setChecked(preferences.getBoolean("pause_resume_wine", true));
+        
+        final CheckBox cbHighRefreshRate = view.findViewById(R.id.CBHighRefreshRate);
+        cbHighRefreshRate.setChecked(preferences.getBoolean("high_refresh_rate_mode", false));
+
+        final CheckBox cbRemoveLoadingBarWhenBootingGames = view.findViewById(R.id.CBRemoveLoadingBarWhenBootingGames);
+        cbRemoveLoadingBarWhenBootingGames.setChecked(preferences.getBoolean("remove_loading_bar_when_booting_games", false));
 
         final EditText etDownloadableContentsURL = view.findViewById(R.id.ETDownloadableContentsURL);
         etDownloadableContentsURL.setText(preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES));
 
         view.findViewById(R.id.BTReInstallImagefs).setOnClickListener(v -> {
-            ContentDialog.confirm(context, R.string.do_you_want_to_reinstall_imagefs, () -> ImageFsInstaller.installFromAssets((MainActivity) getActivity()));
+            ContentDialog.confirm(context, R.string.do_you_want_to_reinstall_imagefs, () -> ImageFsInstaller.installFromAssets((MainActivity) getActivity(), null));
         });
 
         view.findViewById(R.id.BTConfirm).setOnClickListener((v) -> {
@@ -324,6 +334,9 @@ public class SettingsFragment extends Fragment {
             editor.putBoolean("enable_file_provider", cbEnableFileProvider.isChecked());
             editor.putBoolean("open_with_android_browser", cbOpenInBrowser.isChecked());
             editor.putBoolean("share_android_clipboard", cbShareClipboard.isChecked());
+            editor.putBoolean("pause_resume_wine", cbPauseWine.isChecked());
+            editor.putBoolean("high_refresh_rate_mode", cbHighRefreshRate.isChecked());
+            editor.putBoolean("remove_loading_bar_when_booting_games", cbRemoveLoadingBarWhenBootingGames.isChecked());
 
             editor.putString("downloadable_contents_url", etDownloadableContentsURL.getText().toString());
 
@@ -386,6 +399,10 @@ public class SettingsFragment extends Fragment {
 
         TextView themeLabel = view.findViewById(R.id.TVTheme);
         applyFieldSetLabelStyle(themeLabel, isDarkMode);
+        themeLabel.setVisibility(View.GONE);
+        if (themeLabel.getParent() instanceof View) {
+            ((View) themeLabel.getParent()).setVisibility(View.GONE);
+        }
 
         TextView shortcutSettingsLabel = view.findViewById(R.id.TVShortcutSettings);
         applyFieldSetLabelStyle(shortcutSettingsLabel, isDarkMode);

@@ -1,13 +1,16 @@
 package com.winlator.cmod.contentdialog;
 
 
-
+import android.graphics.drawable.Icon;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.graphics.drawable.Icon;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.util.Log;
+import android.view.ContextThemeWrapper;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -16,11 +19,15 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.PopupMenu;
+import android.widget.PopupWindow;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
@@ -32,9 +39,11 @@ import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.fexcore.FEXCoreManager;
@@ -51,15 +60,21 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
-public class ShortcutSettingsDialog extends ContentDialog {
+public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigDialog.ContentInstallHost {
     private final ShortcutsFragment fragment;
     private final Shortcut shortcut;
     private InputControlsManager inputControlsManager;
     private TextView tvGraphicsDriverVersion;
     private String box64Version;
+    private ContentsManager contentsManager;
+    private static final ExecutorService CONTENT_IO_EXECUTOR = Executors.newSingleThreadExecutor();
 
 
     public ShortcutSettingsDialog(ShortcutsFragment fragment, Shortcut shortcut) {
@@ -67,18 +82,8 @@ public class ShortcutSettingsDialog extends ContentDialog {
         this.fragment = fragment;
         this.shortcut = shortcut;
         setTitle(shortcut.name);
-        setIcon(R.drawable.icon_settings);
-
-        // Initialize the ContentsManager
+        setIcon(R.drawable.icon_monitor);
         ContainerManager containerManager = shortcut.container.getManager();
-
-//        if (containerManager != null) {
-//            this.contentsManager = new ContentsManager(containerManager.getContext());
-//            this.contentsManager.syncTurnipContents();
-//        } else {
-//            Toast.makeText(fragment.getContext(), "Failed to initialize container manager. Please try again.", Toast.LENGTH_SHORT).show();
-//            return;
-//        }
 
         createContentView();
     }
@@ -88,13 +93,15 @@ public class ShortcutSettingsDialog extends ContentDialog {
         inputControlsManager = new InputControlsManager(context);
         LinearLayout llContent = findViewById(R.id.LLContent);
         llContent.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
+        View scrollView = (View) llContent.getParent();
+        ViewGroup.LayoutParams scrollParams = scrollView.getLayoutParams();
+        scrollParams.height = (int)(AppUtils.getScreenHeight() * 0.58f);
+        scrollView.setLayoutParams(scrollParams);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = prefs.getBoolean("dark_mode", false);
 
         applyDynamicStyles(findViewById(R.id.LLContent), isDarkMode);
-
-        // Initialize the turnip version TextView
         tvGraphicsDriverVersion = findViewById(R.id.TVGraphicsDriverVersion);
 
         final EditText etName = findViewById(R.id.ETName);
@@ -104,7 +111,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         etExecArgs.setText(shortcut.getExtra("execArgs"));
 
         ContainerDetailFragment containerDetailFragment = new ContainerDetailFragment(shortcut.container.id);
-//        containerDetailFragment.loadScreenSizeSpinner(getContentView(), shortcut.getExtra("screenSize", shortcut.container.getScreenSize()));
 
         loadScreenSizeSpinner(getContentView(), shortcut.getExtra("screenSize", shortcut.container.getScreenSize()), isDarkMode);
 
@@ -115,7 +121,7 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
         final Spinner sBox64Version = findViewById(R.id.SBox64Version);
         
-        ContentsManager contentsManager = new ContentsManager(context);
+        contentsManager = new ContentsManager(context);
         
         contentsManager.syncContents();
 
@@ -138,7 +144,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText(rendererNativeHolder[0] ? "Native Rendering+" : "Vulkan");
-            // Renderer mode is not user-configurable; display only
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
         if (btRendererOptions != null) {
@@ -197,32 +202,24 @@ public class ShortcutSettingsDialog extends ContentDialog {
             sEmulator64.setSelection(1);
         }
 
-        ContainerDetailFragment.setupDXWrapperSpinner(sDXWrapper, vDXWrapperConfig, wineInfo.isArm64EC());
+        setupDXWrapperSpinnerWithDialogHost(sDXWrapper, vDXWrapperConfig, wineInfo.isArm64EC());
         loadBox64VersionSpinner(context, contentsManager, sBox64Version, wineInfo.isArm64EC());
-
-        // Add this part to set the initial spinner selection based on the shortcut
         String currentBox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
         if (currentBox64Version != null) {
             AppUtils.setSpinnerSelectionFromValue(sBox64Version, currentBox64Version);
         } else {
-            // Default selection or use a preferred default version
             AppUtils.setSpinnerSelectionFromValue(sBox64Version, wineInfo.isArm64EC() ? DefaultVersion.WOWBOX64 : DefaultVersion.BOX64);
         }
-
-        // Set OnItemSelectedListener for the Box64 version spinner
         sBox64Version.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedVersion = parent.getItemAtPosition(position).toString();
-                box64Version = selectedVersion;  // Update the class-level variable
-                // Update the shortcut extra immediately, or wait until saveData() is called
+                box64Version = selectedVersion;
                 shortcut.putExtra("box64Version", selectedVersion);
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                // This method must be implemented, even if it's empty.
-                // Optional: You can handle the case where no item is selected, if needed.
             }
         });
 
@@ -274,8 +271,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 if (cbEnableXInput.isChecked() && cbEnableDInput.isChecked()) cbEnableDInput.setChecked(false);
             }
         });
-
-        // Trigger initial state logic
         if (!cbExclusiveXInput.isChecked()) {
             cbEnableXInput.setChecked(true);
             cbEnableDInput.setChecked(true);
@@ -291,6 +286,29 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
         final Spinner sFEXCoreVersion = findViewById(R.id.SFEXCoreVersion);
         FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion, shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion()));
+        View btBox64VersionRemove = findViewById(R.id.BTBox64VersionRemove);
+        View btBox64VersionDownload = findViewById(R.id.BTBox64VersionDownload);
+        View btFEXCoreVersionRemove = findViewById(R.id.BTFEXCoreVersionRemove);
+        View btFEXCoreVersionDownload = findViewById(R.id.BTFEXCoreVersionDownload);
+        Runnable refreshBox64 = () -> {
+            String wineVersionSelected = shortcut.container.getWineVersion();
+            WineInfo wi = WineInfo.fromIdentifier(context, contentsManager, wineVersionSelected);
+            loadBox64VersionSpinner(context, contentsManager, sBox64Version, wi.isArm64EC());
+        };
+        Runnable refreshFEXCore = () -> FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion,
+                sFEXCoreVersion.getSelectedItem() != null ? sFEXCoreVersion.getSelectedItem().toString() : DefaultVersion.FEXCORE);
+        btBox64VersionRemove.setOnClickListener(v -> removeSelectedContent(
+                Collections.singletonList(getBox64LikeContentType(context)),
+                () -> sBox64Version.getSelectedItem() != null ? sBox64Version.getSelectedItem().toString() : "",
+                refreshBox64));
+        btBox64VersionDownload.setOnClickListener(v -> showInstallChoicePopup(v,
+                Collections.singletonList(getBox64LikeContentType(context)), refreshBox64));
+        btFEXCoreVersionRemove.setOnClickListener(v -> removeSelectedContent(
+                Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE),
+                () -> sFEXCoreVersion.getSelectedItem() != null ? sFEXCoreVersion.getSelectedItem().toString() : "",
+                refreshFEXCore));
+        btFEXCoreVersionDownload.setOnClickListener(v -> showInstallChoicePopup(v,
+                Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_FEXCORE), refreshFEXCore));
 
         final Spinner sFEXCorePreset = findViewById(R.id.SFEXCorePreset);
         FEXCorePresetManager.loadSpinner(sFEXCorePreset, shortcut.getExtra("fexcorePreset", shortcut.container.getFEXCorePreset()));
@@ -299,7 +317,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         loadControlsProfileSpinner(sControlsProfile, shortcut.getExtra("controlsProfile", "0"));
 
         final CheckBox cbDisabledXInput = findViewById(R.id.CBDisabledXInput);
-        // Set the initial value based on the shortcut extras
         boolean isXInputDisabled = shortcut.getExtra("disableXinput", "0").equals("1");
         cbDisabledXInput.setChecked(isXInputDisabled);
 
@@ -390,17 +407,17 @@ public class ShortcutSettingsDialog extends ContentDialog {
         final CPUListView cpuListView = findViewById(R.id.CPUListView);
         cpuListView.setCheckedCPUList(shortcut.getExtra("cpuList", shortcut.container.getCPUList(true)));
 
+        final CheckBox cbSyncCpuTopology = findViewById(R.id.CBSyncCpuTopology);
+        boolean syncCpuTopology = shortcut.getExtra("syncCpuTopology",
+                shortcut.container.isSyncCpuTopology() ? "1" : "").equals("1");
+        cbSyncCpuTopology.setChecked(syncCpuTopology);
+
         setOnConfirmCallback(() -> {
             String name = etName.getText().toString().trim();
             boolean nameChanged = !shortcut.name.equals(name) && !name.isEmpty();
-
-            // First, handle renaming if the name has changed
             if (nameChanged) {
                 renameShortcut(name);
             }
-
-
-            // Determine if renaming is needed
             boolean renamingSuccess = !nameChanged || new File(shortcut.file.getParent(), name + ".desktop").exists();
 
             if (renamingSuccess) {
@@ -480,40 +497,39 @@ public class ShortcutSettingsDialog extends ContentDialog {
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 shortcut.putExtra("cpuList", cpuList);
 
-                // Save all changes to the shortcut
+                boolean syncCpuTopologyChecked = cbSyncCpuTopology.isChecked();
+                shortcut.putExtra("syncCpuTopology",
+                        syncCpuTopologyChecked != shortcut.container.isSyncCpuTopology()
+                                ? (syncCpuTopologyChecked ? "1" : "0") : null);
+
                 shortcut.saveData();
             }
         });
     }
-
-    // Utility method to apply styles to dynamically added TextViews based on their content
     private void applyFieldSetLabelStylesDynamically(ViewGroup rootView, boolean isDarkMode) {
         for (int i = 0; i < rootView.getChildCount(); i++) {
             View child = rootView.getChildAt(i);
             if (child instanceof ViewGroup) {
-                applyFieldSetLabelStylesDynamically((ViewGroup) child, isDarkMode); // Recursive call for nested ViewGroups
+                applyFieldSetLabelStylesDynamically((ViewGroup) child, isDarkMode);
             } else if (child instanceof TextView) {
                 TextView textView = (TextView) child;
-                // Apply the style based on the content of the TextView
                 if (isFieldSetLabel(textView.getText().toString())) {
                     applyFieldSetLabelStyle(textView, isDarkMode);
                 }
             }
         }
     }
-
-    // Method to check if the text content matches any fieldset label
     private boolean isFieldSetLabel(String text) {
         return text.equalsIgnoreCase("DirectX") ||
                 text.equalsIgnoreCase("General") ||
                 text.equalsIgnoreCase("Box64") ||
                 text.equalsIgnoreCase("Input Controls") ||
                 text.equalsIgnoreCase("Game Controller") ||
-                text.equalsIgnoreCase("System");
+                text.equalsIgnoreCase("System") ||
+                text.equalsIgnoreCase("vkBasalt");
     }
 
     public void onWinComponentsViewsAdded(boolean isDarkMode) {
-        // Apply styles to all dynamically added TextViews
         ViewGroup llContent = findViewById(R.id.LLContent);
         applyFieldSetLabelStylesDynamically(llContent, isDarkMode);
     }
@@ -521,16 +537,18 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
     public static void loadScreenSizeSpinner(View view, String selectedValue, boolean isDarkMode) {
         final Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-
         final LinearLayout llCustomScreenSize = view.findViewById(R.id.LLCustomScreenSize);
+        final Context context = view.getContext();
 
         applyDarkThemeToEditText(view.findViewById(R.id.ETScreenWidth), isDarkMode);
         applyDarkThemeToEditText(view.findViewById(R.id.ETScreenHeight), isDarkMode);
 
+        ArrayList<String> items = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.screen_size_entries)));
+        sScreenSize.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items));
 
         sScreenSize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            public void onItemSelected(AdapterView<?> parent, View itemView, int position, long id) {
                 String value = sScreenSize.getItemAtPosition(position).toString();
                 llCustomScreenSize.setVisibility(value.equalsIgnoreCase("custom") ? View.VISIBLE : View.GONE);
             }
@@ -542,19 +560,15 @@ public class ShortcutSettingsDialog extends ContentDialog {
         boolean found = AppUtils.setSpinnerSelectionFromIdentifier(sScreenSize, selectedValue);
         if (!found) {
             AppUtils.setSpinnerSelectionFromValue(sScreenSize, "custom");
-            String[] screenSize = selectedValue.split("x");
+            String normalizedScreenSize = selectedValue.replaceAll("\\s*\\(.*\\)$", "").trim();
+            String[] screenSize = normalizedScreenSize.split("x");
             ((EditText)view.findViewById(R.id.ETScreenWidth)).setText(screenSize[0]);
             ((EditText)view.findViewById(R.id.ETScreenHeight)).setText(screenSize[1]);
         }
     }
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
-
-        // Update edit text
-        EditText etName = view.findViewById(R.id.ETName);
-        applyDarkThemeToEditText(etName, isDarkMode);
-
-        // Update Spinners
+        applyDarkThemeToFormFields(view, isDarkMode);
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
@@ -566,9 +580,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
-        
-
-        // Set dark or light mode background for spinners
         sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
@@ -580,24 +591,35 @@ public class ShortcutSettingsDialog extends ContentDialog {
         sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        applyDarkThemeToFormFields(view, isDarkMode);
 
-//        EditText etLC_ALL = view.findViewById(R.id.ETlcall);
-        EditText etExecArgs = view.findViewById(R.id.ETExecArgs);
+    }
 
-//        applyDarkThemeToEditText(etLC_ALL, isDarkMode);
-        applyDarkThemeToEditText(etExecArgs, isDarkMode);
+    private void applyDarkThemeToFormFields(View view, boolean isDarkMode) {
+        if (view instanceof EditText) {
+            applyDarkThemeToEditText((EditText) view, isDarkMode);
+        } else if (view instanceof TextView && isFieldSetLabel(((TextView) view).getText().toString())) {
+            applyFieldSetLabelStyle((TextView) view, isDarkMode);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup viewGroup = (ViewGroup) view;
+            for (int i = 0; i < viewGroup.getChildCount(); i++) {
+                applyDarkThemeToFormFields(viewGroup.getChildAt(i), isDarkMode);
+            }
+        }
+    }
 
+    private int dp(float value) {
+        return (int) (value * getContext().getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
         if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundColor(Color.parseColor("#424242")); // Set dark background color
+            textView.setTextColor(Color.WHITE);
+            textView.setBackgroundColor(Color.BLACK);
         } else {
-            // Apply light mode-specific attributes
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
+            textView.setTextColor(Color.parseColor("#0055ff"));
+            textView.setBackgroundResource(R.color.window_background_color);
         }
     }
 
@@ -622,19 +644,12 @@ public class ShortcutSettingsDialog extends ContentDialog {
 
     private void renameShortcut(String newName) {
         File parent = shortcut.file.getParentFile();
-        File oldDesktopFile = shortcut.file; // Reference to the old file
+        File oldDesktopFile = shortcut.file;
         File newDesktopFile = new File(parent, newName + ".desktop");
-
-        // Rename the desktop file if the new one doesn't exist
         if (!newDesktopFile.isFile() && oldDesktopFile.renameTo(newDesktopFile)) {
-            // Successfully renamed, update the shortcut's file reference
-            updateShortcutFileReference(newDesktopFile); // New helper method
-
-            // As a precaution, delete any remaining old file
+            updateShortcutFileReference(newDesktopFile);
             deleteOldFileIfExists(oldDesktopFile);
         }
-
-        // Rename link file if applicable
         File linkFile = new File(parent, shortcut.name + ".lnk");
         if (linkFile.isFile()) {
             File newLinkFile = new File(parent, newName + ".lnk");
@@ -645,8 +660,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
         fragment.updateShortcutOnScreen(newName, newName, shortcut.container.id, newDesktopFile.getAbsolutePath(),
                 Icon.createWithBitmap(shortcut.icon), shortcut.getExtra("uuid"));
     }
-
-    // Method to ensure no old file remains
     private void deleteOldFileIfExists(File oldFile) {
         if (oldFile.exists()) {
             if (!oldFile.delete()) {
@@ -654,8 +667,6 @@ public class ShortcutSettingsDialog extends ContentDialog {
             }
         }
     }
-
-    // Update the shortcut's file reference to ensure saveData() writes to the correct file
     private void updateShortcutFileReference(File newFile) {
         try {
             Field fileField = Shortcut.class.getDeclaredField("file");
@@ -670,19 +681,11 @@ public class ShortcutSettingsDialog extends ContentDialog {
     private EnvVarsView createEnvVarsTab() {
         final View view = getContentView();
         final Context context = view.getContext();
-
-        // Retrieve the existing EnvVarsView
         final EnvVarsView envVarsView = view.findViewById(R.id.EnvVarsView);
-
-        // Update the dark mode setting of the existing instance
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = prefs.getBoolean("dark_mode", false);
         envVarsView.setDarkMode(isDarkMode);
-
-        // Set the environment variables in the existing EnvVarsView
         envVarsView.setEnvVars(new EnvVars(shortcut.getExtra("envVars")));
-
-        // Set the click listener for adding new environment variables
         view.findViewById(R.id.BTAddEnvVar).setOnClickListener((v) ->
                 new AddEnvVarDialog(context, envVarsView).show()
         );
@@ -720,19 +723,233 @@ public class ShortcutSettingsDialog extends ContentDialog {
         else
             itemList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.box64_version_entries)));
         if (!isArm64EC) {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)) {
+            for (ContentProfile profile : manager.getInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_BOX64)) {
                 String entryName = ContentsManager.getEntryName(profile);
                 int firstDashIndex = entryName.indexOf('-');
                 itemList.add(entryName.substring(firstDashIndex + 1));
             }
         } else {
-            for (ContentProfile profile : manager.getProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)) {
+            for (ContentProfile profile : manager.getInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)) {
                 String entryName = ContentsManager.getEntryName(profile);
                 int firstDashIndex = entryName.indexOf('-');
                 itemList.add(entryName.substring(firstDashIndex + 1));
             }
         }
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+    }
+
+
+    private ContentProfile.ContentType getBox64LikeContentType(Context context) {
+        WineInfo wi = WineInfo.fromIdentifier(context, contentsManager, shortcut.container.getWineVersion());
+        return wi.isArm64EC() ? ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64 : ContentProfile.ContentType.CONTENT_TYPE_BOX64;
+    }
+
+    @Override
+    public void showInstallChoicePopup(View anchor, List<ContentProfile.ContentType> types, Runnable refreshAction) {
+        showInstallChoiceMenu(anchor,
+                () -> handleInstallChoice(0, types, refreshAction),
+                () -> handleInstallChoice(1, types, refreshAction));
+    }
+
+    private void showInstallChoiceMenu(View anchor, Runnable openAction, Runnable downloadAction) {
+        int width = dp(170);
+        LinearLayout menu = new LinearLayout(getContext());
+        menu.setOrientation(LinearLayout.VERTICAL);
+        menu.setPadding(0, dp(4), 0, dp(4));
+        menu.setBackgroundResource(R.drawable.install_choice_popup_background);
+        PopupWindow popupWindow = new PopupWindow(menu, width, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        popupWindow.setOutsideTouchable(true);
+        popupWindow.setElevation(dp(8));
+        addInstallChoiceMenuRow(popupWindow, menu, R.drawable.icon_popup_menu_open, getContext().getString(R.string.open_file), openAction);
+        addInstallChoiceMenuRow(popupWindow, menu, R.drawable.icon_popup_menu_download, getContext().getString(R.string.download_file), downloadAction);
+        popupWindow.showAsDropDown(anchor, -width + anchor.getWidth(), dp(2));
+    }
+
+    private void addInstallChoiceMenuRow(PopupWindow popupWindow, LinearLayout menu, int iconResId, String text, Runnable action) {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(dp(12), 0, dp(12), 0);
+        ImageView icon = new ImageView(getContext());
+        icon.setImageResource(iconResId);
+        icon.setColorFilter(Color.parseColor("#0055ff"));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(26), dp(26));
+        iconParams.setMargins(0, 0, dp(12), 0);
+        row.addView(icon, iconParams);
+        TextView titleView = new TextView(getContext());
+        titleView.setText(text);
+        titleView.setTextColor(Color.WHITE);
+        titleView.setTextSize(16);
+        titleView.setSingleLine(true);
+        row.addView(titleView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        row.setOnClickListener(v -> {
+            popupWindow.dismiss();
+            action.run();
+        });
+        menu.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+    }
+
+    private void handleInstallChoice(int idx, List<ContentProfile.ContentType> types, Runnable refreshAction) {
+        if (idx == 0) {
+            fragment.pickContentArchive(uri -> {
+                if (uri != null) installImportedContent(uri, types, refreshAction);
+            });
+        } else if (idx == 1) {
+            downloadContentForTypes(types, refreshAction);
+        }
+    }
+
+    @Override
+    public void removeSelectedContent(List<ContentProfile.ContentType> types, Supplier<String> selectedValue, Runnable refreshAction) {
+        ContentProfile profile = resolveProfile(types, selectedValue.get());
+        if (profile == null || profile.remoteUrl != null) {
+            Toast.makeText(getContext(), R.string.no_items_to_display, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ContentDialog.confirm(getContext(), R.string.do_you_want_to_remove_this_content, () -> {
+            contentsManager.removeContent(profile);
+            contentsManager.syncContents();
+            refreshAction.run();
+        });
+    }
+
+    private ContentProfile resolveProfile(List<ContentProfile.ContentType> types, String selectedValue) {
+        if (selectedValue == null || selectedValue.isEmpty()) return null;
+        ContentProfile byEntry = contentsManager.getProfileByEntryName(selectedValue);
+        if (byEntry != null) return byEntry;
+        for (ContentProfile.ContentType type : types) {
+            for (ContentProfile profile : contentsManager.getProfiles(type)) {
+                if (selectedValue.equals(profile.verName) || selectedValue.contains(profile.verName)) return profile;
+            }
+        }
+        return null;
+    }
+
+    private void downloadContentForTypes(List<ContentProfile.ContentType> types, Runnable refreshAction) {
+        PreloaderDialog dialog = new PreloaderDialog(fragment.requireActivity());
+        dialog.showOnUiThread(R.string.loading);
+        CONTENT_IO_EXECUTOR.execute(() -> {
+            String contentsURL = PreferenceManager.getDefaultSharedPreferences(getContext())
+                    .getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
+            String json = Downloader.downloadString(contentsURL);
+            if (json != null) contentsManager.setRemoteProfiles(json);
+            List<ContentProfile> candidates = new ArrayList<>();
+            for (ContentProfile.ContentType type : types) {
+                for (ContentProfile profile : contentsManager.getProfiles(type)) {
+                    if (profile.remoteUrl != null) candidates.add(profile);
+                }
+            }
+            fragment.requireActivity().runOnUiThread(() -> {
+                dialog.closeOnUiThread();
+                if (candidates.isEmpty()) {
+                    AppUtils.showToast(getContext(), R.string.no_items_to_display);
+                    return;
+                }
+                String[] entries = new String[candidates.size()];
+                for (int i = 0; i < candidates.size(); i++) entries[i] = candidates.get(i).verName;
+                ContentDialog.showSingleChoiceList(fragment.requireContext(), R.string.install_content, entries, idx -> {
+                    if (idx < 0 || idx >= candidates.size()) return;
+                    downloadAndInstallProfile(candidates.get(idx), refreshAction);
+                });
+            });
+        });
+    }
+
+    private void downloadAndInstallProfile(ContentProfile profile, Runnable refreshAction) {
+        PreloaderDialog dialog = new PreloaderDialog(fragment.requireActivity());
+        dialog.showOnUiThread(R.string.downloading_file);
+        CONTENT_IO_EXECUTOR.execute(() -> {
+            File output = new File(getContext().getCacheDir(), "content_" + System.currentTimeMillis());
+            if (!Downloader.downloadFile(profile.remoteUrl, output)) {
+                fragment.requireActivity().runOnUiThread(() -> {
+                    dialog.closeOnUiThread();
+                    AppUtils.showToast(getContext(), R.string.unable_to_download_file);
+                });
+                return;
+            }
+            installImportedContent(Uri.fromFile(output), Collections.singletonList(profile.type), refreshAction, dialog);
+        });
+    }
+
+    private void installImportedContent(Uri uri, List<ContentProfile.ContentType> expectedTypes, Runnable refreshAction) {
+        installImportedContent(uri, expectedTypes, refreshAction, null);
+    }
+
+    private void installImportedContent(Uri uri, List<ContentProfile.ContentType> expectedTypes, Runnable refreshAction, @Nullable PreloaderDialog existingDialog) {
+        PreloaderDialog dialog = existingDialog != null ? existingDialog : new PreloaderDialog(fragment.requireActivity());
+        if (existingDialog == null) dialog.showOnUiThread(R.string.installing_content);
+        CONTENT_IO_EXECUTOR.execute(() -> contentsManager.extraContentFile(uri, new ContentsManager.OnInstallFinishedCallback() {
+            @Override
+            public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
+                fragment.requireActivity().runOnUiThread(() -> {
+                    dialog.closeOnUiThread();
+                    AppUtils.showToast(getContext(), R.string.install_failed);
+                });
+            }
+
+            @Override
+            public void onSucceed(ContentProfile profile) {
+                if (!expectedTypes.contains(profile.type)) {
+                    fragment.requireActivity().runOnUiThread(() -> {
+                        dialog.closeOnUiThread();
+                        ContentDialog.alert(getContext(), R.string.profile_cannot_be_recognized, null);
+                    });
+                    return;
+                }
+                contentsManager.finishInstallContent(profile, new ContentsManager.OnInstallFinishedCallback() {
+                    @Override
+                    public void onFailed(ContentsManager.InstallFailedReason reason, Exception e) {
+                        fragment.requireActivity().runOnUiThread(() -> {
+                            dialog.closeOnUiThread();
+                            AppUtils.showToast(getContext(), R.string.install_failed);
+                        });
+                    }
+
+                    @Override
+                    public void onSucceed(ContentProfile installedProfile) {
+                        contentsManager.syncContents();
+                        fragment.requireActivity().runOnUiThread(() -> {
+                            dialog.closeOnUiThread();
+                            refreshAction.run();
+                        });
+                    }
+                });
+            }
+        }));
+    }
+
+    private void forceShowMenuIcons(PopupMenu popupMenu) {
+        try {
+            Field field = PopupMenu.class.getDeclaredField("mPopup");
+            field.setAccessible(true);
+            Object menuHelper = field.get(popupMenu);
+            menuHelper.getClass().getDeclaredMethod("setForceShowIcon", boolean.class).invoke(menuHelper, true);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void setupDXWrapperSpinnerWithDialogHost(final Spinner sDXWrapper, final View vDXWrapperConfig, boolean isARM64EC) {
+        AdapterView.OnItemSelectedListener listener = new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
+                if (dxwrapper.startsWith("dxvk"))
+                    vDXWrapperConfig.setOnClickListener(v -> new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, ShortcutSettingsDialog.this, contentsManager).show());
+                else if (dxwrapper.equals("wined3d"))
+                    vDXWrapperConfig.setOnClickListener(v -> new WineD3DConfigDialog(vDXWrapperConfig).show());
+                vDXWrapperConfig.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        };
+        sDXWrapper.setOnItemSelectedListener(listener);
+        int selectedPosition = sDXWrapper.getSelectedItemPosition();
+        if (selectedPosition >= 0 && selectedPosition < sDXWrapper.getCount()) {
+            listener.onItemSelected(sDXWrapper, sDXWrapper.getSelectedView(), selectedPosition, sDXWrapper.getSelectedItemId());
+        }
     }
 
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {

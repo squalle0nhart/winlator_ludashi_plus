@@ -36,7 +36,7 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
-import com.winlator.cmod.winhandler.MouseEventFlags;
+
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
@@ -49,10 +49,11 @@ import java.util.TimerTask;
 public class InputControlsView extends View {
     public static final float DEFAULT_OVERLAY_OPACITY = 0.4f;
     private static final byte MOUSE_WHEEL_DELTA = 120;
+    private static final boolean AUTO_HIDE_CONTROLS = false;
     private boolean editMode = false;
-    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Path path = new Path();
-    private final ColorFilter colorFilter = new PorterDuffColorFilter(0xffffffff, PorterDuff.Mode.SRC_IN);
+    private final ColorFilter colorFilter = new PorterDuffColorFilter(0xff2184ff, PorterDuff.Mode.SRC_IN);
     private final Point cursor = new Point();
     private boolean readyToDraw = false;
     private boolean moveCursor = false;
@@ -68,6 +69,7 @@ public class InputControlsView extends View {
     private Timer mouseMoveTimer;
     private final PointF mouseMoveOffset = new PointF();
     private boolean showTouchscreenControls = true;
+    private int activeTouchPointerCount = 0;
 
     private Handler timeoutHandler; // Reference to the activity's timeout handler
     private Runnable hideControlsRunnable; // Runnable to hide the controls
@@ -141,8 +143,24 @@ public class InputControlsView extends View {
         this.editMode = editMode;
     }
 
+    public boolean isEditMode() {
+        return editMode;
+    }
+
     public void setOverlayOpacity(float overlayOpacity) {
         this.overlayOpacity = overlayOpacity;
+    }
+
+    public float getOverlayOpacity() {
+        return overlayOpacity;
+    }
+
+    public void invalidateElement(Rect rect) {
+        if (rect == null) {
+            invalidate();
+            return;
+        }
+        invalidate(rect.left, rect.top, rect.right, rect.bottom);
     }
 
     public int getSnappingSize() {
@@ -335,11 +353,13 @@ public class InputControlsView extends View {
     }
 
     public int getPrimaryColor() {
+        // Kept for compatibility with ControlElement; visual style now derives from secondary blue.
         return Color.argb((int)(overlayOpacity * 255), 255, 255, 255);
     }
 
     public int getSecondaryColor() {
-        return Color.argb((int)(overlayOpacity * 255), 2, 119, 189);
+        // Winlator-like electric blue used by the app UI. Alpha is handled per primitive.
+        return Color.argb(255, 33, 132, 255);
     }
 
     private synchronized ControlElement intersectElement(float x, float y) {
@@ -396,21 +416,20 @@ public class InputControlsView extends View {
     }
 
     private void createMouseMoveTimer() {
-        WinHandler winHandler = xServer.getWinHandler();
         if (mouseMoveTimer == null && profile != null) {
             final float cursorSpeed = profile.getCursorSpeed();
             mouseMoveTimer = new Timer();
             mouseMoveTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offsete if there's an offset
+                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {
                         if (xServer.isRelativeMouseMovement())
-                            winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
+                            xServer.emitRelativeMotion(mouseMoveOffset.x * cursorSpeed * 10, mouseMoveOffset.y * cursorSpeed * 10);
                         else
                             xServer.injectPointerMoveDelta(
                                 (int) (mouseMoveOffset.x * cursorSpeed * 10),
                                 (int) (mouseMoveOffset.y * cursorSpeed * 10)
-                        );
+                            );
                     }
                 }
             }, 0, 1000 / 60); // 60 FPS
@@ -536,8 +555,9 @@ public class InputControlsView extends View {
 
         boolean hapticsEnabled = preferences.getBoolean("touchscreen_haptics_enabled", true);
 
-        // Reset the timeout when touch events occur within InputControlsView
-        resetTouchscreenTimeout();
+        // Do not let the auto-hide runnable hide controls while a finger is still down.
+        // This fixes controls disappearing under load or while holding a stick/button.
+        updateTouchscreenTimeout(event);
 
         if (editMode && readyToDraw) {
             switch (event.getAction()) {
@@ -615,10 +635,11 @@ public class InputControlsView extends View {
                     for (byte i = 0, count = (byte)event.getPointerCount(); i < count; i++) {
                         float x = event.getX(i);
                         float y = event.getY(i);
+                        int pid = event.getPointerId(i);
 
                         handled = false;
                         for (ControlElement element : profile.getElements()) {
-                            if (element.handleTouchMove(i, x, y)) handled = true;
+                            if (element.handleTouchMove(pid, x, y)) handled = true;
                         }
                         if (!handled) touchpadView.onTouchEvent(event);
                     }
@@ -639,14 +660,50 @@ public class InputControlsView extends View {
 
 
 
-    private void resetTouchscreenTimeout() {
-        Log.d("InputControlsView", "Touch detected, resetting timeout.");
-        if (timeoutHandler != null && hideControlsRunnable != null) {
-            // Cancel any pending hide requests
-            timeoutHandler.removeCallbacks(hideControlsRunnable);
-            // Post a new request to hide the controls after 5 seconds
-            timeoutHandler.postDelayed(hideControlsRunnable, 5000); // Adjust timeout as necessary
+    private void updateTouchscreenTimeout(MotionEvent event) {
+        if (timeoutHandler == null || hideControlsRunnable == null) return;
+
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                activeTouchPointerCount = 1;
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                activeTouchPointerCount = event.getPointerCount();
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (activeTouchPointerCount > 0) {
+                    timeoutHandler.removeCallbacks(hideControlsRunnable);
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                activeTouchPointerCount = Math.max(0, event.getPointerCount() - 1);
+                if (activeTouchPointerCount > 0) {
+                    timeoutHandler.removeCallbacks(hideControlsRunnable);
+                }
+                else {
+                    scheduleTouchscreenTimeout();
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                activeTouchPointerCount = 0;
+                scheduleTouchscreenTimeout();
+                break;
         }
+    }
+
+    private void scheduleTouchscreenTimeout() {
+        if (!AUTO_HIDE_CONTROLS) {
+            if (timeoutHandler != null && hideControlsRunnable != null) {
+                timeoutHandler.removeCallbacks(hideControlsRunnable);
+            }
+            return;
+        }
+        if (timeoutHandler == null || hideControlsRunnable == null) return;
+        timeoutHandler.removeCallbacks(hideControlsRunnable);
+        timeoutHandler.postDelayed(hideControlsRunnable, 5000);
     }
 
     public boolean onKeyEvent(KeyEvent event) {
@@ -772,22 +829,13 @@ public class InputControlsView extends View {
                 Pointer.Button pointerButton = binding.getPointerButton();
                 if (isActionDown) {
                     if (pointerButton != null) {
-                        if (xServer.isRelativeMouseMovement()) {
-                            int wheelDelta = pointerButton == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (pointerButton == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
-                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, true), 0, 0, wheelDelta);
-                        } else {
-                            xServer.injectPointerButtonPress(pointerButton);
-                        }
+                        xServer.injectPointerButtonPress(pointerButton);
                     }
                     else xServer.injectKeyPress(binding.keycode);
                 }
                 else {
                     if (pointerButton != null) {
-                        if (xServer.isRelativeMouseMovement()) {
-                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, false), 0, 0, 0);
-                        } else {
-                            xServer.injectPointerButtonRelease(pointerButton);
-                        }
+                        xServer.injectPointerButtonRelease(pointerButton);
                     }
                     else xServer.injectKeyRelease(binding.keycode);
                 }

@@ -64,6 +64,43 @@
             android:max="150" />
 
         <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Opacity"/>
+
+            <TextView
+                android:id="@+id/TVOpacity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/SBOpacity"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:min="10"
+            android:max="100" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Theme Color" />
+
+        <LinearLayout
+            android:id="@+id/LLColorList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
+
+        <LinearLayout
             android:id="@+id/LLRangeOptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -216,6 +253,13 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
+
+            <CheckBox
+                android:id="@+id/CBMouseMoveMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Move mouse cursor while dragging (touchpad mode)" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

@@ -13,7 +13,7 @@
     <string name="containers">Containers</string>
     <string name="input_controls">Input Controls</string>
     <string name="no_items_to_display">No items to display</string>
-    <string name="new_container">New Container</string>
+    <string name="new_container">Create New Container</string>
     <string name="edit_container">Edit Container</string>
     <string name="creating_container">Creating Container…</string>
     <string name="removing_container">Removing Container…</string>
@@ -21,12 +21,14 @@
     <string name="installing_system_files">Installing System Files…</string>
     <string name="updating_system_files">Updating System Files…</string>
     <string name="starting_up">Starting up…</string>
+    <string name="remove_loading_bar_when_booting_games">Remove loading bar when booting games</string>
     <string name="unable_to_install_system_files">Unable to install system files</string>
     <string name="keyboard">Keyboard</string>
     <string name="toggle_fullscreen">Toggle Fullscreen</string>
     <string name="exit">Exit</string>
     <string name="no_control_element_selected">No control element selected</string>
     <string name="scale">Scale</string>
+    <string name="aspect_ratio">Aspect Ratio</string>
     <string name="shape">Shape</string>
     <string name="type">Type</string>
     <string name="binding">Binding</string>
@@ -79,6 +81,7 @@
     <string name="video_memory_size">Video Memory Size</string>
     <string name="show_fps">Show FPS</string>
     <string name="none">None</string>
+    <string name="auto">Auto</string>
     <string name="custom_text">Custom Text</string>
     <string name="icon">Icon</string>
     <string name="import_profile">Import Profile</string>
@@ -281,6 +284,7 @@
     <string name="general">General</string>
     <string name="msg_warning_install_wine">Warning: Installing a new version of Wine is recommended for testing purposes only.</string>
     <string name="startup_selection">Startup Selection</string>
+    <string name="sync_cpu_topology">Sync with Wine</string>
     <string name="wine_debug_channel">Wine Debug Channel</string>
     <string name="game_controller">Game Controller</string>
     <string name="vibration">Vibration</string>
@@ -422,6 +426,7 @@
     <string name="help_file_provider"><![CDATA[
         <i><b>File Provider</b></i> allows access to Winlator\'s internal data through android file manager.<br/><br/>
     ]]></string>
+    <string name="proton_options">Proton options</string>
     <string name="reconfigure">Reconfigure</string>
     <string name="do_you_want_to_reconfigure_wine">Do you want to reconfigure this container on the next startup? This will remove the timestamp to trigger Wine Configuration.</string>
 
@@ -604,6 +609,10 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="pref_summary_requiresTrackpadAndNative">Requires "Touchscreen input mode" to be "Trackpad" and "Display resolution mode" to be not "native"</string>
     <string name="fexcore_config">FEXCore</string>
     <string name="fexcore_preset">FEXCore Preset</string>
+    <string name="installed_driver">Installed Driver</string>
+    <string name="driver_repositories">Driver Repositories</string>
+    <string name="check_for_driver_updates">Check for driver updates</string>
+    <string name="install_driver_from_file">Install Driver from File</string>
     <string name="adrenotools_gpu_drivers">Adrenotools GPU Drivers</string>
     <string name="install_drivers">Install Drivers</string>
     <string name="install_drivers_message">You will now be prompted to pick a driver. These must be the same ones used in other emulators like Yuzu, Dolphin, Citra, etc.</string>
@@ -630,4 +639,27 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="vkbasalt_sharpness_denoise">Sharpeness Denoise</string>
     <string name="shutdown">Shutdown</string>
     <string name="disable_mouse">Toggle Mouse</string>
+    <string name="installing_wine_files">Installing Wine Files...</string>
+    <string name="installing_drivers_files">Installing System Driver Files...</string>
+    <string name="high_refresh_rate">Enable High Refresh Rate Mode</string>
+    <string name="pause_resume_wine">Suspend Wine when app is in background</string>
+    <string name="release_protons">Release Protons</string>
+    <string name="available_protons">Available Protons</string>
+    <string name="download_from_contents">Download from Contents</string>
+    <string name="select_local_file">Select Local File</string>
+    <string name="download_proton">Download Proton</string>
+    <string name="delete_proton">Delete Proton</string>
+    <string name="select_proton">Select Proton</string>
+    <string name="downloading_proton">Downloading Proton…</string>
+    <string name="unable_to_install_proton">Unable to install Proton</string>
+    <string name="no_protons_to_delete">No removable Proton is selected</string>
+    <string name="download_proton_description">Install a GitHub release Proton package</string>
+    <string name="download_from_contents_description">Browse Proton or Wine packages from Contents</string>
+    <string name="select_local_file_description">Install a Proton or Wine package from storage</string>
+    <string name="delete_proton_description">Remove the selected installed package</string>
+    <string name="proton_package_installed">Installed</string>
+    <string name="proton_package_not_installed">Tap to download and install</string>
+    <string name="install">Install</string>
+    <string name="select">Select</string>
+    <string name="wine_version_locked_for_existing_container">Wine version is locked for existing containers</string>
 </resources>

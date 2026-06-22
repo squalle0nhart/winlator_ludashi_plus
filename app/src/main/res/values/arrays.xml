@@ -9,12 +9,12 @@
         <item>854x480 (16:9)</item>
         <item>960x544 (16:9)</item>
         <item>1024x768 (4:3)</item>
+        <item>1280x576 (20:9)</item>
         <item>1280x720 (16:9)</item>
-        <item>1280x800 (16:10)</item>
         <item>1280x1024 (5:4)</item>
         <item>1366x768 (16:9)</item>
         <item>1440x900 (16:10)</item>
-        <item>1560x720 (19.5:9)</item>
+        <item>1600x720 (20:9)</item>
         <item>1600x900 (16:9)</item>
         <item>1920x1080 (16:9)</item>
     </string-array>
@@ -24,7 +24,7 @@
     <string-array name="wrapper_graphics_driver_version_entries">
         <item>System</item>
         <item>v819</item>
-        <item>turnip25.1.0</item>
+        <item>turnip26.2.0</item>
     </string-array>
     <string-array name="audio_driver_entries">
         <item>ALSA</item>
@@ -128,13 +128,13 @@
         <item>Native (Windows)</item>
     </string-array>
     <string-array name="box64_version_entries">
-        <item>0.3.7</item>
+        <item>0.4.2</item>
     </string-array>
     <string-array name="wowbox64_version_entries">
-        <item>0.3.7</item>
+        <item>0.4.2</item>
     </string-array>
     <string-array name="fexcore_version_entries">
-        <item>2508</item>
+        <item>2601</item>
     </string-array>
     <string-array name="desktop_theme_entries">
         <item>Light</item>
@@ -309,7 +309,6 @@
         <item>Box64</item>
     </string-array>
     <string-array name="wine_entries">
-        <item>proton-9.0-x86_64</item>
         <item>proton-9.0-arm64ec</item>
     </string-array>
     <string-array name="vkbasalt_sharpness_entries">

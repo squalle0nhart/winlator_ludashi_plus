@@ -1,421 +1,959 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Custom left-sidebar for XServerDisplayActivity.
-    Width is dictated by the parent ScrollView (240dp in xserver_display_activity.xml).
-
-    Item order (mirrors old codebase):
-      1. Pause / Resume
-      2. Keyboard
-      3. Input       → submenu: Input Controls, Vibration
-      4. Mouse       → submenu: Relative Mouse, Disable Mouse
-      5. Show FPS    → submenu: HUD controls (master switch, checkboxes, sliders, reset)
-      6. Graphic Engine → submenu: FPS Limit, Super Resolution, Effects, Save Preset
-      7. Screen      → submenu: PiP Mode, Toggle Fullscreen, Magnifier
-      8. Task Manager
-      9. Logs
-     10. Exit
-
-    Screen Effects was removed (only existed in the NavigationView / xserver_menu.xml approach).
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:paddingTop="0dp"
-    android:paddingBottom="16dp">
-
-    <!-- ── 1. Pause / Resume ── -->
-    <LinearLayout
-        android:id="@+id/BTItemPause"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_pause" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:id="@+id/TVPause"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Pause / Resume" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
-
-    <!-- ── 2. Keyboard ── -->
-    <LinearLayout
-        android:id="@+id/BTSubKeyboard"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_keyboard" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Keyboard" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
-
-    <!-- ── 3. Input ── -->
-    <LinearLayout
-        android:id="@+id/BTItemInput"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_input_controls" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Input" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="#000000">
 
     <LinearLayout
-        android:id="@+id/LLSubInput"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:visibility="gone"
-        android:background="#111111" android:paddingTop="8dp" android:paddingBottom="8dp">
+        android:layout_width="64dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="18dp"
+        android:background="#000000">
 
-        <LinearLayout android:id="@+id/BTSubInputControls"
-            android:layout_width="match_parent" android:layout_height="50dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                android:src="@drawable/icon_input_controls" app:tint="@color/colorAccent"
-                android:layout_marginStart="16dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Input Controls" android:textColor="#CCCCCC"
-                android:layout_marginStart="16dp" android:textSize="14sp"/>
+        <LinearLayout
+            android:id="@+id/BTItemGraphics"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/ic_sidebar_gpu"
+                app:tint="#0055ff" />
         </LinearLayout>
 
-        <LinearLayout android:id="@+id/BTSubVibration"
-            android:layout_width="match_parent" android:layout_height="50dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                android:src="@drawable/icon_input_controls" app:tint="@color/colorAccent"
-                android:layout_marginStart="16dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="@string/vibration" android:textColor="#CCCCCC"
-                android:layout_marginStart="16dp" android:textSize="14sp"/>
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- ── 4. Mouse ── -->
-    <LinearLayout
-        android:id="@+id/BTItemMouse"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_mouse" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Mouse" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/LLSubMouse"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:visibility="gone"
-        android:background="#111111" android:paddingTop="8dp" android:paddingBottom="8dp">
-
-        <Switch android:id="@+id/SWRelativeMouse"
-            android:layout_width="match_parent" android:layout_height="40dp"
-            android:text="Relative Mouse" android:textColor="#CCCCCC"
-            android:paddingStart="56dp" android:paddingEnd="16dp"/>
-
-        <Switch android:id="@+id/SWDisableMouse"
-            android:layout_width="match_parent" android:layout_height="40dp"
-            android:text="Disable Mouse" android:textColor="#CCCCCC"
-            android:paddingStart="56dp" android:paddingEnd="16dp"/>
-    </LinearLayout>
-
-    <!-- ── 5. Show FPS / HUD ── -->
-    <LinearLayout
-        android:id="@+id/BTItemFPS"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_screen_effect" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Show FPS" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/LLSubFPS"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:visibility="gone"
-        android:background="#111111" android:padding="16dp">
-
-        <!-- Master on/off -->
-        <Switch android:id="@+id/SWHudMaster"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Enable HUD" android:textColor="#FFFFFF"/>
-
-        <!-- Row 1: FPS · GPU · CPU · RAM -->
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="horizontal" android:layout_marginTop="10dp">
-            <CheckBox android:id="@+id/CBHudFps"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="FPS" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
-            <CheckBox android:id="@+id/CBHudGpu"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="GPU" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
-            <CheckBox android:id="@+id/CBHudCpuRam"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="CPU" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
-            <CheckBox android:id="@+id/CBHudRam"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="RAM" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
+        <LinearLayout
+            android:id="@+id/BTItemScreen"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/ic_sidebar_effects"
+                app:tint="#0055ff" />
         </LinearLayout>
 
-        <!-- Row 2: Batt/Temp · Graph (no-op, kept for NPE safety) · Renderer -->
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="horizontal">
-            <CheckBox android:id="@+id/CBHudBattTemp"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="Batt/Temp" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
-            <!--
-                CBHudGraph: kept in XML so Activity's cbGraph reference is non-null (avoids NPE
-                in updateSidebarHud). WinlatorHUD.toggleElement(5,…) is a no-op (idxToMask
-                returns 0 for index 5 — no SHOW bit exists for graph mode).
-            -->
-            <CheckBox android:id="@+id/CBHudGraph"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="Graph" android:textColor="#555555" android:textSize="12sp"
-                android:checked="false" android:enabled="false"/>
-            <CheckBox android:id="@+id/CBHudRenderer"
-                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="Renderer" android:textColor="#CCCCCC" android:textSize="12sp" android:checked="true"/>
+        <LinearLayout
+            android:id="@+id/BTItemInput"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/icon_mouse"
+                app:tint="#0055ff" />
         </LinearLayout>
 
-        <!-- HUD Size -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="HUD Size" android:textColor="#AAAAAA" android:textSize="12sp"
-            android:layout_marginTop="10dp"/>
-        <com.winlator.cmod.widget.SeekBar android:id="@+id/SBHudScale"
-            android:layout_width="match_parent" android:layout_height="30dp"
-            app:maxValue="100" app:minValue="0" app:step="1"/>
+        <LinearLayout
+            android:id="@+id/BTItemFPS"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/ic_sidebar_performance"
+                app:tint="#0055ff" />
+        </LinearLayout>
 
-        <!-- HUD Alpha -->
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="HUD Alpha" android:textColor="#AAAAAA" android:textSize="12sp"
-            android:layout_marginTop="5dp"/>
-        <com.winlator.cmod.widget.SeekBar android:id="@+id/SBHudAlpha"
-            android:layout_width="match_parent" android:layout_height="30dp"
-            app:maxValue="100" app:minValue="0" app:step="1"/>
+        <View
+            android:layout_width="38dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/sidebar_field" />
 
-        <!-- Reset HUD position -->
-        <LinearLayout android:id="@+id/BTResetHud"
-            android:layout_width="match_parent" android:layout_height="40dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:layout_marginTop="10dp"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="18dp" android:layout_height="18dp"
-                android:src="@android:drawable/ic_menu_rotate" app:tint="#FF5252"
-                android:layout_marginStart="4dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Reset HUD" android:textColor="#FF5252"
-                android:textSize="13sp" android:textStyle="bold"
-                android:layout_marginStart="8dp"/>
+        <LinearLayout
+            android:id="@+id/BTItemTaskManager"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/ic_sidebar_task_manager"
+                app:tint="#0055ff" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/BTItemPause"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_nav_icon_bg">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/icon_pause"
+                app:tint="#0055ff" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/TVPause"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/BTItemMouse"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:id="@+id/BTItemExit"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/sidebar_exit">
+            <ImageView
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:src="@drawable/ic_sidebar_power"
+                app:tint="#FF5252" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- ── 6. Graphic Engine ── -->
-    <LinearLayout
-        android:id="@+id/BTItemGraphics"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_settings" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Graphic Engine" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="@drawable/sidebar_field" />
 
-    <LinearLayout
-        android:id="@+id/LLSubGraphics"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:visibility="gone"
-        android:background="#111111" android:padding="16dp">
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="#000000"
+        android:paddingStart="18dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="18dp">
 
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="GAME FPS LIMIT" android:textStyle="bold"
-            android:textColor="#FF0055" android:textSize="10sp"
-            android:layout_marginTop="10dp" android:layout_marginBottom="4dp"/>
-        <Spinner android:id="@+id/SPNativeFPS"
-            android:layout_width="match_parent" android:layout_height="40dp"
-            android:backgroundTint="#FF0055"/>
+        <ScrollView
+            android:id="@+id/LLSubGraphics"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="visible"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Rendering"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="92dp"
+                        android:layout_height="wrap_content"
+                        android:text="FPS Limiter"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <Spinner
+                        android:id="@+id/SPNativeFPS"
+                        android:layout_width="105dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="10dp"
+                        android:background="@drawable/sidebar_spinner" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/LLStandardOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:padding="12dp">
+                    <Switch
+                        android:id="@+id/SWEnableFSR"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="Super Resolution"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Upscaler Mode"
+                            android:textColor="#0055ff"
+                            android:textSize="13sp" />
+                        <Spinner
+                            android:id="@+id/SPUpscalerMode"
+                            android:layout_width="120dp"
+                            android:layout_height="36dp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/LBLSharpnessHeader"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="Sharpness"
+                        android:textColor="#0055ff"
+                        android:textSize="13sp" />
+                    <com.winlator.cmod.widget.SeekBar
+                        android:id="@+id/SBSharpness"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        app:maxValue="100"
+                        app:minValue="0"
+                        app:step="1" />
 
-        <LinearLayout android:id="@+id/LLStandardOptions"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:visibility="gone"
-            android:layout_marginTop="15dp">
+                    <!-- ── Post Effect ─────────────────────────────────────── -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="2dp"
+                        android:background="#33FFFFFF" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Post Effect"
+                            android:textColor="#0055ff"
+                            android:textSize="13sp" />
+                        <Spinner
+                            android:id="@+id/SPPostFXMode"
+                            android:layout_width="130dp"
+                            android:layout_height="36dp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="SUPER RESOLUTION" android:textStyle="bold"
-                android:textColor="#00E5FF" android:textSize="10sp"/>
-            <Switch android:id="@+id/SWEnableFSR"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Enable" android:textColor="#CCCCCC"/>
-            <Spinner android:id="@+id/SPUpscalerMode"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:backgroundTint="#00E5FF"/>
-            <TextView android:id="@+id/LBLSharpnessHeader"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:text="Sharpness Strength"
-                android:textColor="#AAAAAA" android:textSize="10sp"/>
-            <com.winlator.cmod.widget.SeekBar android:id="@+id/SBSharpness"
-                android:layout_width="match_parent" android:layout_height="40dp"
-                app:maxValue="100" app:minValue="0" app:step="1"/>
-
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="EFFECTS" android:textStyle="bold"
-                android:textColor="#FFD700" android:textSize="10sp"
-                android:layout_marginTop="10dp"/>
-            <Spinner android:id="@+id/SPColorMode"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:backgroundTint="#FFD700"/>
-
-            <LinearLayout android:id="@+id/BTSaveGraphicsPreset"
-                android:layout_width="match_parent" android:layout_height="40dp"
-                android:orientation="horizontal" android:gravity="center_vertical"
-                android:layout_marginTop="10dp"
-                android:clickable="true" android:background="?android:attr/selectableItemBackground">
-                <ImageView android:layout_width="18dp" android:layout_height="18dp"
-                    android:src="@android:drawable/ic_menu_save" app:tint="#00E676"
-                    android:layout_marginStart="4dp"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="Save Preset" android:textColor="#00E676"
-                    android:textSize="13sp" android:textStyle="bold"
-                    android:layout_marginStart="8dp"/>
+                    <!-- SPColorMode mantido oculto por compatibilidade -->
+                    <Spinner
+                        android:id="@+id/SPColorMode"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/LLFrameGenOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:padding="12dp"
+                    android:visibility="gone">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Frame Generation"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                    <Spinner
+                        android:id="@+id/SPFrameGenFPS"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/sidebar_spinner" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTSaveGraphicsPreset"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/sidebar_action">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Save Preset"
+                        android:textColor="#DDF6FF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
+        </ScrollView>
 
-        <LinearLayout android:id="@+id/LLFrameGenOptions"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="vertical" android:visibility="gone"
-            android:layout_marginTop="15dp">
+        <ScrollView
+            android:id="@+id/LLSubScreen"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Display and Effects"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <LinearLayout
+                    android:id="@+id/BTItemPipMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Picture in Picture"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTItemToggleFullscreen"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Toggle Fullscreen"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTItemMagnifier"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Magnifier"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTItemSoftStretch"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Soft Stretch"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="FRAME GENERATION" android:textStyle="bold"
-                android:textColor="#39FF14" android:textSize="10sp"/>
-            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:text="Generates fake frames." android:textColor="#888888"
-                android:textSize="10sp" android:paddingBottom="5dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Generation Strategy" android:textColor="#AAAAAA"
-                android:textSize="10sp"/>
-            <Spinner android:id="@+id/SPFrameGenFPS"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:backgroundTint="#39FF14"/>
-        </LinearLayout>
-    </LinearLayout>
+        <ScrollView
+            android:id="@+id/LLSubInput"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Controls"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <LinearLayout
+                    android:id="@+id/LLSidebarInputControls"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <Spinner
+                            android:id="@+id/SPInputControlsProfile"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_spinner"
+                            android:spinnerMode="dropdown" />
+                        <ImageView
+                            android:id="@+id/BTInputControlsSettings"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_marginStart="10dp"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:src="@drawable/icon_settings"
+                            app:tint="#0066FF" />
+                    </LinearLayout>
+                    <Switch
+                        android:id="@+id/SWShowTouchscreenControls"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/show_touchscreen_controls"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                    <Switch
+                        android:id="@+id/SWEnableTouchscreenTimeout"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="@string/enable_touchscreen_timeout"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                    <Switch
+                        android:id="@+id/SWEnableTouchscreenHaptics"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="@string/enable_touchscreen_haptics"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Touch Controls Opacity"
+                        android:textColor="#0055ff"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                    <com.winlator.cmod.widget.SeekBar
+                        android:id="@+id/SBControlsOpacity"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        app:maxValue="100"
+                        app:minValue="10"
+                        app:step="1" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTSubKeyboard"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Show Keyboard"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTSubVibration"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Vibration"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                </LinearLayout>
+                <Switch
+                    android:id="@+id/SWRelativeMouse"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="Relative Mouse"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+                <Switch
+                    android:id="@+id/SWDisableMouse"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="Disable Mouse"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </ScrollView>
 
-    <!-- ── 7. Screen ── -->
-    <LinearLayout
-        android:id="@+id/BTItemScreen"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_screen_effect" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Screen" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+        <ScrollView
+            android:id="@+id/LLSubFPS"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="HUD"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <Switch
+                    android:id="@+id/SWHudMaster"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="Enable HUD"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+                <LinearLayout
+                    android:id="@+id/LLHudStyleRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Style"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+                    <Spinner
+                        android:id="@+id/SPHudStyle"
+                        android:layout_width="120dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/sidebar_spinner" />
+                </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/LLSubScreen"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="vertical" android:visibility="gone"
-        android:background="#111111" android:paddingTop="8dp" android:paddingBottom="8dp">
+                <LinearLayout
+                    android:id="@+id/LLModernHudOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="10dp">
 
-        <!-- PiP Mode -->
-        <LinearLayout android:id="@+id/BTItemPipMode"
-            android:layout_width="match_parent" android:layout_height="50dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                android:src="@drawable/ic_picture_in_picture_alt" app:tint="@color/colorAccent"
-                android:layout_marginStart="16dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="PiP Mode" android:textColor="#CCCCCC"
-                android:layout_marginStart="16dp" android:textSize="14sp"/>
-        </LinearLayout>
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="HUD Metrics"
+                        android:textColor="#0055ff"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
 
-        <!-- Toggle Fullscreen -->
-        <LinearLayout android:id="@+id/BTItemToggleFullscreen"
-            android:layout_width="match_parent" android:layout_height="50dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                android:src="@drawable/icon_fullscreen" app:tint="@color/colorAccent"
-                android:layout_marginStart="16dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Toggle Fullscreen" android:textColor="#CCCCCC"
-                android:layout_marginStart="16dp" android:textSize="14sp"/>
-        </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal">
 
-        <!-- Magnifier — wires to MagnifierView toggle in Activity (BTItemMagnifier) -->
-        <LinearLayout android:id="@+id/BTItemMagnifier"
-            android:layout_width="match_parent" android:layout_height="50dp"
-            android:orientation="horizontal" android:gravity="center_vertical"
-            android:clickable="true" android:background="?android:attr/selectableItemBackground">
-            <ImageView android:layout_width="24dp" android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_zoom" app:tint="@color/colorAccent"
-                android:layout_marginStart="16dp"/>
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="Magnifier" android:textColor="#CCCCCC"
-                android:layout_marginStart="16dp" android:textSize="14sp"/>
-        </LinearLayout>
-    </LinearLayout>
+                        <CheckBox
+                            android:id="@+id/CBHudFps"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="FPS"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
 
-    <!-- ── 8. Task Manager ── -->
-    <LinearLayout
-        android:id="@+id/BTItemTaskManager"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_task_manager" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Task Manager" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+                        <CheckBox
+                            android:id="@+id/CBHudGpu"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="GPU"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
+                    </LinearLayout>
 
-    <!-- ── 9. Logs ── -->
-    <LinearLayout
-        android:id="@+id/BTItemLogs"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            app:tint="@color/colorAccent" android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Logs" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:orientation="horizontal">
 
-    <!-- ── 10. Exit ── -->
-    <LinearLayout
-        android:id="@+id/BTItemExit"
-        android:layout_width="match_parent" android:layout_height="50dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:clickable="true" android:background="?android:attr/selectableItemBackground">
-        <ImageView android:layout_width="24dp" android:layout_height="24dp"
-            android:src="@drawable/icon_exit" app:tint="@color/colorAccent"
-            android:layout_marginStart="16dp"/>
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Exit" android:textColor="#FFFFFF"
-            android:layout_marginStart="16dp" android:textSize="16sp"/>
-    </LinearLayout>
+                        <CheckBox
+                            android:id="@+id/CBHudCpuRam"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="CPU"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
 
+                        <CheckBox
+                            android:id="@+id/CBHudRam"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="RAM"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:orientation="horizontal">
+
+                        <CheckBox
+                            android:id="@+id/CBHudBattTemp"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="Batt/Temp"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
+
+                        <CheckBox
+                            android:id="@+id/CBHudRenderer"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:text="Renderer"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <CheckBox
+                        android:id="@+id/CBHudGraph"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone"
+                        android:enabled="false" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical"
+                    android:background="@drawable/sidebar_card"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="HUD Size"
+                        android:textColor="#0055ff"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                    <com.winlator.cmod.widget.SeekBar
+                        android:id="@+id/SBHudScale"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        app:maxValue="100"
+                        app:minValue="0"
+                        app:step="1" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="HUD Opacity"
+                        android:textColor="#0055ff"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                    <com.winlator.cmod.widget.SeekBar
+                        android:id="@+id/SBHudAlpha"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        app:maxValue="100"
+                        app:minValue="0"
+                        app:step="1" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTResetHud"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/sidebar_action">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Reset HUD"
+                        android:textColor="#DDF6FF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/BTItemLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/sidebar_action"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:visibility="gone">
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/ic_sidebar_logs"
+                        app:tint="#DDF6FF" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Show Logs"
+                        android:textColor="#DDF6FF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <ScrollView
+            android:id="@+id/LLSubTaskManager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:scrollbars="none">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Task Manager"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="66dp"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:background="@drawable/sidebar_card"
+                        android:padding="9dp">
+                        <TextView
+                            android:id="@+id/TVCPUTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="CPU"
+                            android:textColor="#0055ff"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/TVCPUInfoCompact"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="--%"
+                            android:textColor="#0055ff"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:orientation="vertical"
+                        android:background="@drawable/sidebar_card"
+                        android:padding="9dp">
+                        <TextView
+                            android:id="@+id/TVMemoryTitle"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Memory"
+                            android:textColor="#0055ff"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/TVMemoryInfo"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="-- / --"
+                            android:textColor="#0055ff"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:singleLine="true" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:id="@+id/TVProcessesTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Processes"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="180dp"
+                    android:layout_marginTop="4dp">
+                    <LinearLayout
+                        android:id="@+id/LLProcessList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                    <TextView
+                        android:id="@+id/TVEmptyText"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:gravity="center"
+                        android:text="@string/no_items_to_display"
+                        android:textColor="#0055ff"
+                        android:visibility="gone" />
+                </FrameLayout>
+                <LinearLayout
+                    android:id="@+id/BTTaskNewTask"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/sidebar_action">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="+ New Task"
+                        android:textColor="#DDF6FF"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/LLSubMouse"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>

@@ -87,25 +87,25 @@ public class ImageFs {
     }
 
     public File getInstalledWineDir() {
-        return new File(rootDir, "/opt/installed-wine");
+        return new File(rootDir, "opt/installed-wine");
     }
 
     public File getTmpDir() {
-        return new File(rootDir, "/usr/tmp");
+        return new File(rootDir, "usr/tmp");
     }
 
     public File getLibDir() {
-        return new File(rootDir, "/usr/lib");
+        return new File(rootDir, "usr/lib");
     }
 
-    public File getBinDir() { return new File(rootDir, "/usr/bin"); }
+    public File getBinDir() { return new File(rootDir, "usr/bin"); }
     
     public File getShareDir() {
-        return new File(rootDir, "/usr/share");
+        return new File(rootDir, "usr/share");
     }
     
     public File getEtcDir() {
-        return new File(rootDir, "/usr/etc");
+        return new File(rootDir, "usr/etc");
     }
 
     @NonNull

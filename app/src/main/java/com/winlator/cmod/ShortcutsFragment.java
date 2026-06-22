@@ -347,23 +347,52 @@ public class ShortcutsFragment extends Fragment {
         if (item.path == null || item.path.isEmpty()) return null;
 
         String path = item.path.replace("\\", "/").trim();
-        
-        if (path.startsWith("\"") && path.endsWith("\"")) {
-            path = path.substring(1, path.length() - 1);
-        }
 
-        
+        if (path.startsWith("\"") && path.endsWith("\""))
+            path = path.substring(1, path.length() - 1);
+
         if (path.startsWith("/")) {
             File f = new File(path);
             if (f.exists()) return f;
         }
 
-        
-        String normalized = path.replaceAll("^[A-Za-z]:/", "");
-        File containerRoot = item.container.getRootDir();
-        if (containerRoot != null) {
-            File candidate = new File(containerRoot, ".wine/drive_c/" + normalized);
-            if (candidate.exists()) return candidate;
+        if (path.length() >= 3 && path.charAt(1) == ':' && path.charAt(2) == '/') {
+            String drive    = path.substring(0, 1).toLowerCase();
+            String relative = path.substring(3);
+
+            if (item.container != null) {
+                for (String[] entry : item.container.drivesIterator()) {
+                    if (entry == null || entry.length < 2 || entry[0] == null || entry[1] == null) continue;
+                    if (entry[0].replace(":", "").trim().equalsIgnoreCase(drive)) {
+                        File f = new File(entry[1], relative);
+                        if (f.exists()) return f;
+                    }
+                }
+            }
+
+            switch (drive) {
+                case "c": {
+                    File root = item.container != null ? item.container.getRootDir() : null;
+                    if (root != null) {
+                        File f = new File(root, ".wine/drive_c/" + relative);
+                        if (f.exists()) return f;
+                    }
+                    break;
+                }
+                case "d": {
+                    File f = new File(Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS), relative);
+                    if (f.exists()) return f;
+                    f = new File(Environment.getExternalStorageDirectory(), relative);
+                    if (f.exists()) return f;
+                    break;
+                }
+                case "z": {
+                    File f = new File("/" + relative);
+                    if (f.exists()) return f;
+                    break;
+                }
+            }
         }
 
         return null;
@@ -575,7 +604,7 @@ public class ShortcutsFragment extends Fragment {
                 intent.putExtra("shortcut_path", shortcut.file.getPath());
                 intent.putExtra("shortcut_name", shortcut.name); 
                 intent.putExtra("disableXinput", shortcut.getExtra("disableXinput", "0")); 
-                intent.putExtra("native_rendering", shortcut.getNativeRendering());
+                intent.putExtra("native_rendering", shortcut.getRendererNative());
                 activity.startActivity(intent);
             } else XrActivity.openIntent(activity, shortcut.container.id, shortcut.file.getPath());
         }

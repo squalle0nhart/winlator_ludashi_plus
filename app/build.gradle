@@ -23,17 +23,16 @@ plugins {
 
 tasks.register("downloadImageFS") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    File imageFS = new File(assetDir, "imagefs.txz")
-    String imageFSSHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.sha256sum"
-    int parts = 4
+    File imageFS = new File(assetDir, "imagefs.tar.zst")
+    int parts = 2
 
     doLast {
         if (!imageFS.exists()) {
             println("ImageFS was not present, downloading...\n")
             FileOutputStream outputStream = new FileOutputStream(imageFS)
             for (int i = 0; i < parts; i++) {
-                File partFile = new File(assetDir, String.format("imagefs.txz.%02d", i))
-                String partURL = String.format("https://gitlab.com/winlator3/winlator-extra/-/raw/main/imagefs/imagefs.txz.%02d", i)
+                File partFile = new File(assetDir, String.format("imagefs.tar.zst.%02d", i))
+                String partURL = String.format("https://raw.githubusercontent.com/Other-backup/winlator-imagefs/main/imagefs.tar.zst.%02d", i)
                 new URL(partURL).withInputStream { p ->
                     partFile.withOutputStream { it << p }
                     outputStream << partFile.bytes
@@ -47,22 +46,23 @@ tasks.register("downloadImageFS") {
 
 tasks.register("downloadProton") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
-    File protonARM64EC = new File(assetDir, "proton-9.0-arm64ec.txz")
-    File protonX8664 = new File(assetDir, "proton-9.0-x86_64.txz")
-    String protonARM64ECUrl = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-arm64ec.txz"
-    String protonARM64ECSHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-arm64ec.txz.sha256sum"
-    String protonX8664Url = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-x86_64.txz"
-    String protonX8664SHA256Sum = "https://gitlab.com/winlator3/winlator-extra/-/raw/main/proton/proton-9.0-x86_64.txz.sha256sum"
-
+    File protonARM64EC = new File(assetDir, "proton-9.0-arm64ec.tar.zst")
+    int parts = 2
 
     doLast {
         if (!protonARM64EC.exists()) {
             println("Proton 9.0 ARM64EC was not present, downloading...\n")
-            new URL(protonARM64ECUrl).withInputStream { i -> protonARM64EC.withOutputStream { it << i } }
-        }
-        if (!protonX8664.exists()) {
-            println("Proton 9.0 x86_64 was not present, downloading...\n")
-            new URL(protonX8664Url).withInputStream { i -> protonX8664.withOutputStream { it << i } }
+            FileOutputStream outputStream = new FileOutputStream(protonARM64EC)
+            for (int i = 0; i < parts; i++) {
+                File partFile = new File(assetDir, String.format("proton-9.0-arm64ec.tar.zst.%02d", i))
+                String partURL = String.format("https://github.com/Other-backup/winlator-imagefs/releases/download/protons-zst-latest/proton-9.0-arm64ec.tar.zst.%02d", i)
+                new URL(partURL).withInputStream { p ->
+                    partFile.withOutputStream { it << p }
+                    outputStream << partFile.bytes
+                }
+                partFile.delete()
+            }
+            outputStream.close()
         }
     }
 }
@@ -84,7 +84,7 @@ android {
         targetSdkVersion 28
 
         versionCode 20
-        versionName "7.1.4x-cmod"
+        versionName "3.1"
 
         // External native build from Winlator
         externalNativeBuild {

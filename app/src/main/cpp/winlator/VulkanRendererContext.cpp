@@ -9,6 +9,9 @@
 #include <dlfcn.h>
 #include "window_vert.h"
 #include "window_frag.h"
+#include "window_sgsr_frag.h"
+#include "window_stretch_frag.h"
+#include "window_postfx_frag.h"
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
     : window(win), surfaceWidth(cW), surfaceHeight(cH), containerWidth(cW), containerHeight(cH),
@@ -30,7 +33,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     vk_.DeviceWaitIdle(device);
     for (auto& [id, wt] : texMap) destroyWinTex(wt);
     texMap.clear();
-    
+
     for (auto& wt : deleteQueue) {
         if (wt.ds   != VK_NULL_HANDLE) vk_.FreeDescriptorSets(device, winTexPool, 1, &wt.ds);
         if (wt.view != VK_NULL_HANDLE) vk_.DestroyImageView(device, wt.view, nullptr);
@@ -40,9 +43,12 @@ VulkanRendererContext::~VulkanRendererContext() {
     }
     deleteQueue.clear();
     cleanupSwapchain(); cleanupCursorTex();
-    
+
     vk_.DestroySampler(device, sampler, nullptr);
     vk_.DestroyDescriptorPool(device, winTexPool, nullptr);
+    if (sgsrPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, sgsrPipeline, nullptr);
+    if (stretchPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, stretchPipeline, nullptr);
+    if (postfxPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, postfxPipeline, nullptr);
     vk_.DestroyPipeline(device, pipeline, nullptr);
     vk_.DestroyPipelineLayout(device, pipeLayout, nullptr);
     vk_.DestroyDescriptorSetLayout(device, dsLayout, nullptr);
@@ -218,14 +224,12 @@ void VulkanRendererContext::createLogicalDevice() {
       std::vector<VkExtensionProperties> av(n);
       if(enumDevExts) enumDevExts(physicalDevice,nullptr,&n,av.data());
       for (auto& e:av) {
-          if (strcmp(e.extensionName,"VK_EXT_filter_cubic")==0
-           || strcmp(e.extensionName,"VK_IMG_filter_cubic")==0) cubicSupported=true;
+          (void)e;
       } }
     std::vector<const char*> extList = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME
     };
-    if (cubicSupported) extList.push_back("VK_EXT_filter_cubic");
     VkDeviceCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     ci.pQueueCreateInfos=&qi; ci.queueCreateInfoCount=1;
     ci.enabledExtensionCount=(uint32_t)extList.size(); ci.ppEnabledExtensionNames=extList.data();
@@ -244,7 +248,19 @@ void VulkanRendererContext::createLogicalDevice() {
 void VulkanRendererContext::createSwapchain() {
     VkSurfaceCapabilitiesKHR caps;
     vk_.GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,surface,&caps);
-    swapchainExt=(caps.currentExtent.width!=0xFFFFFFFF)?caps.currentExtent:VkExtent2D{(uint32_t)surfaceWidth,(uint32_t)surfaceHeight};
+
+    if (caps.currentExtent.width != 0xFFFFFFFF) {
+        swapchainExt = caps.currentExtent;
+    } else if (window) {
+        int winW = ANativeWindow_getWidth(window);
+        int winH = ANativeWindow_getHeight(window);
+        swapchainExt = {
+            (uint32_t)std::clamp(winW, (int)caps.minImageExtent.width, (int)caps.maxImageExtent.width),
+            (uint32_t)std::clamp(winH, (int)caps.minImageExtent.height, (int)caps.maxImageExtent.height)
+        };
+    } else {
+        swapchainExt = {(uint32_t)surfaceWidth, (uint32_t)surfaceHeight};
+    }
     uint32_t fmtN=0; vk_.GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,surface,&fmtN,nullptr);
     std::vector<VkSurfaceFormatKHR> fmts(fmtN); vk_.GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,surface,&fmtN,fmts.data());
     swapchainFmt = VK_FORMAT_R8G8B8A8_UNORM;
@@ -326,7 +342,6 @@ void VulkanRendererContext::createDSLayout() {
     ci.bindingCount=1; ci.pBindings=&b;
     if (vk_.CreateDescriptorSetLayout(device,&ci,nullptr,&dsLayout)!=VK_SUCCESS) throw std::runtime_error("dslayout");
 }
- 
 
 VkShaderModule VulkanRendererContext::makeShader(const uint32_t* code, size_t sz) {
     VkShaderModuleCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -338,7 +353,7 @@ VkShaderModule VulkanRendererContext::makeShader(const uint32_t* code, size_t sz
 void VulkanRendererContext::createPipeline(bool blend, VkPipeline& out) {
     if (pipeLayout==VK_NULL_HANDLE) {
         VkPushConstantRange pc{}; pc.stageFlags=VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT;
-        pc.size=sizeof(WindowPushConstants);
+        pc.size=sizeof(WindowPushConstantsSGSR);
         VkPipelineLayoutCreateInfo li{}; li.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         li.setLayoutCount=1; li.pSetLayouts=&dsLayout; li.pushConstantRangeCount=1; li.pPushConstantRanges=&pc;
         if (vk_.CreatePipelineLayout(device,&li,nullptr,&pipeLayout)!=VK_SUCCESS) throw std::runtime_error("pipelayout");
@@ -366,8 +381,108 @@ void VulkanRendererContext::createPipeline(bool blend, VkPipeline& out) {
     vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
 }
 
-
 void VulkanRendererContext::createCursorPipeline() {  }
+
+void VulkanRendererContext::createSgsrPipeline() {
+    if (sgsrPipeline != VK_NULL_HANDLE) return;
+    auto vert=makeShader(window_vert_code,sizeof(window_vert_code));
+    auto frag=makeShader(window_sgsr_frag_code,sizeof(window_sgsr_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT; stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&sgsrPipeline)!=VK_SUCCESS) throw std::runtime_error("sgsr_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createSgsrPipeline: done");
+}
+void VulkanRendererContext::createStretchPipeline() {
+    if (stretchPipeline != VK_NULL_HANDLE) return;
+    auto vert=makeShader(window_vert_code,sizeof(window_vert_code));
+    auto frag=makeShader(window_stretch_frag_code,sizeof(window_stretch_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT; stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&stretchPipeline)!=VK_SUCCESS) throw std::runtime_error("stretch_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createStretchPipeline: done");
+}
+
+void VulkanRendererContext::createPostFXPipeline() {
+    if (postfxPipeline != VK_NULL_HANDLE) return;
+    auto vert = makeShader(window_vert_code,        sizeof(window_vert_code));
+    auto frag = makeShader(window_postfx_frag_code, sizeof(window_postfx_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT;   stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo   vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&postfxPipeline)!=VK_SUCCESS) throw std::runtime_error("postfx_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createPostFXPipeline: done");
+}
+
+void VulkanRendererContext::setPostFXMode(int mode) {
+    RLOG("setPostFXMode: %d -> %d", postFXMode, mode);
+    if (postFXMode == mode) return;
+    postFXMode = mode;
+    if (mode > 0) {
+
+        if (filterMode != 2 && postfxPipeline == VK_NULL_HANDLE)
+            createPostFXPipeline();
+    } else {
+
+        if (postfxPipeline != VK_NULL_HANDLE) {
+            vk_.DeviceWaitIdle(device);
+            vk_.DestroyPipeline(device, postfxPipeline, nullptr);
+            postfxPipeline = VK_NULL_HANDLE;
+            RLOG("setPostFXMode: postfxPipeline destruído");
+        }
+    }
+    needsRender.store(true); dirtyCV.notify_one();
+}
+
+void VulkanRendererContext::setSharpness(float s) {
+    sharpness = std::clamp(s, 0.0f, 1.0f);
+    needsRender.store(true); dirtyCV.notify_one();
+}
+
 void VulkanRendererContext::createFramebuffers() {
     swapchainFBs.resize(swapchainViews.size());
     for (size_t i=0;i<swapchainViews.size();i++) {
@@ -386,13 +501,9 @@ void VulkanRendererContext::createCmdPool() {
 }
 
 void VulkanRendererContext::createSampler() {
-    bool useCubic = (filterMode == 2) && cubicSupported;
-    VkFilter filter = (filterMode == 1) ? VK_FILTER_NEAREST
-                    : (useCubic)         ? VK_FILTER_CUBIC_EXT
-                    :                      VK_FILTER_LINEAR;
-    RLOG("createSampler: filter=%s (filterMode=%d, cubicSupported=%d)",
-        filterMode==2?(cubicSupported?"CUBIC":"LINEAR_FALLBACK"):filterMode==1?"NEAREST":"LINEAR",
-        filterMode, (int)cubicSupported);
+    VkFilter filter = (filterMode == 1) ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+    RLOG("createSampler: filter=%s (filterMode=%d)",
+        filterMode==1?"NEAREST":"LINEAR", filterMode);
     VkSamplerCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     ci.magFilter=filter; ci.minFilter=filter;
     ci.addressModeU=ci.addressModeV=ci.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -409,7 +520,6 @@ void VulkanRendererContext::createWinTexPool() {
     ci.poolSizeCount=1; ci.pPoolSizes=&ps; ci.maxSets=129;
     if (vk_.CreateDescriptorPool(device,&ci,nullptr,&winTexPool)!=VK_SUCCESS) throw std::runtime_error("wintexpool");
 }
-
 
 void VulkanRendererContext::createCursorDS() {
     VkDescriptorSetAllocateInfo ai{}; ai.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -616,12 +726,11 @@ bool VulkanRendererContext::importAHBToWinTex(WinTex& wt, AHardwareBuffer* ahb) 
 void VulkanRendererContext::destroyWinTex(WinTex& wt) {
     if (wt.isAHB) {
 
-
         wt = {};
         return;
     }
     if (wt.img!=VK_NULL_HANDLE || wt.stg!=VK_NULL_HANDLE) {
-        
+
         WinTex deferred = wt;
         deferred.isAHB = false;
         deleteQueue.push_back(deferred);
@@ -672,16 +781,11 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     VkBuffer cursorUpload, bool hasCursorUpload,
     float ox, float oy, float sx, float sy, float cw, float ch,
     short ptrX, short ptrY, short curHotX, short curHotY,
-    short curW, short curH, bool curVis)
+    short curW, short curH, bool curVis,
+    VkRect2D scissorRect)
 {
     VkCommandBufferBeginInfo bi{}; bi.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vk_.BeginCommandBuffer(cb,&bi)!=VK_SUCCESS) throw std::runtime_error("begin cb");
-
-
-
-
-
-
 
     ahbTransitions.clear(); preUpload.clear(); postUpload.clear();
 
@@ -714,7 +818,6 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, (uint32_t)preUpload.size(), preUpload.data());
 
-
     for (auto& d : draws) {
         if (d.isAHB || d.upload==VK_NULL_HANDLE || d.img==VK_NULL_HANDLE) continue;
         VkBufferImageCopy r{}; r.bufferOffset=0; r.bufferRowLength=0; r.bufferImageHeight=0;
@@ -745,7 +848,6 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
         vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0, 0, nullptr, 0, nullptr, (uint32_t)postUpload.size(), postUpload.data());
 
-
     VkRenderPassBeginInfo rpi{}; rpi.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rpi.renderPass=renderPass; rpi.framebuffer=swapchainFBs[imgIdx]; rpi.renderArea={{0,0},swapchainExt};
     VkClearValue clr={{{0.f,0.f,0.f,1.f}}}; rpi.clearValueCount=1; rpi.pClearValues=&clr;
@@ -753,24 +855,86 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     vk_.CmdBeginRenderPass(cb, &rpi, VK_SUBPASS_CONTENTS_INLINE);
     VkViewport vp{0,0,(float)swapchainExt.width,(float)swapchainExt.height,0,1};
     vk_.CmdSetViewport(cb, 0, 1, &vp);
-    VkRect2D sc{{0,0},swapchainExt}; vk_.CmdSetScissor(cb, 0, 1, &sc);
 
-    vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    {
+        int32_t  ox2 = std::max(0, scissorRect.offset.x);
+        int32_t  oy2 = std::max(0, scissorRect.offset.y);
+        uint32_t maxW = (swapchainExt.width  > (uint32_t)ox2) ? swapchainExt.width  - (uint32_t)ox2 : 0u;
+        uint32_t maxH = (swapchainExt.height > (uint32_t)oy2) ? swapchainExt.height - (uint32_t)oy2 : 0u;
+        VkRect2D sc{{ox2, oy2},
+                    {std::min(scissorRect.extent.width,  maxW),
+                     std::min(scissorRect.extent.height, maxH)}};
+        vk_.CmdSetScissor(cb, 0, 1, &sc);
+    }
+
+    bool useSgsr    = (filterMode == 2) && (sgsrPipeline    != VK_NULL_HANDLE);
+    bool usePostFX  = (postFXMode  > 0) && (postfxPipeline  != VK_NULL_HANDLE);
+    bool useStretch = (stretchMode == 1) && (stretchPipeline != VK_NULL_HANDLE);
+
+    VkPipeline activePipeline = useSgsr   ? sgsrPipeline
+                              : usePostFX ? postfxPipeline
+                              : useStretch? stretchPipeline
+                              : pipeline;
+    vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, activePipeline);
     for (auto& d : draws) {
         if (d.ds==VK_NULL_HANDLE) continue;
         vk_.CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeLayout, 0, 1, &d.ds, 0, nullptr);
-        WindowPushConstants pc{};
-        pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
-        pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
-        pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
-        pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
-        pc.useTexAlpha = 0;
-        vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        if (useSgsr) {
+            WindowPushConstantsSGSR pc{};
+
+            if (useStretch) {
+                pc.ndcX0 = -1.f;
+                pc.ndcX1 =  1.f;
+            } else {
+                pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
+                pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
+            }
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            pc.useTexAlpha = 0;
+            float sw = (float)std::max(d.w, 1); float sh = (float)std::max(d.h, 1);
+            pc.invSrcW = 1.0f / sw; pc.invSrcH = 1.0f / sh;
+            pc.srcW = sw; pc.srcH = sh;
+            pc.effectId = postFXMode;  
+            pc.resW     = 0.0f;        
+            pc.sharpness = sharpness;
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        } else if (usePostFX) {
+            WindowPushConstantsPostFX pc{};
+            pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            pc.effectId  = postFXMode;
+            pc.sharpness = sharpness;
+            pc.resW      = (float)std::max(d.w, 1);
+            pc.resH      = (float)std::max(d.h, 1);
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        } else if (useStretch) {
+            WindowPushConstantsStretch pc{};
+            pc.ndcX0 = -1.f;
+            pc.ndcX1 =  1.f;
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            pc.useTexAlpha = 0;
+            pc.strength = stretchStrength;
+            pc.profile  = stretchProfile;
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        } else {
+            WindowPushConstants pc{};
+            pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            pc.useTexAlpha = 0;
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        }
         vk_.CmdDraw(cb, 4, 1, 0, 0);
     }
 
     if (cursorDrawn) {
 
+        if (useSgsr || useStretch || usePostFX) vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         vk_.CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeLayout, 0, 1, &cursorDS, 0, nullptr);
         float cx=(float)std::max(0,(int)ptrX-curHotX), cy=(float)std::max(0,(int)ptrY-curHotY);
         WindowPushConstants cpc{};
@@ -804,7 +968,6 @@ void VulkanRendererContext::renderLoop() {
 }
 
 void VulkanRendererContext::flushDeleteQueue() {
-
 
     std::lock_guard<std::mutex> lk(renderMutex);
     if (deleteQueue.empty()) return;
@@ -884,9 +1047,10 @@ ok=true;}catch(...){}
     short ptrX,ptrY,curHotX,curHotY,curW,curH; bool curVis;
     VkBuffer curUpload=VK_NULL_HANDLE; bool hasCurUpload=false;
 
+    VkRect2D effectiveScissor{{0,0},swapchainExt};
+
     {
         std::lock_guard<std::mutex> lk(renderMutex);
-
 
         if (!deleteQueue.empty()) {
             for (auto& wt:deleteQueue) {
@@ -904,6 +1068,7 @@ ok=true;}catch(...){}
         ptrX=(short)pointerX.load(); ptrY=(short)pointerY.load();
         curHotX=cursorHotX; curHotY=cursorHotY; curW=cursorTexW; curH=cursorTexH;
         curVis=cursorVisible.load();
+        if (hasCustomScissor) effectiveScissor = customScissor;
 
         frameDraws.clear();
         for (auto& re:renderList) {
@@ -932,7 +1097,6 @@ ok=true;}catch(...){}
         }
     }
 
-
     if (hasCurUpload && cursorStgP && !cursorPixels.empty())
         memcpy(cursorStgP, cursorPixels.data(), cursorUploadSize);
 
@@ -940,7 +1104,8 @@ ok=true;}catch(...){}
     recordCmdBuf(cmdBufs[currentFrame],imgIdx,frameDraws,
         frameAhbTransitions,framePreUpload,framePostUpload,
         curUpload,hasCurUpload,
-        ox,oy,sx,sy,cw,ch,ptrX,ptrY,curHotX,curHotY,curW,curH,effectiveCurVis);
+        ox,oy,sx,sy,cw,ch,ptrX,ptrY,curHotX,curHotY,curW,curH,effectiveCurVis,
+        effectiveScissor);
 
     VkSemaphore wSem[]={imgAvailSems[currentFrame]}, sSem[]={renderDoneSems[currentFrame]};
     VkPipelineStageFlags wStage[]={VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -1010,6 +1175,15 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
             __android_log_print(ANDROID_LOG_ERROR, "Winlator_Renderer", "reattachSurface: swapchain recreate failed");
             return false;
         }
+
+        surfaceWidth  = (int)swapchainExt.width;
+        surfaceHeight = (int)swapchainExt.height;
+
+        for (auto& [id, wt] : texMap)
+            wt.needsTransition = true;
+        for (auto& [ahb, wt] : ahbImportCache)
+            wt.needsTransition = true;
+
         surfaceDetached.store(false, std::memory_order_release);
     }
     needsRender.store(true, std::memory_order_release);
@@ -1075,10 +1249,6 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
     if (!ahb) return;
     std::lock_guard<std::mutex> lk(renderMutex);
 
-
-
-
-
     auto cit = ahbImportCache.find(ahb);
     if (cit == ahbImportCache.end()) {
         WinTex tmp{};
@@ -1093,7 +1263,6 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
         RLOG("updateWindowContentAHB: imported new AHB %p for id=%" PRId64 " (%dx%d)",
             (void*)ahb, id, tmp.w, tmp.h);
     }
-
 
     WinTex& src = cit->second;
     WinTex& wt  = texMap[id];
@@ -1123,15 +1292,12 @@ void VulkanRendererContext::setRenderList(const int64_t* ids, const int* xs, con
 void VulkanRendererContext::removeWindow(int64_t id) {
     std::lock_guard<std::mutex> lk(renderMutex);
 
-
-
     auto it = texMap.find(id);
     if (it != texMap.end()) {
         if (!it->second.isAHB) destroyWinTex(it->second);
         else it->second = {};
         texMap.erase(it);
     }
-
 
     auto wit = windowAhbs.find(id);
     if (wit != windowAhbs.end()) {
@@ -1165,7 +1331,6 @@ void VulkanRendererContext::cleanupAllAHBCache() {
     windowAhbs.clear();
 }
 
-
 void VulkanRendererContext::dumpRendererInfo() {
     VkPhysicalDeviceProperties props{};
     vk_.GetPhysicalDeviceProperties(physicalDevice,&props);
@@ -1182,7 +1347,7 @@ void VulkanRendererContext::dumpRendererInfo() {
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "SupportedPresentModes: [%s] current=%d",pmList.c_str(),(int)requestedPresentMode);
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
-        "Filter: mode=%d (%s)", filterMode, filterMode==2?(cubicSupported?"CUBIC":"LINEAR"):filterMode==1?"NEAREST":"LINEAR");
+        "Filter: mode=%d (%s)", filterMode, filterMode==2?"SGSR":filterMode==1?"NEAREST":"LINEAR");
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "Scanout: active=%d gameFrameDelivered=%d scanoutGameSC=%p",
         (int)scanoutActive.load(),(int)gameFrameDelivered.load(),scanoutGameSC);
@@ -1193,10 +1358,11 @@ void VulkanRendererContext::dumpRendererInfo() {
 }
 
 void VulkanRendererContext::setFilterMode(int mode) {
-    RLOG("setFilterMode: %d -> %d (%s->%s)", filterMode, mode,
-        filterMode==2?(cubicSupported?"CUBIC":"LINEAR"):filterMode==1?"NEAREST":"LINEAR", mode==2?(cubicSupported?"CUBIC":"LINEAR"):mode==1?"NEAREST":"LINEAR");
+    auto modeName=[](int m){ return m==1?"NEAREST":m==2?"SGSR":"LINEAR"; };
+    RLOG("setFilterMode: %d -> %d (%s->%s)", filterMode, mode, modeName(filterMode), modeName(mode));
     if (filterMode==mode) { RLOG("setFilterMode: already set, skipping"); return; }
     filterMode=mode;
+    if (mode == 2 && sgsrPipeline == VK_NULL_HANDLE) createSgsrPipeline();
     vk_.DeviceWaitIdle(device);
     if (sampler!=VK_NULL_HANDLE){vk_.DestroySampler(device,sampler,nullptr);sampler=VK_NULL_HANDLE;}
     createSampler();
@@ -1209,7 +1375,7 @@ void VulkanRendererContext::setFilterMode(int mode) {
         wr.descriptorCount=1; wr.pImageInfo=&dii;
         vk_.UpdateDescriptorSets(device,1,&wr,0,nullptr);
     };
-    
+
     for (auto& [id,wt]:texMap) updateDS(wt.ds, wt.view);
 
     for (auto& [ahb,wt]:ahbImportCache) updateDS(wt.ds, wt.view);
@@ -1217,11 +1383,18 @@ void VulkanRendererContext::setFilterMode(int mode) {
     needsRender.store(true); dirtyCV.notify_one();
 }
 
+void VulkanRendererContext::setStretchMode(int mode) {
+    RLOG("setStretchMode: %d -> %d", stretchMode, mode);
+    if (stretchMode == mode) return;
+    stretchMode = mode;
+    if (mode == 1 && stretchPipeline == VK_NULL_HANDLE) createStretchPipeline();
+    needsRender.store(true); dirtyCV.notify_one();
+}
+
 void VulkanRendererContext::setSwapRB(bool enabled) {
     if (swapRB == enabled) return;
     swapRB = enabled;
     RLOG("setSwapRB: %d", (int)swapRB);
-
 
 }
 
@@ -1240,6 +1413,19 @@ std::vector<int> VulkanRendererContext::getSupportedPresentModes() const {
     std::vector<int> out;
     for (auto pm:availablePresentModes) out.push_back((int)pm);
     return out;
+}
+
+void VulkanRendererContext::setCustomScissor(int x, int y, int w, int h) {
+    std::lock_guard<std::mutex> lk(renderMutex);
+    customScissor  = {{x, y}, {(uint32_t)std::max(0, w), (uint32_t)std::max(0, h)}};
+    hasCustomScissor = true;
+    needsRender.store(true); dirtyCV.notify_one();
+}
+
+void VulkanRendererContext::clearCustomScissor() {
+    std::lock_guard<std::mutex> lk(renderMutex);
+    hasCustomScissor = false;
+    needsRender.store(true); dirtyCV.notify_one();
 }
 
 #pragma GCC diagnostic pop

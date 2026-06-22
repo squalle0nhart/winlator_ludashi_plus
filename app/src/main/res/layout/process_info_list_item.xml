@@ -1,45 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
     android:layout_width="match_parent"
-    android:layout_height="38dp"
-    android:gravity="center_vertical">
+    android:layout_height="62dp"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/sidebar_card"
+    android:paddingStart="12dp"
+    android:paddingEnd="10dp">
 
     <ImageView
         android:id="@+id/IVIcon"
-        android:layout_width="26dp"
-        android:layout_height="26dp"
-        android:paddingLeft="4dp" />
+        android:layout_width="24dp"
+        android:layout_height="24dp" />
 
-    <TextView
-        android:id="@+id/TVName"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:paddingLeft="6dp" />
+        android:layout_marginStart="10dp"
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/TVPID"
-        android:layout_width="60dp"
-        android:layout_height="wrap_content"
-        android:paddingLeft="4dp" />
+        <TextView
+            android:id="@+id/TVName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/TVPID"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#8FD8FF"
+            android:textSize="11sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/TVMemoryUsage"
-        android:layout_width="110dp"
+        android:layout_width="64dp"
         android:layout_height="wrap_content"
-        android:paddingLeft="4dp" />
+        android:gravity="end"
+        android:textColor="#DDF6FF"
+        android:textSize="12sp" />
 
-    <RelativeLayout
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:gravity="center">
+    <ImageButton
+        android:id="@+id/BTMenu"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="6dp"
+        android:background="@android:color/transparent"
+        android:src="@drawable/icon_list_item_menu"
+        app:tint="#40C4FF" />
 
-        <ImageButton
-            style="@style/ListMenuButton"
-            android:id="@+id/BTMenu"
-            android:src="@drawable/icon_list_item_menu" />
-    </RelativeLayout>
 </LinearLayout>

@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:padding="10dp">
 
     <androidx.recyclerview.widget.RecyclerView
-        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:id="@+id/RecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:scrollbars="vertical"
         app:layoutManager="LinearLayoutManager" />
 
@@ -17,6 +20,7 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:text="@string/no_items_to_display"
+        android:textColor="#B8B8B8"
         android:textSize="24sp"
         android:visibility="gone" />
 </FrameLayout>

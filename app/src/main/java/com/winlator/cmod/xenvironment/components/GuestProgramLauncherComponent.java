@@ -73,7 +73,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
 
-        // Fallback to default if the shared preference is not set or is empty
         String box64Version = container.getBox64Version();
 
         if (shortcut != null)
@@ -93,7 +92,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             container.saveData();
         }
 
-        // Set execute permissions for box64 just in case
         File box64File = new File(rootDir, "/usr/bin/box64");
         if (box64File.exists()) {
             FileUtils.chmod(box64File, 0755);
@@ -111,6 +109,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
 
         if (shortcut != null) {
             wowbox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
+            fexcoreVersion = shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion());
         }
 
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
@@ -156,7 +155,6 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
     }
 
-
     private String checkDependencies() {
         String curlPath = environment.getImageFs().getRootDir().getPath() + "/usr/lib/libXau.so";
         String lddCommand = "ldd " + curlPath;
@@ -181,10 +179,9 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             output.append("Error running ldd: ").append(e.getMessage());
         }
 
-        Log.d("CurlDeps", output.toString()); // Log the full dependency output
+        Log.d("CurlDeps", output.toString()); 
         return output.toString();
     }
-
 
     @Override
     public void stop() {
@@ -270,65 +267,63 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         boolean shareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
 
         if (openWithAndroidBrowser)
-            envVars.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
+            this.envVars.put("WINE_OPEN_WITH_ANDROID_BROWSER", "1");
         if (shareAndroidClipboard) {
-            envVars.put("WINE_FROM_ANDROID_CLIPBOARD", "1");
-            envVars.put("WINE_TO_ANDROID_CLIPBOARD", "1");
+            this.envVars.put("WINE_FROM_ANDROID_CLIPBOARD", "1");
+            this.envVars.put("WINE_TO_ANDROID_CLIPBOARD", "1");
         }
 
-        EnvVars envVars = new EnvVars();
+        EnvVars execEnvVars = new EnvVars();
 
-        addBox64EnvVars(envVars, enableBox64Logs);
-        envVars.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
+        addBox64EnvVars(execEnvVars, enableBox64Logs);
+        execEnvVars.putAll(FEXCorePresetManager.getEnvVars(context, fexcorePreset));
 
         String renderer = GPUInformation.getRenderer(null, null);
 
-        if (renderer.contains("Mali")) //Mali Cope HAHAHAHAHAHA
-            envVars.put("BOX64_MMAP32", "0");
+        if (renderer.contains("Mali")) 
+            execEnvVars.put("BOX64_MMAP32", "0");
 
-        if (envVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
+        if (execEnvVars.get("BOX64_MMAP32").equals("1") && !wineInfo.isArm64EC()) {
             Log.d("GuestProgramLauncherComponent", "Disabling map memory placed");
-            envVars.put("WRAPPER_DISABLE_PLACED", "1");
+            execEnvVars.put("WRAPPER_DISABLE_PLACED", "1");
         }
 
-        // Setting up essential environment variables for Wine
-        envVars.put("HOME", imageFs.home_path);
-        envVars.put("USER", ImageFs.USER);
-        envVars.put("TMPDIR", rootDir.getPath() + "/usr/tmp");
-        envVars.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
-        envVars.put("LD_LIBRARY_PATH", rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64");
-        envVars.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
-        envVars.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
-        envVars.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
-        envVars.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
-        envVars.put("WRAPPER_LAYER_PATH", rootDir.getPath() + "/usr/lib");
-        envVars.put("WRAPPER_CACHE_PATH", rootDir.getPath() + "/usr/var/cache");
-        envVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
-        envVars.put("PREFIX", rootDir.getPath() + "/usr");
-        envVars.put("DISPLAY", ":0");
-        envVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
-        envVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
-        envVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
-        envVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
-        envVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");
-        envVars.put("SSL_CERT_FILE", rootDir.getPath() + "/usr/etc/tls/cert.pem");
-        envVars.put("SSL_CERT_DIR", rootDir.getPath() + "/usr/etc/tls/certs");
-        envVars.put("WINE_X11FORCEGLX", "1");
-        envVars.put("WINE_GST_NO_GL", "1");
-        envVars.put("SteamGameId", "0");
-        envVars.put("PROTON_AUDIO_CONVERT", "0");
-        envVars.put("PROTON_VIDEO_CONVERT", "0");
-        envVars.put("PROTON_DEMUX", "0");
+        execEnvVars.put("HOME", imageFs.home_path);
+        execEnvVars.put("USER", ImageFs.USER);
+        execEnvVars.put("TMPDIR", rootDir.getPath() + "/usr/tmp");
+        execEnvVars.put("XDG_DATA_DIRS", rootDir.getPath() + "/usr/share");
+        execEnvVars.put("LD_LIBRARY_PATH", rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64");
+        execEnvVars.put("XDG_CONFIG_DIRS", rootDir.getPath() + "/usr/etc/xdg");
+        execEnvVars.put("GST_PLUGIN_PATH", rootDir.getPath() + "/usr/lib/gstreamer-1.0");
+        execEnvVars.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
+        execEnvVars.put("VK_LAYER_PATH", rootDir.getPath() + "/usr/share/vulkan/implicit_layer.d" + ":" + rootDir.getPath() + "/usr/share/vulkan/explicit_layer.d");
+        execEnvVars.put("WRAPPER_LAYER_PATH", rootDir.getPath() + "/usr/lib");
+        execEnvVars.put("WRAPPER_CACHE_PATH", rootDir.getPath() + "/usr/var/cache");
+        execEnvVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
+        execEnvVars.put("PREFIX", rootDir.getPath() + "/usr");
+        execEnvVars.put("DISPLAY", ":0");
+        execEnvVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
+        execEnvVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
+        execEnvVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
+        execEnvVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
+        execEnvVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");
+        execEnvVars.put("SSL_CERT_FILE", rootDir.getPath() + "/usr/etc/tls/cert.pem");
+        execEnvVars.put("SSL_CERT_DIR", rootDir.getPath() + "/usr/etc/tls/certs");
+        execEnvVars.put("WINE_X11FORCEGLX", "1");
+        execEnvVars.put("WINE_GST_NO_GL", "1");
+        execEnvVars.put("SteamGameId", "0");
+        execEnvVars.put("PROTON_AUDIO_CONVERT", "0");
+        execEnvVars.put("PROTON_VIDEO_CONVERT", "0");
+        execEnvVars.put("PROTON_DEMUX", "0");
 
         String winePath = imageFs.getWinePath() + "/bin";
 
         Log.d("GuestProgramLauncherComponent", "WinePath is " + winePath);
 
-        envVars.put("PATH", winePath + ":" +
+        execEnvVars.put("PATH", winePath + ":" +
                 rootDir.getPath() + "/usr/bin");
 
- 
-        envVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
+        execEnvVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
 
         String primaryDNS = "8.8.4.4";
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Service.CONNECTIVITY_SERVICE);
@@ -336,17 +331,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             ArrayList<InetAddress> dnsServers = new ArrayList<>(connectivityManager.getLinkProperties(connectivityManager.getActiveNetwork()).getDnsServers());
             primaryDNS = dnsServers.get(0).toString().substring(1);
         }
-        envVars.put("ANDROID_RESOLV_DNS", primaryDNS);
-        envVars.put("WINE_NEW_NDIS", "1");
+        execEnvVars.put("ANDROID_RESOLV_DNS", primaryDNS);
+        execEnvVars.put("WINE_NEW_NDIS", "1");
 
         String ld_preload = "";
 
-        // Check for specific shared memory libraries
         if ((new File(imageFs.getLibDir(), "libandroid-sysvshm.so")).exists()){
             ld_preload = imageFs.getLibDir() + "/libandroid-sysvshm.so";
         }
 
-        // Copy libfakeinput.so
         File fakeinputDest = new File(imageFs.getLibDir(), "libfakeinput.so");
         String nativeLibDir = environment.getContext().getApplicationInfo().nativeLibraryDir;
         File fakeinputSrc = new File(nativeLibDir, "libfakeinput.so");
@@ -395,11 +388,11 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 try { event0.createNewFile(); } catch (Exception e) {}
         }
 
-        envVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
-        envVars.put("FAKE_EVDEV_VIBRATION", "1");
+        execEnvVars.put("FAKE_EVDEV_DIR", devInputDir.getAbsolutePath());
+        execEnvVars.put("FAKE_EVDEV_VIBRATION", "1");
 
         Log.d("GuestLauncher", "Final LD_PRELOAD: " + ld_preload);
-        envVars.put("LD_PRELOAD", ld_preload);
+        execEnvVars.put("LD_PRELOAD", ld_preload);
 
         if (this.envVars.has("MANGOHUD")) {
             this.envVars.remove("MANGOHUD");
@@ -408,18 +401,21 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         if (this.envVars.has("MANGOHUD_CONFIG")) {
             this.envVars.remove("MANGOHUD_CONFIG");
         }
-        // Merge any additional environment variables from external sources
+        
         if (this.envVars != null) {
-            envVars.putAll(this.envVars);
+            execEnvVars.putAll(this.envVars);
         }
 
         String emulator = container.getEmulator();
         if (shortcut != null)
             emulator = shortcut.getExtra("emulator", container.getEmulator());
 
-        // Construct the command without Box64 to the Wine executable
+        if (wineInfo.isArm64EC()) {
+            emulator = "fexcore";
+        }
+
         String command = "";
-        String overriddenCommand = envVars.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
+        String overriddenCommand = execEnvVars.get("GUEST_PROGRAM_LAUNCHER_COMMAND");
         if (!overriddenCommand.isEmpty()) {
             String[] parts = overriddenCommand.split(";");
             for (String part : parts)
@@ -430,20 +426,19 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             if (wineInfo.isArm64EC()) {
                 command = winePath + "/" + guestExecutable;
                 if (emulator.toLowerCase().equals("fexcore"))
-                    envVars.put("HODLL", "libwow64fex.dll");
+                    execEnvVars.put("HODLL", "libwow64fex.dll");
                 else
-                    envVars.put("HODLL", "wowbox64.dll");
+                    execEnvVars.put("HODLL", "wowbox64.dll");
             } else
                 command = imageFs.getBinDir() + "/box64 " + guestExecutable;
         }
 
-        // **Maybe remove this: Set execute permissions for box64 if necessary (Glibc/Proot artifact)
         File box64File = new File(rootDir, "/usr/bin/box64");
         if (box64File.exists()) {
             FileUtils.chmod(box64File, 0755);
         }
 
-        return ProcessHelper.exec(command, envVars.toStringArray(), rootDir, (status) -> {
+        return ProcessHelper.exec(command, execEnvVars.toStringArray(), rootDir, (status) -> {
             synchronized (lock) {
                 pid = -1;
             }

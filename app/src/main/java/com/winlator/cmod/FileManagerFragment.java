@@ -1,5 +1,4 @@
 package com.winlator.cmod;
-
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
@@ -30,6 +29,8 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.core.ExeIconExtractor;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.core.StringUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -185,13 +186,7 @@ public class FileManagerFragment extends Fragment {
     }
 
     private void navigateToContainerDriveC(Container container) {
-        String userName = "xuser-" + container.id; 
-        File driveC = new File(getContext().getFilesDir(), "imagefs/home/" + userName + "/.wine/drive_c");
-        
-        if (!driveC.exists()) {
-             File defaultDriveC = new File(getContext().getFilesDir(), "imagefs/home/xuser/.wine/drive_c");
-             if (defaultDriveC.exists()) driveC = defaultDriveC;
-        }
+        File driveC = new File(container.getRootDir(), ".wine/drive_c");
 
         File windowsDir = new File(driveC, "windows");
         
@@ -258,7 +253,7 @@ public class FileManagerFragment extends Fragment {
             ivDriveIcon.setImageResource(R.drawable.icon_wine); 
         } else if (path.startsWith(Environment.getExternalStorageDirectory().getAbsolutePath())) {
             tvDriveName.setText("Drive D:");
-            ivDriveIcon.setImageResource(android.R.drawable.stat_sys_phone_call);
+            ivDriveIcon.setImageResource(R.drawable.ic_internal_storage);
         } else if (path.startsWith("/storage") && !path.contains("emulated")) {
              tvDriveName.setText("External");
              ivDriveIcon.setImageResource(android.R.drawable.stat_sys_data_bluetooth);
@@ -288,24 +283,146 @@ public class FileManagerFragment extends Fragment {
         }
     }
 
+    private String normalizeFilePath(String path) {
+        if (path == null) return "";
+        try {
+            return new File(path).getCanonicalPath();
+        } catch (IOException e) {
+            return new File(path).getAbsolutePath();
+        }
+    }
+
+    private String getContainerWineHome(Container container) {
+        // Returns the wine-internal home path, e.g. "/home/xuser" or "/home/xuser-1".
+        // container.getRootDir() is the Android path: <filesDir>/imagefs/home/xuser-<id>
+        File imagefs = new File(getContext().getFilesDir(), "imagefs");
+        String imagefsPath = normalizeFilePath(imagefs.getAbsolutePath());
+        String rootPath    = normalizeFilePath(container.getRootDir().getAbsolutePath());
+        return rootPath.startsWith(imagefsPath)
+            ? rootPath.substring(imagefsPath.length())   // "/home/xuser-1"
+            : "/home/" + ImageFs.USER;                   // fallback
+    }
+
+    private String toDesktopWindowsPath(File file, Container container) {
+        String filePath = normalizeFilePath(file.getAbsolutePath());
+
+        // C: is implicit — never stored in drivesIterator(). Always <rootDir>/.wine/drive_c
+        File   driveC     = new File(container.getRootDir(), ".wine/drive_c");
+        String driveCPath = normalizeFilePath(driveC.getAbsolutePath());
+        if (filePath.equals(driveCPath) || filePath.startsWith(driveCPath + File.separator)) {
+            String rel = filePath.substring(driveCPath.length()).replace(File.separatorChar, '\\');
+            while (rel.startsWith("\\")) rel = rel.substring(1);
+            return "C:\\" + rel;
+        }
+
+        for (String[] drive : container.drivesIterator()) {
+            if (drive == null || drive.length < 2 || drive[0] == null || drive[1] == null) continue;
+
+            String driveLetter = drive[0].replace(":", "").trim();
+            String drivePath = normalizeFilePath(drive[1]);
+
+            if (driveLetter.isEmpty() || drivePath.isEmpty()) continue;
+
+            if (filePath.equals(drivePath) || filePath.startsWith(drivePath + File.separator)) {
+                String relativePath = filePath.substring(drivePath.length()).replace(File.separatorChar, '\\');
+                while (relativePath.startsWith("\\")) relativePath = relativePath.substring(1);
+                return driveLetter.toUpperCase() + ":\\" + relativePath;
+            }
+        }
+
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        String downloadsPath = normalizeFilePath(downloadsDir.getAbsolutePath());
+
+        if (filePath.equals(downloadsPath) || filePath.startsWith(downloadsPath + File.separator)) {
+            String relativePath = filePath.substring(downloadsPath.length()).replace(File.separatorChar, '\\');
+            while (relativePath.startsWith("\\")) relativePath = relativePath.substring(1);
+            return "D:\\" + relativePath;
+        }
+
+        String externalPath = normalizeFilePath(Environment.getExternalStorageDirectory().getAbsolutePath());
+
+        if (filePath.equals(externalPath) || filePath.startsWith(externalPath + File.separator)) {
+            String relativePath = filePath.substring(externalPath.length()).replace(File.separatorChar, '\\');
+            while (relativePath.startsWith("\\")) relativePath = relativePath.substring(1);
+            return "D:\\" + relativePath;
+        }
+
+        return "Z:" + filePath.replace('/', '\\');
+    }
+
+    private String toDesktopPath(File file, Container container) {
+        File parent = file.getParentFile();
+        if (parent == null) return "";
+
+        String parentPath = normalizeFilePath(parent.getAbsolutePath());
+
+        for (String[] drive : container.drivesIterator()) {
+            if (drive == null || drive.length < 2 || drive[0] == null || drive[1] == null) continue;
+
+            String driveLetter = drive[0].replace(":", "").trim();
+            String drivePath = normalizeFilePath(drive[1]);
+
+            if (driveLetter.isEmpty() || drivePath.isEmpty()) continue;
+
+            if (parentPath.equals(drivePath) || parentPath.startsWith(drivePath + File.separator)) {
+                String relativePath = parentPath.substring(drivePath.length()).replace(File.separatorChar, '/');
+                while (relativePath.startsWith("/")) relativePath = relativePath.substring(1);
+                String basePath = getContainerWineHome(container) + "/.wine/dosdevices/" + driveLetter.toLowerCase() + ":";
+                return relativePath.isEmpty() ? basePath : basePath + "/" + relativePath;
+            }
+        }
+
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        String downloadsPath = normalizeFilePath(downloadsDir.getAbsolutePath());
+
+        if (parentPath.equals(downloadsPath) || parentPath.startsWith(downloadsPath + File.separator)) {
+            String relativePath = parentPath.substring(downloadsPath.length()).replace(File.separatorChar, '/');
+            while (relativePath.startsWith("/")) relativePath = relativePath.substring(1);
+            String dBase = getContainerWineHome(container) + "/.wine/dosdevices/d:";
+            return relativePath.isEmpty() ? dBase : dBase + "/" + relativePath;
+        }
+
+        String externalPath = normalizeFilePath(Environment.getExternalStorageDirectory().getAbsolutePath());
+
+        if (parentPath.equals(externalPath) || parentPath.startsWith(externalPath + File.separator)) {
+            String relativePath = parentPath.substring(externalPath.length()).replace(File.separatorChar, '/');
+            while (relativePath.startsWith("/")) relativePath = relativePath.substring(1);
+            String dBase = getContainerWineHome(container) + "/.wine/dosdevices/d:";
+            return relativePath.isEmpty() ? dBase : dBase + "/" + relativePath;
+        }
+
+        return parentPath;
+    }
+
+    private void writeDesktopEntry(PrintWriter writer, String name, String execPath, String path, String icon, Container container) {
+        writer.println("[Desktop Entry]");
+        writer.println("Name=" + name);
+        // .desktop format requires backslashes doubled (\\) and spaces escaped (\ ).
+        // Without this, Shortcut.unescape() strips every \ treating them as escape
+        // characters, destroying the entire Windows path.
+        String escapedExecPath = StringUtils.escapeFileDOSPath(execPath);
+        String winePrefix = getContainerWineHome(container) + "/.wine";
+        writer.println("Exec=env WINEPREFIX=\"" + winePrefix + "\" wine " + escapedExecPath);
+        writer.println("Type=Application");
+        if (path != null && !path.isEmpty()) writer.println("Path=" + path);
+        if (icon != null && !icon.isEmpty()) writer.println("Icon=" + icon);
+        writer.println("container_id:" + container.id);
+    }
+
     private void runFileDirectly(File file, Container container) {
         try {
-            File cacheDir = getContext().getCacheDir();
-            File tempShortcut = new File(cacheDir, "temp_run.desktop");
+            File tempShortcut = new File(getContext().getCacheDir(), "temp_run.desktop");
+            String winePath = toDesktopWindowsPath(file, container);
+            String workingDir = toDesktopPath(file, container);
 
             try (PrintWriter writer = new PrintWriter(new FileWriter(tempShortcut))) {
-                writer.println("[Desktop Entry]");
-                writer.println("Name=" + file.getName());
-                writer.println("Exec=env WINEPREFIX=\"/home/xuser/.wine\" wine \"" + file.getAbsolutePath() + "\"");
-                writer.println("Type=Application");
-                writer.println("container_id:" + container.id);
+                writeDesktopEntry(writer, file.getName(), winePath, workingDir, null, container);
             }
 
             Intent intent = new Intent();
             intent.setClassName(getContext().getPackageName(), "com.winlator.cmod.XServerDisplayActivity");
             intent.putExtra("container_id", container.id);
             intent.putExtra("shortcut_path", tempShortcut.getAbsolutePath());
-            
             startActivity(intent);
 
         } catch (Exception e) {
@@ -314,22 +431,17 @@ public class FileManagerFragment extends Fragment {
         }
     }
 
-
     private void createShortcutDirectly(File file, Container container) {
         try {
             String displayName = getSmartDisplayName(file);
-            String unixPath = file.getAbsolutePath();
+            String winePath = toDesktopWindowsPath(file, container);
+            String workingDir = toDesktopPath(file, container);
             File shortcutsDir = container.getDesktopDir();
             if (!shortcutsDir.exists()) shortcutsDir.mkdirs();
             File desktopFile = new File(shortcutsDir, displayName + ".desktop");
-            
+
             try (PrintWriter writer = new PrintWriter(new FileWriter(desktopFile))) {
-                writer.println("[Desktop Entry]");
-                writer.println("Name=" + displayName);
-                writer.println("Exec=env WINEPREFIX=\"/home/xuser/.wine\" wine \"" + unixPath + "\"");
-                writer.println("Type=Application");
-                writer.println("Icon=" + displayName);
-                writer.println("container_id:" + container.id);
+                writeDesktopEntry(writer, displayName, winePath, workingDir, displayName, container);
             }
             Toast.makeText(getContext(), "Shortcut created!", Toast.LENGTH_SHORT).show();
 
@@ -352,7 +464,7 @@ public class FileManagerFragment extends Fragment {
             File coversDir = new File(Environment.getExternalStorageDirectory(), "Winlator/covers");
             if (!coversDir.exists()) coversDir.mkdirs();
             File autoCover = new File(coversDir, displayName + ".png");
-            if (autoCover.exists()) autoCover.delete(); // Force fresh SteamGridDB fetch
+            if (autoCover.exists()) autoCover.delete();
 
         } catch (Exception e) {
             e.printStackTrace();

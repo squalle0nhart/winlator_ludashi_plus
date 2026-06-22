@@ -31,7 +31,7 @@ public class DebugDialog extends ContentDialog implements Callback<String> {
         
         logView.getLayoutParams().width = (int)UnitUtils.dpToPx(UnitUtils.pxToDp(AppUtils.getScreenWidth()) * 0.7f);
 
-        findViewById(R.id.BTCancel).setVisibility(View.GONE);
+       // findViewById(R.id.BTCancel).setVisibility(View.GONE);
 
         LinearLayout llBottomBarPanel = findViewById(R.id.LLBottomBarPanel);
         llBottomBarPanel.setVisibility(View.VISIBLE);

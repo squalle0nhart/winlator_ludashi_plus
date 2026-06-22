@@ -1,0 +1,82 @@
+#version 450
+
+layout(binding = 0) uniform sampler2D texSampler;
+
+layout(push_constant) uniform PC {
+    float ndcX0, ndcY0, ndcX1, ndcY1;   
+    int   effectId;                       
+    float sharpness;                      
+    float resW;                           
+    float resH;                           
+} pc;
+
+layout(location = 0) in  vec2 fragTexCoord;
+layout(location = 0) out vec4 outColor;
+
+vec3 applyDLS(vec2 uv, float sharp) {
+    vec2 texel  = 1.0 / max(vec2(pc.resW, pc.resH), vec2(1.0));
+    float SAT   = 1.0 + sharp * 0.20;
+    float CON   = 1.0 + sharp * 0.12;
+    float SHARP = sharp * 1.2;
+    vec3 orig = texture(texSampler, uv).rgb;
+    vec3 c    = clamp((orig - 0.5) * CON + 0.5, 0.0, 1.0);
+    float gray = dot(c, vec3(0.299, 0.587, 0.114));
+    c = mix(vec3(gray), c, SAT);
+    vec3 blur = (texture(texSampler, uv + vec2( 0.0,    -texel.y)).rgb
+               + texture(texSampler, uv + vec2( 0.0,     texel.y)).rgb
+               + texture(texSampler, uv + vec2(-texel.x,  0.0   )).rgb
+               + texture(texSampler, uv + vec2( texel.x,  0.0   )).rgb) * 0.25;
+    return clamp(c + (orig - blur) * SHARP, 0.0, 1.0);
+}
+
+vec3 applyCRT(vec2 uv) {
+    const float CA = 1.0025;
+    vec4 fc = texture(texSampler, uv);
+    fc.r = texture(texSampler, (uv - 0.5) * CA + 0.5).r;
+    fc.b = texture(texSampler, (uv - 0.5) / CA + 0.5).b;
+    float sx = abs(sin(uv.x * 1024.0) * 0.5 * 0.125);
+    float sy = abs(sin(uv.y * 1024.0) * 0.5 * 0.375);
+    return mix(fc.rgb, vec3(0.0), sx + sy);
+}
+
+vec3 applyHDR(vec2 uv) {
+    vec2 texel = 1.0 / max(vec2(pc.resW, pc.resH), vec2(1.0));
+    vec3 c     = texture(texSampler, uv).rgb;
+    const float r1 = 0.793, r2 = 0.870;
+    vec3 b1 = vec3(0.0), b2 = vec3(0.0);
+    vec2 offs[8] = vec2[](
+        vec2( 1.5, -1.5), vec2(-1.5, -1.5), vec2( 1.5,  1.5), vec2(-1.5,  1.5),
+        vec2( 0.0, -2.5), vec2( 0.0,  2.5), vec2(-2.5,  0.0), vec2( 2.5,  0.0)
+    );
+    for (int i = 0; i < 8; i++) {
+        b1 += texture(texSampler, uv + offs[i] * r1 * texel).rgb;
+        b2 += texture(texSampler, uv + offs[i] * r2 * texel).rgb;
+    }
+    b1 *= 0.005; b2 *= 0.010;
+    vec3 hdr = (c + (b2 - b1)) * (r2 - r1);
+    return clamp(pow(abs(hdr + c), vec3(1.30)) + hdr, 0.0, 1.0);
+}
+
+vec3 applyNatural(vec2 uv) {
+    mat3 toYIQ = mat3( 0.299,  0.596,  0.212,
+                       0.587, -0.275, -0.523,
+                       0.114, -0.321,  0.311);
+    mat3 toRGB = mat3( 1.0,         1.0,         1.0,
+                       0.95568806, -0.27158179, -1.10817732,
+                       0.61985809, -0.64687381,  1.70506455);
+    vec3 c = texture(texSampler, uv).rgb;
+    vec3 t = c * toYIQ;
+    t = vec3(pow(t.r, 1.12), t.g * 1.2, t.b * 1.2);
+    return clamp(t * toRGB, 0.0, 1.0);
+}
+
+void main() {
+    vec2 uv = fragTexCoord;
+    vec3 rgb;
+    if      (pc.effectId == 1) rgb = applyDLS    (uv, pc.sharpness);
+    else if (pc.effectId == 2) rgb = applyCRT    (uv);
+    else if (pc.effectId == 3) rgb = applyHDR    (uv);
+    else if (pc.effectId == 4) rgb = applyNatural(uv);
+    else                       rgb = texture(texSampler, uv).rgb;
+    outColor = vec4(rgb, 1.0);
+}

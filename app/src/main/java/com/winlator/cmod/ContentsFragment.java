@@ -40,6 +40,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.DownloadProgressDialog;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -215,6 +216,9 @@ public class ContentsFragment extends Fragment {
                             });
 
                         } else {
+                            if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE && profile.type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+                                manager.applyContent(profile);
+                            }
                             preloaderDialog.closeOnUiThread();
                             requireActivity().runOnUiThread(() -> {
                                 ContentDialog.alert(getContext(), R.string.content_installed_success, null);
@@ -338,13 +342,17 @@ public class ContentsFragment extends Fragment {
 
                 Intent intent = new Intent();
                 intent.setData(Uri.parse(profile.remoteUrl));
+                DownloadProgressDialog downloadDialog = new DownloadProgressDialog(requireActivity());
+                downloadDialog.show(R.string.downloading_file);
                 new Thread(() -> {
                     long timestamp = System.currentTimeMillis();
                     File output = new File(getContext().getCacheDir(), "temp_" + timestamp);
-                    if (Downloader.downloadFile(profile.remoteUrl, output)) {
+                    if (Downloader.downloadFile(profile.remoteUrl, output, progress ->
+                            requireActivity().runOnUiThread(() -> downloadDialog.setProgress(progress)))) {
                         intent.setData(Uri.parse(output.getAbsolutePath()));
                     }
                     getActivity().runOnUiThread(() -> {
+                        downloadDialog.close();
                         holder.progressBar.setVisibility(View.GONE);
                         holder.ibDownload.setVisibility(View.VISIBLE);
                         onActivityResult(MainActivity.OPEN_FILE_REQUEST_CODE, Activity.RESULT_OK, intent);

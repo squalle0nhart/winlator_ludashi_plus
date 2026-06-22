@@ -68,6 +68,17 @@ public class WindowManager extends XResourceManager {
         return null;
     }
 
+    public Window findWindowByProcessName(String exeName) {
+        String exeBase = exeName.toLowerCase().replace(".exe", "");
+        for (int i = 0; i < windows.size(); i++) {
+            Window window = windows.valueAt(i);
+            if (window == null) continue;
+            String className = window.getClassName().toLowerCase();
+            if (!className.isEmpty() && className.contains(exeBase)) return window;
+        }
+        return null;
+    }
+
     public void destroyWindow(int id) {
         Window window = getWindow(id);
         if (window != null && rootWindow.id != id) {
@@ -274,6 +285,12 @@ public class WindowManager extends XResourceManager {
             parent.sendEvent(Event.SUBSTRUCTURE_NOTIFY, new ConfigureNotify(parent, window, previousSibling, x, y, width, height, borderWidth, overrideRedirect));
         }
         else parent.sendEvent(Event.SUBSTRUCTURE_REDIRECT, new ConfigureRequest(parent, window, window.previousSibling(), x, y, width, height, borderWidth, stackMode, valueMask));
+    }
+
+    /** Raises {@code window} to the top of its parent's Z-order. */
+    public void raiseWindow(Window window) {
+        if (window == null || window.getParent() == null) return;
+        changeWindowZOrder(Window.StackMode.ABOVE, window, null);
     }
 
     public void reparentWindow(Window window, Window newParent) {

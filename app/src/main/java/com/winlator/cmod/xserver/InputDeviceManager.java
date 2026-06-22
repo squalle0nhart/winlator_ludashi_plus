@@ -1,7 +1,6 @@
 package com.winlator.cmod.xserver;
 
-import com.winlator.cmod.winhandler.MouseEventFlags;
-import com.winlator.cmod.winhandler.WinHandler;
+
 import com.winlator.cmod.xserver.events.ButtonPress;
 import com.winlator.cmod.xserver.events.ButtonRelease;
 import com.winlator.cmod.xserver.events.EnterNotify;
@@ -126,12 +125,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonPress(Pointer.Button button) {
-        if (xServer.isRelativeMouseMovement()) {
-            WinHandler winHandler = xServer.getWinHandler();
-            int wheelDelta = button == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (button == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
-            winHandler.mouseEvent(MouseEventFlags.getFlagFor(button, true), 0, 0, wheelDelta);
-        }
-        else {
+        {
             Window grabWindow = xServer.grabManager.getWindow();
             if (grabWindow == null) {
                 grabWindow = pointWindow.getAncestorWithEventId(Event.BUTTON_PRESS);
@@ -154,11 +148,7 @@ public class InputDeviceManager implements Pointer.OnPointerMotionListener, Keyb
 
     @Override
     public void onPointerButtonRelease(Pointer.Button button) {
-        if (xServer.isRelativeMouseMovement()) {
-            WinHandler winHandler = xServer.getWinHandler();
-            winHandler.mouseEvent(MouseEventFlags.getFlagFor(button, false), 0, 0, 0);
-        }
-        else {
+        {
             Bitmask eventMask = createPointerEventMask();
             Window grabWindow = xServer.grabManager.getWindow();
             Window window = grabWindow == null || xServer.grabManager.isOwnerEvents() ? pointWindow.getAncestorWithEventMask(eventMask) : null;

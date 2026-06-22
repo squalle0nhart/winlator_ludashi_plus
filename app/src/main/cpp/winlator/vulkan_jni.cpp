@@ -238,6 +238,24 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetFilterMode(JNIEnv*, jobj
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetStretchMode(JNIEnv*, jobject, jlong handle, jint mode) {
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setStretchMode((int)mode);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetPostFXMode(JNIEnv*, jobject, jlong handle, jint mode) {
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setPostFXMode((int)mode);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetSharpness(JNIEnv*, jobject, jlong handle, jfloat s) {
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setSharpness((float)s);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetSwapRB(JNIEnv*, jobject, jlong handle, jboolean enabled) {
     auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
     if (r) r->setSwapRB(enabled == JNI_TRUE);
@@ -257,6 +275,33 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeGetSupportedPresentModes(JN
     jintArray arr = env->NewIntArray((jsize)modes.size());
     if (!modes.empty()) env->SetIntArrayRegion(arr,0,(jsize)modes.size(),modes.data());
     return arr;
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeGetSwapchainSize(JNIEnv* env, jobject, jlong handle) {
+    jintArray arr = env->NewIntArray(2);
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (!r) return arr;
+    VkExtent2D ext = r->getSwapchainExtent();
+    jint vals[2] = {(jint)ext.width, (jint)ext.height};
+    env->SetIntArrayRegion(arr, 0, 2, vals);
+    return arr;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetCustomScissor(
+    JNIEnv*, jobject, jlong handle, jint x, jint y, jint w, jint h)
+{
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setCustomScissor((int)x, (int)y, (int)w, (int)h);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeClearCustomScissor(
+    JNIEnv*, jobject, jlong handle)
+{
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->clearCustomScissor();
 }
 
 extern "C" JNIEXPORT void JNICALL

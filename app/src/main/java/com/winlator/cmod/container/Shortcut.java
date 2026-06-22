@@ -2,7 +2,6 @@ package com.winlator.cmod.container;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.Environment;
 import android.util.Log;
 
 import com.winlator.cmod.core.FileUtils;
@@ -83,20 +82,6 @@ public class Shortcut {
             }
         }
 
-        try {
-            File externalStorage = Environment.getExternalStorageDirectory();
-            File customIconsDir = new File(externalStorage, "Winlator/icons");
-            String baseName = FileUtils.getBasename(file.getPath());
-            File customIcon = new File(customIconsDir, baseName + ".png");
-
-            if (customIcon.exists()) {
-                Bitmap customBitmap = BitmapFactory.decodeFile(customIcon.getAbsolutePath());
-                if (customBitmap != null) {
-                    icon = customBitmap;
-                    iconFile = customIcon;
-                }
-            }
-        } catch (Exception e) {}
 
         this.name = FileUtils.getBasename(file.getPath());
         
@@ -113,7 +98,6 @@ public class Shortcut {
 
         this.customCoverArtPath = getExtra("customCoverArtPath");
         loadCoverArt();
-        Container.checkObsoleteOrMissingProperties(extraData);
     }
 
     private void loadCoverArt() {
@@ -274,14 +258,6 @@ public class Shortcut {
         return exe;
     }
     
-    public boolean getNativeRendering() {
-        return getExtra("nativeRendering", "0").equals("1");
-    }
-
-    public void setNativeRendering(boolean enabled) {
-        putExtra("nativeRendering", enabled ? "1" : "0");
-        saveData();
-    }
 
     public boolean getRendererNative() {
         String v = getExtra("rendererNative", null);

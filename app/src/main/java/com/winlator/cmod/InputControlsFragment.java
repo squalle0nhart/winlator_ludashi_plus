@@ -67,15 +67,27 @@ public class InputControlsFragment extends Fragment {
     private ControlsProfile currentProfile;
     private Runnable updateLayout;
     private Callback<ControlsProfile> importProfileCallback;
-    private final int selectedProfileId;
+    private int selectedProfileId;
     private SharedPreferences preferences;
 
-
+    private static final String ARG_SELECTED_PROFILE_ID = "selected_profile_id";
 
     private boolean isDarkMode;
 
-    public InputControlsFragment(int selectedProfileId) {
-        this.selectedProfileId = selectedProfileId;
+    // Fragments precisam de um construtor público sem argumentos: o FragmentManager usa
+    // reflection pra recriar fragments (ex: depois que o Android mata o processo em
+    // background e o usuário volta pro app). Sem esse construtor, isso causa o crash
+    // "NoSuchMethodException: InputControlsFragment.<init> []". Os dados agora são
+    // passados via argumentos (Bundle), que sobrevivem normalmente a esse processo.
+    public InputControlsFragment() {
+    }
+
+    public static InputControlsFragment newInstance(int selectedProfileId) {
+        InputControlsFragment fragment = new InputControlsFragment();
+        Bundle args = new Bundle();
+        args.putInt(ARG_SELECTED_PROFILE_ID, selectedProfileId);
+        fragment.setArguments(args);
+        return fragment;
     }
 
 
@@ -84,6 +96,7 @@ public class InputControlsFragment extends Fragment {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(false);
         manager = new InputControlsManager(getContext());
+        selectedProfileId = getArguments() != null ? getArguments().getInt(ARG_SELECTED_PROFILE_ID, 0) : 0;
 
         preferences = PreferenceManager.getDefaultSharedPreferences(getContext());
         isDarkMode = preferences.getBoolean("dark_mode", false);

@@ -66,7 +66,9 @@ public class ContainerManager {
                             );
 
                             container.setRootDir(new File(homeDir, ImageFs.USER + "-" + container.id));
-                            JSONObject data = new JSONObject(FileUtils.readString(container.getConfigFile()));
+                            File configFile = container.getConfigFile();
+                            if (!configFile.isFile() || configFile.length() == 0) continue;
+                            JSONObject data = new JSONObject(FileUtils.readString(configFile));
                             container.loadData(data);
                             containers.add(container);
                             maxContainerId = Math.max(maxContainerId, container.id);
@@ -234,6 +236,7 @@ public class ContainerManager {
         File srcDir = new File(wineInfo.path + "/lib/wine/" + srcName);
 
         File[] srcfiles = srcDir.listFiles(file -> file.isFile());
+        if (srcfiles == null) throw new JSONException("Missing Wine files");
 
         for (File file : srcfiles) {
             String dllName = file.getName();
@@ -253,6 +256,7 @@ public class ContainerManager {
 
     public boolean extractContainerPatternFile(Container container, String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {
         WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
+        if (wineInfo.path == null || wineInfo.path.isEmpty()) return false;
         String containerPattern = wineVersion + "_container_pattern.tzst";
         boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
 

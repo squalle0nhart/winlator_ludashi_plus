@@ -12,6 +12,7 @@ add_library(winlator SHARED
         xr/engine.c
         xr/framebuffer.c
         xr/input.c
+        winlator/process_helper.c
         xr/main.c
         xr/math.c
         xr/renderer.c
@@ -37,7 +38,6 @@ target_link_libraries(winlator
         adrenotools
 )
 
-# Add Fake Input library for controller emulation (loaded via LD_PRELOAD)
 add_library(fakeinput SHARED
         winlator/fakeinput.cpp
 )
@@ -67,6 +67,33 @@ add_custom_command(
     COMMENT "Compiling window.frag → window_frag.h"
 )
 
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+    COMMAND glslangValidator -V --vn window_sgsr_frag_code
+            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_sgsr.frag
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_sgsr.frag
+    COMMENT "Compiling window_sgsr.frag → window_sgsr_frag.h"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
+    COMMAND glslangValidator -V --vn window_stretch_frag_code
+            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_stretch.frag
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_stretch.frag
+    COMMENT "Compiling window_stretch.frag → window_stretch_frag.h"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
+    COMMAND glslangValidator -V --vn window_postfx_frag_code
+            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_postfx.frag
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_postfx.frag
+    COMMENT "Compiling window_postfx.frag → window_postfx_frag.h"
+)
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(vulkan_renderer SHARED
@@ -76,6 +103,9 @@ add_library(vulkan_renderer SHARED
 
         ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
 )
 
 target_compile_options(vulkan_renderer PRIVATE

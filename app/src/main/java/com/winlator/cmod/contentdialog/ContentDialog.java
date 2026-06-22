@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -21,6 +22,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.UnitUtils;
 
 import java.util.ArrayList;
 
@@ -37,19 +39,21 @@ public class ContentDialog extends Dialog {
 
     private View inflatedLayout;
 
+    private static int getDialogStyle(Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean("dark_mode", true) ? R.style.ContentDialog_Dark : R.style.ContentDialog;
+    }
+
     public ContentDialog(@NonNull Context context, int layoutResId) {
-        super(context, R.style.ContentDialog);
+        super(context, getDialogStyle(context));
         contentView = LayoutInflater.from(context).inflate(R.layout.content_dialog, null);
 
 
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-        isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
 
-//        contentView.setBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark: R.drawable.content_dialog_background);
+        contentView.setBackgroundResource(isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
 
-        if (isDarkMode) {
-            this.getContext().setTheme(R.style.ContentDialog_Dark);
-        }
+        if (getWindow() != null) getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
 
         if (layoutResId > 0) {
@@ -181,7 +185,7 @@ public class ContentDialog extends Dialog {
         final EditText editText = dialog.findViewById(R.id.EditText);
 
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
-        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", false);
+        boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
         applyDarkThemeToEditText(editText, isDarkMode);
 
         editText.setHint(R.string.untitled);
@@ -236,9 +240,12 @@ public class ContentDialog extends Dialog {
         dialog.getContentView().findViewById(R.id.BTConfirm).setVisibility(View.GONE);
 
         final ListView listView = dialog.findViewById(R.id.ListView);
-        listView.getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
+        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams)listView.getLayoutParams();
+        layoutParams.width = AppUtils.getPreferredDialogWidth(context);
+        layoutParams.height = (int)UnitUtils.dpToPx(Math.min(items.length, 5) * 48);
+        layoutParams.weight = 0;
         listView.setChoiceMode(ListView.CHOICE_MODE_NONE);
-        listView.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_list_item_single_choice, items));
+        listView.setAdapter(new ArrayAdapter<>(context, R.layout.dialog_list_item_amoled, items));
         listView.setVisibility(View.VISIBLE);
         listView.setOnItemClickListener((parent, view, position, id) -> {
             callback.call(position);

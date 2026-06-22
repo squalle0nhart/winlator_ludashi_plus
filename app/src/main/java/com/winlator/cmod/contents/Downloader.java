@@ -6,36 +6,45 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+
+import com.winlator.cmod.core.Callback;
 import java.net.URL;
 import java.net.URLConnection;
 
 public class Downloader {
 
     public static boolean downloadFile(String address, File file) {
+        return downloadFile(address, file, null);
+    }
+
+    public static boolean downloadFile(String address, File file, Callback<Integer> progressCallback) {
         try {
             URL url = new URL(address);
             URLConnection connection = url.openConnection();
             connection.connect();
 
-            // download the file
-            InputStream input = url.openStream();
+            long contentLength = connection.getContentLengthLong();
+            long downloadedSize = 0;
+            int lastProgress = -1;
 
-            // Output stream
-            OutputStream output = new FileOutputStream(file.getAbsolutePath());
-
-            byte[] data = new byte[1024];
-
-            int count;
-            while ((count = input.read(data)) != -1) {
-                output.write(data, 0, count);
+            try (InputStream input = connection.getInputStream();
+                 OutputStream output = new FileOutputStream(file.getAbsolutePath())) {
+                byte[] data = new byte[8192];
+                int count;
+                while ((count = input.read(data)) != -1) {
+                    output.write(data, 0, count);
+                    if (progressCallback != null && contentLength > 0) {
+                        downloadedSize += count;
+                        int progress = Math.min(100, (int)(downloadedSize * 100 / contentLength));
+                        if (progress != lastProgress) {
+                            lastProgress = progress;
+                            progressCallback.call(progress);
+                        }
+                    }
+                }
+                output.flush();
             }
-
-            // flushing output
-            output.flush();
-
-            // closing streams
-            output.close();
-            input.close();
+            if (progressCallback != null) progressCallback.call(100);
             return true;
         } catch (Exception e) {
             e.printStackTrace();

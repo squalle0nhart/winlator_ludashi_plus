@@ -37,6 +37,8 @@ public class FrameRating extends FrameLayout implements Runnable {
     private final SharedPreferences prefs;
     private boolean userEnabled = false;
 
+    private String lastKnownRenderer = null;
+
     public FrameRating(Context context, HashMap graphicsDriverConfig) {
         this(context, graphicsDriverConfig ,null);
     }
@@ -60,16 +62,11 @@ public class FrameRating extends FrameLayout implements Runnable {
         this.graphicsDriverConfig = graphicsDriverConfig;
         addView(view);
     }
-    
+
     private String getTotalRAM() {
         long[] mem = readMeminfo();
         return mem[0] > 0 ? StringUtils.formatBytes(mem[0] * 1024L) : "N/A";
     }
-
-    
-
-
-
 
     private long[] readMeminfo() {
         long total = -1, avail = -1;
@@ -96,6 +93,7 @@ public class FrameRating extends FrameLayout implements Runnable {
     }
 
     public void setRenderer(String renderer) {
+        lastKnownRenderer = renderer; 
         tvRenderer.setText(renderer);
     }
 
@@ -104,7 +102,8 @@ public class FrameRating extends FrameLayout implements Runnable {
     }
 
     public void reset() {
-        tvRenderer.setText("Vulkan");
+
+        tvRenderer.setText(lastKnownRenderer != null ? lastKnownRenderer : "Vulkan");
         tvGPU.setText(GPUInformation.getRenderer(graphicsDriverConfig.get("version").toString(), context));
     }
 
@@ -119,6 +118,8 @@ public class FrameRating extends FrameLayout implements Runnable {
     public void enableByUser() {
         userEnabled = true;
         prefs.edit().putBoolean(KEY_VIS, true).apply();
+
+        post(() -> setVisibility(View.VISIBLE));
     }
 
     public void disableByUser() {

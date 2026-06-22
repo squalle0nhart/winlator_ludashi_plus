@@ -8,6 +8,8 @@ import android.widget.Spinner;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
+import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.UnitUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,17 +40,16 @@ public class RendererOptionsDialog extends ContentDialog {
         void setRendererSwapRB(boolean v);
     }
 
-    private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo", "shared_demand"};
+    private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
     private static final String[] PRESENT_MODE_LABELS = {
         "Mailbox",
-        "Fifo",
-        "Shared Demand"
+        "Fifo"
     };
 
     private static final String[] FILTER_LABELS = {
         "Bilinear",
         "Nearest neighbor",
-        "Bicubic"
+        "Snapdragon Super Resolution"
     };
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
@@ -56,6 +57,7 @@ public class RendererOptionsDialog extends ContentDialog {
         this.isNativeMode = isNativeMode;
 
         Context ctx = anchorView.getContext();
+        findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(ctx), Math.round(UnitUtils.dpToPx(260)));
 
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
@@ -67,8 +69,7 @@ public class RendererOptionsDialog extends ContentDialog {
         setGroupVisibility(R.id.GroupFilter,  View.VISIBLE);
 
         // Present Mode (visible in both modes)
-        spPresent.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, PRESENT_MODE_LABELS));
+        setAmoledAdapter(ctx, spPresent, PRESENT_MODE_LABELS);
         int pmSel = 0;
         String curPm = config.getRendererPresentMode();
         for (int i = 0; i < PRESENT_MODE_IDS.length; i++) {
@@ -80,14 +81,12 @@ public class RendererOptionsDialog extends ContentDialog {
         AdrenotoolsManager atm = new AdrenotoolsManager(ctx);
         List<String> driverLabels = new ArrayList<>();
         List<String> driverIds    = new ArrayList<>();
-        driverLabels.add("Wrapper"); driverIds.add("");
         driverLabels.add("System");  driverIds.add("system");
         for (String id : atm.enumarateInstalledDrivers()) {
             driverLabels.add(atm.getDriverName(id) + " " + atm.getDriverVersion(id));
             driverIds.add(id);
         }
-        spDriver.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, driverLabels));
+        setAmoledAdapter(ctx, spDriver, driverLabels);
         String curDrv = config.getRendererDriverId();
         int drvSel = 0;
         for (int i = 0; i < driverIds.size(); i++) {
@@ -96,8 +95,7 @@ public class RendererOptionsDialog extends ContentDialog {
         spDriver.setSelection(drvSel);
 
         // Texture Filter
-        spFilter.setAdapter(new ArrayAdapter<>(ctx,
-            android.R.layout.simple_spinner_dropdown_item, FILTER_LABELS));
+        setAmoledAdapter(ctx, spFilter, FILTER_LABELS);
         spFilter.setSelection(config.getRendererFilterMode());
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
@@ -110,11 +108,24 @@ public class RendererOptionsDialog extends ContentDialog {
         });
     }
 
+    private void setAmoledAdapter(Context ctx, Spinner spinner, String[] items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(ctx, R.layout.spinner_item_amoled, items);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        spinner.setAdapter(adapter);
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+    }
+
+    private void setAmoledAdapter(Context ctx, Spinner spinner, List<String> items) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(ctx, R.layout.spinner_item_amoled, items);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        spinner.setAdapter(adapter);
+        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+    }
+
     public static int toVkPresentMode(String mode) {
         if (mode == null) return 2;
         switch (mode) {
             case "mailbox":       return 1;
-            case "shared_demand": return 1000111000;
             default:              return 2;
         }
     }

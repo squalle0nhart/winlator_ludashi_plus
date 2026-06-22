@@ -25,7 +25,13 @@ public class StringUtils {
     }
 
     public static String unescape(String path) {
-        return path.replaceAll("\\\\([^\\\\]+)", "$1").replaceAll("\\\\([^\\\\]+)", "$1").replaceAll("\\\\\\\\", "\\\\").trim();
+
+        String result = path.replaceAll("\\\\([^\\\\]+)", "$1");
+
+        result = result.replaceAll("\\\\+", "\\\\");
+
+        result = result.replace("\\ ", " ");
+        return result.trim();
     }
 
     public static String parseIdentifier(Object text) {
@@ -78,17 +84,9 @@ public class StringUtils {
     }
 
     public static String escapeDOSPath(String path) {
-        if (path == null || path.isEmpty()) {
-            return "";
-        }
-
-        // Replace backslashes with double backslashes
-        String escapedPath = path.replace("\\", "\\\\");
-
-        // Replace spaces with escaped spaces
-        escapedPath = escapedPath.replace(" ", "\\ ");
-
-        return escapedPath;
+        if (path == null || path.isEmpty()) return "";
+        if (path.contains(" ")) return "\"" + path + "\"";
+        return path;
     }
 
     public static String escapeFileDOSPath(String path) {
@@ -96,11 +94,8 @@ public class StringUtils {
             return "";
         }
 
-        // Replace backslashes with double backslashes
-        String escapedPath = path.replace("\\", "\\\\\\\\");
-
-        // Replace spaces with escaped spaces
-        escapedPath = escapedPath.replace(" ", "\\\\");
+        String escapedPath = path.replace("\\", "\\\\");
+        escapedPath = escapedPath.replace(" ", "\\ ");
 
         return escapedPath;
     }

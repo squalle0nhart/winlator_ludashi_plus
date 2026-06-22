@@ -44,6 +44,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private String driverPath = null;
     private java.util.concurrent.ExecutorService initExecutor = null;
     private volatile boolean initComplete = false;
+    private volatile boolean inPipMode = false;
     private String driverLibraryName = null;
     private String nativeLibDir = null;
     private Drawable rootCursorDrawable;
@@ -103,9 +104,19 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeSetVerboseLog(long handle, boolean v);
     private native void nativeDumpRendererInfo(long handle);
     private native void nativeSetFilterMode(long handle, int mode);
+    private native void nativeSetStretchMode(long handle, int mode);
+    private native void nativeSetPostFXMode(long handle, int mode);
+    private native void nativeSetSharpness(long handle, float sharpness);
     private native void nativeSetSwapRB(long handle, boolean enabled);
     private native void nativeSetPresentMode(long handle, int mode);
     private native int[] nativeGetSupportedPresentModes(long handle);
+    private native int[] nativeGetSwapchainSize(long handle);
+
+    
+    
+    
+    private native void nativeSetCustomScissor(long handle, int x, int y, int w, int h);
+    private native void nativeClearCustomScissor(long handle);
 
     private static volatile boolean gpuImageChecked = false;
 
@@ -130,6 +141,29 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         nativeDestroy(nativeHandle);
                         nativeHandle = 0;
                     } else {
+                        
+                        
+                        
+                        
+                        
+                        
+                        int[] sc = nativeGetSwapchainSize(nativeHandle);
+                        if (sc != null && sc[0] > 0 && sc[1] > 0) {
+                            surfaceWidth = sc[0];
+                            surfaceHeight = sc[1];
+                            viewTransformation.update(surfaceWidth, surfaceHeight,
+                                xServer.screenInfo.width, xServer.screenInfo.height);
+                        }
+                        
+                        
+                        nativeSetPresentMode(nativeHandle, pendingPresentMode);
+                        nativeSetFilterMode(nativeHandle, pendingFilterMode);
+                        nativeSetSwapRB(nativeHandle, pendingSwapRB);
+                        nativeSetStretchMode(nativeHandle, pendingStretchMode);
+                        nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
+                        nativeSetSharpness(nativeHandle, pendingSharpness);
+                        updateTransform();
+                        nativeSetCursorVisible(nativeHandle, cursorVisible);
                         initComplete = true;
                         xServerView.queueEvent(this::updateScene);
                         return;
@@ -141,6 +175,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                     nativeSetPresentMode(nativeHandle, pendingPresentMode);
                     nativeSetFilterMode(nativeHandle, pendingFilterMode);
                     nativeSetSwapRB(nativeHandle, pendingSwapRB);
+                    nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
+                    nativeSetSharpness(nativeHandle, pendingSharpness);
                     updateTransform();
                     nativeSetCursorVisible(nativeHandle, cursorVisible);
                     if (nativeMode) {
@@ -193,6 +229,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public void onSurfaceChanged(int width, int height) {
+        if (inPipMode) return;
         surfaceWidth = width; surfaceHeight = height;
         viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
         synchronized (lock) {
@@ -283,13 +320,31 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private void updateTransform() {
         if (nativeHandle == 0) return;
         float zoom = magnifierZoom;
-        float cx = surfaceWidth / 2f;
-        float cy = surfaceHeight / 2f;
+        
+        
+        float ptrX = xServer.pointer.getX();
+        float ptrY = xServer.pointer.getY();
         if (fullscreen) {
-            nativeSetTransform(nativeHandle,
-                cx * (1f - zoom), cy * (1f - zoom), zoom, zoom);
+            
+            
             viewTransformation.update(surfaceWidth, surfaceHeight,
                 xServer.screenInfo.width, xServer.screenInfo.height);
+            if (zoom != 1.0f) {
+                
+                
+                float baseOx = viewTransformation.sceneOffsetX;
+                float baseOy = viewTransformation.sceneOffsetY;
+                float baseSx = viewTransformation.sceneScaleX;
+                float baseSy = viewTransformation.sceneScaleY;
+                nativeSetTransform(nativeHandle,
+                    baseOx + ptrX * baseSx * (1f - zoom),
+                    baseOy + ptrY * baseSy * (1f - zoom),
+                    baseSx * zoom,
+                    baseSy * zoom);
+            } else {
+                
+                nativeSetTransform(nativeHandle, 0f, 0f, 1f, 1f);
+            }
             nativeScanoutSetDst(nativeHandle,
                 viewTransformation.viewOffsetX,
                 viewTransformation.viewOffsetY,
@@ -305,9 +360,11 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             float baseOy = viewTransformation.sceneOffsetY - py;
             float baseSx = viewTransformation.sceneScaleX;
             float baseSy = viewTransformation.sceneScaleY;
+            
+            
             nativeSetTransform(nativeHandle,
-                baseOx * zoom + cx * (1f - zoom),
-                baseOy * zoom + cy * (1f - zoom),
+                baseOx + ptrX * baseSx * (1f - zoom),
+                baseOy + ptrY * baseSy * (1f - zoom),
                 baseSx * zoom,
                 baseSy * zoom);
             nativeScanoutSetDst(nativeHandle,
@@ -315,6 +372,25 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 viewTransformation.viewOffsetY,
                 viewTransformation.viewWidth,
                 viewTransformation.viewHeight);
+        }
+
+        
+        
+        
+        
+        
+        
+        
+        
+        boolean needScissor = !(fullscreen && zoom == 1.0f);
+        if (needScissor) {
+            nativeSetCustomScissor(nativeHandle,
+                viewTransformation.viewOffsetX,
+                viewTransformation.viewOffsetY,
+                viewTransformation.viewWidth,
+                viewTransformation.viewHeight);
+        } else {
+            nativeClearCustomScissor(nativeHandle);
         }
     }
 
@@ -467,8 +543,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     @Override
     public void onUpdateWindowContent(Window window) {
-        // FPS is counted only via XServerDisplayActivity's listener (filtered by
-        // frameRatingWindowId) — counting here would double-count every frame.
+        
+        
         synchronized (lock) {
             if (nativeHandle == 0) return;
             Drawable drawable = window.getContent();
@@ -538,7 +614,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 if (cursor != null) { hotX = (short)cursor.hotSpotX; hotY = (short)cursor.hotSpotY; }
                 nativeScanoutSetCursorPos(nativeHandle, x, y, hotX, hotY);
             }
-            if (screenOffsetYRelativeToCursor) updateTransform();
+            if (screenOffsetYRelativeToCursor || magnifierZoom != 1.0f) updateTransform();
         }
     }
 
@@ -675,6 +751,21 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         synchronized (lock) { if (nativeHandle != 0) nativeDumpRendererInfo(nativeHandle); }
     }
 
+    public void setStretchMode(int mode) {
+        pendingStretchMode = mode;
+        synchronized (lock) { if (nativeHandle != 0) nativeSetStretchMode(nativeHandle, mode); }
+    }
+
+    public void setPostFXMode(int mode) {
+        pendingPostFXMode = mode;
+        synchronized (lock) { if (nativeHandle != 0) nativeSetPostFXMode(nativeHandle, mode); }
+    }
+
+    public void setSharpness(float s) {
+        pendingSharpness = s;
+        synchronized (lock) { if (nativeHandle != 0) nativeSetSharpness(nativeHandle, s); }
+    }
+
     public void setFilterMode(int mode) {
         pendingFilterMode = mode;
         synchronized (lock) { if (nativeHandle != 0) nativeSetFilterMode(nativeHandle, mode); }
@@ -723,7 +814,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public void setUnviewableWMClasses(String... classes) { this.unviewableWMClasses = classes; }
     private int fpsLimit = 0;
     private int     pendingPresentMode    = 2;
+    private int     pendingStretchMode    = 0;
     private int     pendingFilterMode     = 0;
+    private int     pendingPostFXMode     = 0;
+    private float   pendingSharpness      = 0.5f;
     private boolean pendingSwapRB         = false;
     public int getFpsLimit() { return fpsLimit; }
     public void setFpsLimit(int limit) {
@@ -738,6 +832,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 .apply();
         }
     }
+    public void setPipMode(boolean pip) { inPipMode = pip; }
     public int getSurfaceWidth() { return surfaceWidth; }
     public int getSurfaceHeight() { return surfaceHeight; }
     public void requestRender() {}

@@ -11,6 +11,7 @@ import com.winlator.cmod.xserver.extensions.Extension;
 import com.winlator.cmod.xserver.extensions.MITSHMExtension;
 import com.winlator.cmod.xserver.extensions.PresentExtension;
 import com.winlator.cmod.xserver.extensions.SyncExtension;
+import com.winlator.cmod.xserver.extensions.XInput2Extension;
 
 import java.nio.charset.Charset;
 import java.util.EnumMap;
@@ -194,16 +195,26 @@ public class XServer {
         }
     }
 
+    public void emitRelativeMotion(double dx, double dy) {
+        XInput2Extension xi2 = getExtension(XInput2Extension.MAJOR_OPCODE);
+        if (xi2 != null) xi2.emitRawMotion(XInput2Extension.MASTER_POINTER_ID, dx, dy);
+    }
+
     private void setupExtensions() {
         extensions.put(BigReqExtension.MAJOR_OPCODE, new BigReqExtension());
         extensions.put(MITSHMExtension.MAJOR_OPCODE, new MITSHMExtension());
         extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension());
         extensions.put(PresentExtension.MAJOR_OPCODE, new PresentExtension());
         extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension());
+
+        XInput2Extension xi2 = new XInput2Extension();
+        xi2.setFirstEventId((byte) 64);
+        xi2.setFirstErrorId((byte) 128);
+        extensions.put(XInput2Extension.MAJOR_OPCODE, xi2);
     }
 
     public <T extends Extension> T getExtension(int opcode) {
-        return (T)extensions.get(opcode);
+        return (T) extensions.get(opcode);
     }
 
     public synchronized void setGrabbed(boolean grabbed, XClient client) {
@@ -215,5 +226,3 @@ public class XServer {
         return isGrabbed && grabbingClient == client;
     }
 }
-
-

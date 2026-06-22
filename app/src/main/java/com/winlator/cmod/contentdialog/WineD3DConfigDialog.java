@@ -30,6 +30,7 @@ public class WineD3DConfigDialog extends ContentDialog {
     public WineD3DConfigDialog(View anchor) {
         super(anchor.getContext(), R.layout.wined3d_config_dialog);
         context = anchor.getContext();
+        findViewById(R.id.FrameLayout).getLayoutParams().width = AppUtils.getPreferredDialogWidth(context);
         setIcon(R.drawable.icon_settings);
         setTitle("WineD3D " + context.getString(R.string.configuration));
 

@@ -83,4 +83,11 @@ public class CPUListView extends LinearLayout {
     public byte getNumProcessors() {
         return numProcessors;
     }
+
+    public void setCheckboxesEnabled(boolean enabled) {
+        for (int i = 0; i < numProcessors; i++) {
+            CheckBox checkBox = findViewWithTag("CPU" + i);
+            if (checkBox != null) checkBox.setEnabled(enabled);
+        }
+    }
 }
