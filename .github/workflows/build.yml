@@ -2,10 +2,12 @@ name: Android CI Bionic
 
 on:
   push:
-    branches: [ "wfm-fix" ]
+    branches: [ "winlator_bionic_vulkan_renderer" ]
+  pull_request:
+    branches: [ "winlator_bionic_vulkan_renderer" ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -54,15 +56,8 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew assembleDebug
 
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v2
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
       with:
-        tag_name: build-${{ github.run_number }}
-        name: Bionic Build ${{ github.run_number }}
-        draft: false
-        prerelease: false
-        files: app/build/outputs/apk/debug/app-debug.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
