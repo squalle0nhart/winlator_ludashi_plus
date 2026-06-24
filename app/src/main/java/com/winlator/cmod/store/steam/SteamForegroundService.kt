@@ -43,6 +43,12 @@ class SteamForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        try {
+            SteamCryptoCompat.ensureBcSha1()
+            Log.i(TAG, "Crypto provider ready: ${SteamCryptoCompat.currentBcProviderSummary()}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Crypto provider init failed", e)
+        }
         createNotificationChannel()
         Log.i(TAG, "Service created")
     }

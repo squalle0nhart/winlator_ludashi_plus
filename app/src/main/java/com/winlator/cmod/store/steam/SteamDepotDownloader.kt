@@ -153,6 +153,15 @@ object SteamDepotDownloader {
         activeDownloads[appId] = Unit
         initDebugLog(ctx)
         dlog("=== Starting install: appId=$appId ===")
+        try {
+            SteamCryptoCompat.ensureBcSha1()
+            dlog("Crypto provider ready: ${SteamCryptoCompat.currentBcProviderSummary()}")
+        } catch (e: Exception) {
+            dlog("FAIL: Steam crypto provider init failed")
+            dlogError("SteamCryptoCompat.ensureBcSha1()", e)
+            emitFailed(appId, "Steam crypto provider init failed: ${e.message}")
+            return
+        }
 
         val repo = SteamRepository.getInstance()
         val steamClient = repo.steamClient
