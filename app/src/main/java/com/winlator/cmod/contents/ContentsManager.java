@@ -24,7 +24,7 @@ import java.util.Map;
 
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
-    public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
+    public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/nicholasx417/WinNative-Components/refs/heads/main/contents.json";
     public static final String BANNERLATOR_REMOTE_PROFILES = "https://raw.githubusercontent.com/The412Banner/winlator-contents/main/contents.json";
     public static final String VEGAS_RELEASES_API = "https://api.github.com/repos/isygold/vegas-releases/releases";
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
