@@ -491,8 +491,18 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
-                            public boolean supportsLsfg() {
+                            public boolean supportsFrameGen() {
                                 return true;
+                            }
+
+                            public String getFrameGenBackend() {
+                                return rendererCfgHolder.getFrameGenBackend();
+                            }
+
+                            public void setFrameGenBackend(String val) {
+                                rendererCfgHolder.setFrameGenBackend(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
                             }
 
                             public boolean isLsfgDllAvailable() {
@@ -532,6 +542,36 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
                             public void setLsfgPerformanceMode(boolean val) {
                                 rendererCfgHolder.setLsfgPerformanceMode(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public int getBionicFgMultiplier() {
+                                return rendererCfgHolder.getBionicFgMultiplier();
+                            }
+
+                            public void setBionicFgMultiplier(int val) {
+                                rendererCfgHolder.setBionicFgMultiplier(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public float getBionicFgFlowScale() {
+                                return rendererCfgHolder.getBionicFgFlowScale();
+                            }
+
+                            public void setBionicFgFlowScale(float val) {
+                                rendererCfgHolder.setBionicFgFlowScale(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public int getBionicFgModel() {
+                                return rendererCfgHolder.getBionicFgModel();
+                            }
+
+                            public void setBionicFgModel(int val) {
+                                rendererCfgHolder.setBionicFgModel(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
                             }
@@ -1093,9 +1133,10 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.contains("dxvk")) {
-                    vDXWrapperConfig
-                            .setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
+                if (dxwrapper.contains("dxvk") || dxwrapper.contains("vegas")) {
+                    boolean isVegas = dxwrapper.contains("vegas");
+                    vDXWrapperConfig.setOnClickListener((v) ->
+                            (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, isVegas, null, new ContentsManager(vDXWrapperConfig.getContext()))).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }
@@ -1124,9 +1165,10 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.contains("dxvk")) {
+                if (dxwrapper.contains("dxvk") || dxwrapper.contains("vegas")) {
+                    boolean isVegas = dxwrapper.contains("vegas");
                     vDXWrapperConfig.setOnClickListener((v) ->
-                            (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, ContainerDetailFragment.this, contentsManager)).show());
+                            (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, isVegas, ContainerDetailFragment.this, contentsManager)).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }
@@ -1825,8 +1867,21 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             String contentsURL = PreferenceManager.getDefaultSharedPreferences(getContext())
                     .getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
             String json = Downloader.downloadString(contentsURL);
+            boolean includeBannerlator = types.contains(ContentProfile.ContentType.CONTENT_TYPE_BOX64)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_VKD3D);
+            String bannerlatorJson = includeBannerlator
+                    ? Downloader.downloadString(ContentsManager.BANNERLATOR_REMOTE_PROFILES)
+                    : null;
+            boolean includeVegasDxvk = types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
+            String vegasJson = includeVegasDxvk ? Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API) : null;
             requireActivity().runOnUiThread(() -> dialog.setProgress(65));
-            if (json != null) contentsManager.setRemoteProfiles(json);
+            contentsManager.clearRemoteProfiles();
+            if (json != null) contentsManager.appendRemoteProfiles(json);
+            if (bannerlatorJson != null) contentsManager.appendBannerlatorRemoteProfiles(bannerlatorJson);
+            if (vegasJson != null) contentsManager.appendVegasDxvkRemoteProfiles(vegasJson);
+            contentsManager.syncContents();
             List<ContentProfile> candidates = new ArrayList<>();
             for (ContentProfile.ContentType type : types) {
                 for (ContentProfile profile : contentsManager.getProfiles(type)) {

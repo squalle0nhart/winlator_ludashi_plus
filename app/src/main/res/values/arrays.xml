@@ -20,6 +20,10 @@
     </string-array>
     <string-array name="graphics_driver_entries">
         <item>Wrapper</item>
+        <item>Wrapper-original</item>
+        <item>Wrapper-leegao</item>
+        <item>Wrapper-legacy</item>
+        <item>Wrapper-gamenative</item>
     </string-array>
     <string-array name="wrapper_graphics_driver_version_entries">
         <item>System</item>
@@ -38,6 +42,8 @@
     <string-array name="dxwrapper_entries">
         <item>WineD3D</item>
         <item>DXVK+VKD3D</item>
+        <item>VEGAS+VKD3D</item>
+        <item>VEGAS</item>
     </string-array>
     <string-array name="ddrawrapper_entries">
         <item>CnC-DDraw</item>
@@ -50,6 +56,9 @@
         <item>1.10.3</item>
         <item>2.3.1</item>
         <item>2.3.1-arm64ec-gplasync</item>
+    </string-array>
+    <string-array name="vegas_version_entries">
+        <item>2.7.3</item>
     </string-array>
     <string-array name="dxvk_max_device_memory_entries">
         <item>0 (Default)</item>

@@ -5,6 +5,7 @@
     android:orientation="vertical">
 
     <ScrollView
+        android:id="@+id/SVContent"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fillViewport="true">
@@ -92,14 +93,30 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="LSFG-VK"
+                    android:text="Frame Generation"
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:paddingBottom="8dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Backend"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
+
+                <Spinner
+                    android:id="@+id/SPFrameGenBackend"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"/>
 
                 <TextView
                     android:id="@+id/TVLsfgStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:paddingBottom="8dp"
                     android:textSize="12sp" />
 
@@ -140,6 +157,29 @@
                     android:id="@+id/SBLsfgFlowScale"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <LinearLayout
+                    android:id="@+id/GroupBionicFgModel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Model"
+                        android:textAppearance="?android:attr/textAppearanceMedium"
+                        android:paddingBottom="8dp"/>
+
+                    <Spinner
+                        android:id="@+id/SPBionicFgModel"
+                        style="@style/ComboBoxCompact"
+                        android:background="@drawable/combo_box_no_arrow_dark"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:spinnerMode="dropdown"/>
+                </LinearLayout>
 
                 <CheckBox
                     android:id="@+id/CBLsfgPerformanceMode"

@@ -25,6 +25,8 @@ import java.util.Map;
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
+    public static final String BANNERLATOR_REMOTE_PROFILES = "https://raw.githubusercontent.com/The412Banner/winlator-contents/main/contents.json";
+    public static final String VEGAS_RELEASES_API = "https://api.github.com/repos/isygold/vegas-releases/releases";
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
@@ -92,8 +94,18 @@ public class ContentsManager {
     }
 
     public void setRemoteProfiles(String json) {
+        remoteProfiles = new ArrayList<>();
+        appendRemoteProfiles(json);
+        syncContents();
+    }
+
+    public void clearRemoteProfiles() {
+        remoteProfiles = new ArrayList<>();
+    }
+
+    public void appendRemoteProfiles(String json) {
+        ensureRemoteProfiles();
         try {
-            remoteProfiles = new ArrayList<>();
             JSONArray content = new JSONArray(json);
             for (int i = 0; i < content.length(); i++) {
                 try {
@@ -103,7 +115,7 @@ public class ContentsManager {
                     remoteProfile.type = ContentProfile.ContentType.getTypeByName(object.getString("type"));
                     remoteProfile.verName = object.getString("verName");
                     remoteProfile.verCode = object.getInt("verCode");
-                    remoteProfiles.add(remoteProfile);
+                    addRemoteProfile(remoteProfile);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -111,7 +123,90 @@ public class ContentsManager {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        syncContents();
+    }
+
+    public void appendBannerlatorRemoteProfiles(String json) {
+        ensureRemoteProfiles();
+        try {
+            JSONArray content = new JSONArray(json);
+            for (int i = 0; i < content.length(); i++) {
+                try {
+                    JSONObject object = content.getJSONObject(i);
+                    String remoteUrl = object.optString("remoteUrl", "");
+                    if (remoteUrl.isEmpty() || !remoteUrl.endsWith(".wcp")) {
+                        continue;
+                    }
+
+                    ContentProfile.ContentType type = ContentProfile.ContentType.getTypeByName(object.optString("type"));
+                    if (type == null) {
+                        continue;
+                    }
+
+                    ContentProfile remoteProfile = new ContentProfile();
+                    remoteProfile.remoteUrl = remoteUrl;
+                    remoteProfile.type = type;
+                    remoteProfile.verName = object.getString("verName");
+                    remoteProfile.verCode = object.getInt("verCode");
+                    addRemoteProfile(remoteProfile);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void appendVegasDxvkRemoteProfiles(String json) {
+        ensureRemoteProfiles();
+        try {
+            JSONArray releases = new JSONArray(json);
+            for (int i = 0; i < releases.length(); i++) {
+                JSONObject release = releases.getJSONObject(i);
+                JSONArray assets = release.optJSONArray("assets");
+                if (assets == null) continue;
+
+                for (int j = 0; j < assets.length(); j++) {
+                    JSONObject asset = assets.getJSONObject(j);
+                    String assetName = asset.optString("name", "");
+                    String remoteUrl = asset.optString("browser_download_url", "");
+                    if (!assetName.startsWith("dxvk-") || !assetName.endsWith(".wcp") || remoteUrl.isEmpty()) {
+                        continue;
+                    }
+
+                    ContentProfile remoteProfile = new ContentProfile();
+                    remoteProfile.type = ContentProfile.ContentType.CONTENT_TYPE_DXVK;
+                    remoteProfile.remoteUrl = remoteUrl;
+                    remoteProfile.verName = assetName.substring("dxvk-".length(), assetName.length() - ".wcp".length());
+                    remoteProfile.verCode = asset.optInt("id", release.optInt("id", 0));
+                    remoteProfile.desc = release.optString("name", release.optString("tag_name", "VEGAS"));
+                    addRemoteProfile(remoteProfile);
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void ensureRemoteProfiles() {
+        if (remoteProfiles == null) {
+            remoteProfiles = new ArrayList<>();
+        }
+    }
+
+    private void addRemoteProfile(ContentProfile remoteProfile) {
+        if (remoteProfile == null || remoteProfile.type == null || remoteProfile.remoteUrl == null || remoteProfile.remoteUrl.isEmpty()) {
+            return;
+        }
+
+        for (ContentProfile profile : remoteProfiles) {
+            if (profile.type == remoteProfile.type
+                    && profile.verCode == remoteProfile.verCode
+                    && profile.verName.equals(remoteProfile.verName)) {
+                return;
+            }
+        }
+        remoteProfiles.add(remoteProfile);
     }
 
     public void syncContents() {

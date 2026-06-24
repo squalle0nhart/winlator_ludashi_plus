@@ -84,10 +84,14 @@ public class ContentsFragment extends Fragment {
         new Thread(() -> {
             String contentsURL = sp.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
             String json = Downloader.downloadString(contentsURL);
-            if (json == null)
-                return;
+            String bannerlatorJson = Downloader.downloadString(ContentsManager.BANNERLATOR_REMOTE_PROFILES);
+            String vegasJson = Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API);
             getActivity().runOnUiThread(() -> {
-                manager.setRemoteProfiles(json);
+                manager.clearRemoteProfiles();
+                if (json != null) manager.appendRemoteProfiles(json);
+                if (bannerlatorJson != null) manager.appendBannerlatorRemoteProfiles(bannerlatorJson);
+                if (vegasJson != null) manager.appendVegasDxvkRemoteProfiles(vegasJson);
+                manager.syncContents();
                 loadContentList();
             });
         }).start();

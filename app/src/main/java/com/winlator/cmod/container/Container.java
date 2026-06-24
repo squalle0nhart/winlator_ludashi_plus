@@ -194,6 +194,58 @@ public class Container {
         putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
     }
 
+    public String getFrameGenBackend() {
+        String value = getExtra("frameGenBackend", "");
+        if (!value.isEmpty()) return value;
+        return isLsfgEnabled() ? "lsfg_vk" : "lsfg_vk";
+    }
+
+    public void setFrameGenBackend(String backend) {
+        putExtra("frameGenBackend", backend != null && !backend.isEmpty() ? backend : "lsfg_vk");
+    }
+
+    public int getBionicFgMultiplier() {
+        String value = getExtra("bionicFgMultiplier", "0");
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed == 0) return 0;
+            return Math.max(2, Math.min(4, parsed));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public void setBionicFgMultiplier(int multiplier) {
+        putExtra("bionicFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getBionicFgFlowScale() {
+        String value = getExtra("bionicFgFlowScale", "0.80");
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
+        } catch (NumberFormatException e) {
+            return 0.80f;
+        }
+    }
+
+    public void setBionicFgFlowScale(float flowScale) {
+        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
+        putExtra("bionicFgFlowScale", String.format(Locale.US, "%.2f", clamped));
+    }
+
+    public int getBionicFgModel() {
+        String value = getExtra("bionicFgModel", "0");
+        try {
+            return Math.max(0, Math.min(1, Integer.parseInt(value)));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public void setBionicFgModel(int model) {
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+    }
+
     public String getDXWrapper() {
         return dxwrapper;
     }

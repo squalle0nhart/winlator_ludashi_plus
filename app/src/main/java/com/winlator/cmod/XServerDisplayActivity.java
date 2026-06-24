@@ -70,7 +70,8 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
-import com.winlator.cmod.core.LsfgQuickMenuHelper;
+import com.winlator.cmod.core.FrameGenManager;
+import com.winlator.cmod.core.FrameGenQuickMenuHelper;
 import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
@@ -155,6 +156,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Runnable editInputControlsCallback;
     private Shortcut shortcut;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
+    private String graphicsDriverConfigData = Container.DEFAULT_GRAPHICSDRIVERCONFIG;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
     private String emulator = Container.DEFAULT_EMULATOR;
@@ -164,6 +166,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private WineInfo wineInfo;
     private final EnvVars envVars = new EnvVars();
     private boolean firstTimeBoot = false;
+    private boolean forceGraphicsDriverExtraction = false;
     private SharedPreferences preferences;
     private OnExtractFileListener onExtractFileListener;
     private WinHandler winHandler;
@@ -476,6 +479,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             simulateTouchScreen = shortcut.getExtra("simTouchScreen").equals("1");
         }
 
+        this.graphicsDriverConfigData = graphicsDriverConfig;
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
 
@@ -903,12 +907,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         String dxwrapper = this.dxwrapper;
+        String graphicsDriverState = graphicsDriver + ";" + graphicsDriverConfigData;
+
+        forceGraphicsDriverExtraction = !graphicsDriverState.equals(container.getExtra("graphicsDriver"));
+        if (forceGraphicsDriverExtraction) {
+            container.putExtra("graphicsDriver", graphicsDriverState);
+            containerDataChanged = true;
+        }
 
         if (dxwrapper.contains("dxvk")) {
             String dxvkWrapper = "dxvk-" + dxwrapperConfig.get("version");
             String vkd3dWrapper = "vkd3d-" + dxwrapperConfig.get("vkd3dVersion");
             String ddrawrapper = dxwrapperConfig.get("ddrawrapper");
             dxwrapper = dxvkWrapper + ";" + vkd3dWrapper + ";" + ddrawrapper;
+        } else if (dxwrapper.contains("vegas")) {
+            String vegasVersion = dxwrapperConfig.get("version");
+            if (vegasVersion == null || vegasVersion.isEmpty()) {
+                vegasVersion = DefaultVersion.getVegasDefault();
+            }
+            String vkd3dWrapper = dxwrapper.contains("+vkd3d")
+                    ? "vkd3d-" + dxwrapperConfig.get("vkd3dVersion")
+                    : "None";
+            String ddrawrapper = dxwrapperConfig.get("ddrawrapper");
+            dxwrapper = "vegas-" + vegasVersion + ";" + vkd3dWrapper + ";" + ddrawrapper;
         }
 
         if (!dxwrapper.equals(container.getExtra("dxwrapper"))) {
@@ -1871,63 +1892,77 @@ public class XServerDisplayActivity extends AppCompatActivity {
         boolean dllAvailable = shortcut != null
                 ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
                 : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
-        if (!dllAvailable) {
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("LSFG-VK")
-                    .setMessage("Lossless.dll not found. Import it from app settings or place it inside the container.")
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show();
-            return;
-        }
 
-        LsfgQuickMenuHelper.Settings currentSettings = shortcut != null
-                ? LsfgQuickMenuHelper.readSettings(shortcut)
-                : LsfgQuickMenuHelper.readSettings(container);
-        final int[] selectedMultiplier = {currentSettings.multiplier};
-        final float[] selectedFlowScale = {currentSettings.flowScale};
-        final boolean[] selectedPerformanceMode = {currentSettings.performanceMode};
+        FrameGenQuickMenuHelper.Settings currentSettings = shortcut != null
+                ? FrameGenQuickMenuHelper.readSettings(shortcut)
+                : FrameGenQuickMenuHelper.readSettings(container);
+        final String[] selectedBackend = {currentSettings.backend};
+        final int[] selectedLsfgMultiplier = {shortcut != null ? shortcut.getLsfgMultiplier() : container.getLsfgMultiplier()};
+        final float[] selectedLsfgFlowScale = {shortcut != null ? shortcut.getLsfgFlowScale() : container.getLsfgFlowScale()};
+        final boolean[] selectedPerformanceMode = {shortcut != null ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode()};
+        final int[] selectedBionicMultiplier = {shortcut != null ? shortcut.getBionicFgMultiplier() : container.getBionicFgMultiplier()};
+        final float[] selectedBionicFlowScale = {shortcut != null ? shortcut.getBionicFgFlowScale() : container.getBionicFgFlowScale()};
+        final int[] selectedBionicModel = {shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         int padding = Math.round(getResources().getDisplayMetrics().density * 16.0f);
         layout.setPadding(padding, padding / 2, padding, 0);
 
+        TextView backendLabel = new TextView(this);
+        backendLabel.setText("Backend");
+        layout.addView(backendLabel);
+
+        Spinner backendSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> backendAdapter = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, new String[]{"LSFG-VK", "Bionic-FG"});
+        backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        backendSpinner.setAdapter(backendAdapter);
+        backendSpinner.setSelection(currentSettings.backend.equals(FrameGenManager.BACKEND_BIONIC_FG) ? 1 : 0);
+        layout.addView(backendSpinner);
+
+        TextView status = new TextView(this);
+        status.setPadding(0, padding / 2, 0, 0);
+        layout.addView(status);
+
         TextView description = new TextView(this);
+        description.setPadding(0, padding / 2, 0, 0);
         description.setText("Frame multiplier - generates intermediate frames between rendered ones.");
         layout.addView(description);
 
         android.widget.RadioGroup multiplierGroup = new android.widget.RadioGroup(this);
         multiplierGroup.setOrientation(android.widget.RadioGroup.VERTICAL);
+        int initialMultiplier = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
+                ? selectedBionicMultiplier[0]
+                : selectedLsfgMultiplier[0];
         int[] multiplierValues = {0, 2, 3, 4};
         for (int value : multiplierValues) {
             android.widget.RadioButton radioButton = new android.widget.RadioButton(this);
             radioButton.setId(View.generateViewId());
             radioButton.setTag(value);
             radioButton.setText(value == 0 ? "Off" : value + "x");
-            boolean checked = value == selectedMultiplier[0] || (value == 0 && selectedMultiplier[0] < 2);
+            boolean checked = value == initialMultiplier || (value == 0 && initialMultiplier < 2);
             radioButton.setChecked(checked);
             multiplierGroup.addView(radioButton);
         }
-        multiplierGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            View checkedView = group.findViewById(checkedId);
-            Object tag = checkedView != null ? checkedView.getTag() : null;
-            if (tag instanceof Integer) selectedMultiplier[0] = (Integer) tag;
-        });
         layout.addView(multiplierGroup);
 
         TextView flowLabel = new TextView(this);
         flowLabel.setPadding(0, padding, 0, 0);
-        flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", selectedFlowScale[0]));
         layout.addView(flowLabel);
 
         android.widget.SeekBar flowSeekBar = new android.widget.SeekBar(this);
         flowSeekBar.setMax(75);
-        flowSeekBar.setProgress(Math.round((selectedFlowScale[0] - 0.25f) * 100.0f));
         flowSeekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                selectedFlowScale[0] = LsfgQuickMenuHelper.sanitizeFlowScale(0.25f + (progress / 100.0f));
-                flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", selectedFlowScale[0]));
+                float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + (progress / 100.0f));
+                if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
+                    selectedBionicFlowScale[0] = value;
+                } else {
+                    selectedLsfgFlowScale[0] = value;
+                }
+                flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", value));
             }
 
             @Override
@@ -1938,36 +1973,123 @@ public class XServerDisplayActivity extends AppCompatActivity {
         });
         layout.addView(flowSeekBar);
 
+        TextView modelLabel = new TextView(this);
+        modelLabel.setPadding(0, padding, 0, 0);
+        modelLabel.setText("Model");
+        layout.addView(modelLabel);
+
+        Spinner modelSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> modelAdapter = new android.widget.ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, new String[]{"Model 0", "Model 1"});
+        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        modelSpinner.setAdapter(modelAdapter);
+        modelSpinner.setSelection(Math.max(0, Math.min(1, selectedBionicModel[0])));
+        modelSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                selectedBionicModel[0] = position;
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        layout.addView(modelSpinner);
+
         CheckBox performanceMode = new CheckBox(this);
         performanceMode.setText("Performance mode");
         performanceMode.setChecked(selectedPerformanceMode[0]);
         performanceMode.setOnCheckedChangeListener((buttonView, isChecked) -> selectedPerformanceMode[0] = isChecked);
         layout.addView(performanceMode);
 
+        final boolean[] syncingUi = {false};
+        Runnable syncUi = () -> {
+            syncingUi[0] = true;
+            selectedBackend[0] = backendSpinner.getSelectedItemPosition() == 1
+                    ? FrameGenManager.BACKEND_BIONIC_FG
+                    : FrameGenManager.BACKEND_LSFG_VK;
+            boolean useBionicFg = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+            status.setText(useBionicFg
+                    ? "Bionic-FG is bundled with the app and does not require Lossless.dll."
+                    : (dllAvailable
+                            ? "LSFG-VK uses the imported Lossless.dll."
+                            : "Import Lossless.dll in app settings before enabling LSFG-VK."));
+
+            int selectedMultiplier = useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
+            for (int i = 0; i < multiplierGroup.getChildCount(); i++) {
+                View child = multiplierGroup.getChildAt(i);
+                if (child instanceof android.widget.RadioButton) {
+                    Object tag = child.getTag();
+                    ((android.widget.RadioButton) child).setChecked(tag instanceof Integer
+                            && ((Integer) tag) == selectedMultiplier);
+                    child.setEnabled(useBionicFg || dllAvailable);
+                }
+            }
+            float currentFlowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
+            flowSeekBar.setEnabled(useBionicFg || dllAvailable);
+            flowSeekBar.setProgress(Math.round((currentFlowScale - 0.25f) * 100.0f));
+            flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", currentFlowScale));
+            modelLabel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
+            modelSpinner.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
+            performanceMode.setVisibility(useBionicFg ? View.GONE : View.VISIBLE);
+            performanceMode.setEnabled(dllAvailable);
+            syncingUi[0] = false;
+        };
+
+        backendSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                syncUi.run();
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        multiplierGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (syncingUi[0]) return;
+            View checkedView = group.findViewById(checkedId);
+            Object tag = checkedView != null ? checkedView.getTag() : null;
+            if (!(tag instanceof Integer)) return;
+            if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
+                selectedBionicMultiplier[0] = (Integer) tag;
+            } else {
+                selectedLsfgMultiplier[0] = (Integer) tag;
+            }
+        });
+        syncUi.run();
+
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("LSFG-VK")
+                .setTitle("Frame Generation")
                 .setView(layout)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                    LsfgQuickMenuHelper.Settings newSettings = new LsfgQuickMenuHelper.Settings(
-                            selectedMultiplier[0],
-                            selectedFlowScale[0],
-                            selectedPerformanceMode[0]);
+                    boolean backendChanged = !currentSettings.backend.equals(selectedBackend[0]);
+                    int selectedMultiplier = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
+                            ? selectedBionicMultiplier[0]
+                            : selectedLsfgMultiplier[0];
+                    FrameGenQuickMenuHelper.Settings newSettings = new FrameGenQuickMenuHelper.Settings(
+                            selectedBackend[0],
+                            selectedMultiplier,
+                            FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
+                                    ? selectedBionicFlowScale[0]
+                                    : selectedLsfgFlowScale[0],
+                            selectedPerformanceMode[0],
+                            selectedBionicModel[0]);
                     if (shortcut != null) {
-                        LsfgQuickMenuHelper.applySettings(shortcut, newSettings);
-                        if (selectedMultiplier[0] >= 2) {
-                            LsfgVkManager.ensureRuntimeInstalled(this, shortcut);
-                            LsfgVkManager.writeConfig(shortcut);
-                        }
+                        FrameGenQuickMenuHelper.applySettings(shortcut, newSettings);
+                        if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
+                        FrameGenManager.writeConfig(shortcut);
                     } else {
-                        LsfgQuickMenuHelper.applySettings(container, newSettings);
-                        if (selectedMultiplier[0] >= 2) {
-                            LsfgVkManager.ensureRuntimeInstalled(this, container);
-                            LsfgVkManager.writeConfig(container);
-                        }
+                        FrameGenQuickMenuHelper.applySettings(container, newSettings);
+                        if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, container);
+                        FrameGenManager.writeConfig(container);
                     }
-                    AppUtils.showToast(this, selectedMultiplier[0] >= 2
-                            ? "LSFG enabled: " + selectedMultiplier[0] + "x"
-                            : "LSFG disabled");
+                    if (backendChanged) {
+                        AppUtils.showToast(this, "Frame generation backend changed. Relaunch the game to apply it.");
+                    } else {
+                        String backendLabelText = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]) ? "Bionic-FG" : "LSFG-VK";
+                        AppUtils.showToast(this, selectedMultiplier >= 2
+                                ? backendLabelText + " enabled: " + selectedMultiplier + "x"
+                                : "Frame generation disabled");
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -2305,10 +2427,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File rootDir = imageFs.getRootDir();
 
-        if (dxwrapper.contains("dxvk")) {
+        if (dxwrapper.contains("dxvk") || dxwrapper.contains("vegas")) {
             DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
             String version = dxwrapperConfig.get("version");
-            if (version.equals("1.11.1-sarek")) {
+            if ("1.11.1-sarek".equals(version)) {
                 Log.d("GraphicsDriverExtraction", "Disabling Wrapper PATCH_OPCONSTCOMP SPIR-V pass");
                 envVars.put("WRAPPER_NO_PATCH_OPCONSTCOMP", "1");
             }
@@ -2324,10 +2446,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
         envVars.put("GALLIUM_DRIVER", "zink");
 
-        if (firstTimeBoot) {
-            Log.d("XServerDisplayActivity", "First time container boot, re-extracting libs");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst",
-                    rootDir);
+        if (firstTimeBoot || forceGraphicsDriverExtraction) {
+            String graphicsDriverArchive = resolveGraphicsDriverArchiveName();
+            Log.d("XServerDisplayActivity", "Extracting graphics driver libs from " + graphicsDriverArchive);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                    "graphics_driver/" + graphicsDriverArchive + ".tzst", rootDir);
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers" + ".tzst", rootDir);
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst",
                     rootDir);
@@ -2403,6 +2526,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("ENABLE_VKBASALT", "1");
             envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
         }
+    }
+
+    private String resolveGraphicsDriverArchiveName() {
+        if (graphicsDriver == null || graphicsDriver.isEmpty() || graphicsDriver.equals("wrapper")) {
+            return "wrapper";
+        }
+        if (graphicsDriver.startsWith("wrapper-original")) {
+            return "wrapper-original";
+        }
+        if (graphicsDriver.startsWith("wrapper-leegao")) {
+            return "wrapper-leegao";
+        }
+        if (graphicsDriver.startsWith("wrapper-legacy")) {
+            return "wrapper-legacy";
+        }
+        if (graphicsDriver.startsWith("wrapper-gamenative")) {
+            return "wrapper-gamenative";
+        }
+        return "wrapper";
     }
 
     @Override
@@ -2507,7 +2649,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir,
                     onExtractFileListener);
 
-            if (ddrawrapper.contains("None")) {
+            if (ddrawrapper.equalsIgnoreCase("none")) {
                 Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
                 restoreOriginalDllFiles(new String[] { "ddraw.dll", "d3dimm.dll" });
             } else {
@@ -2523,6 +2665,56 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } else if (dxwrapper.contains("wined3d")) {
             Log.d(TAG, "Restoring original DLL files for wined3d.");
             restoreOriginalDllFiles(dlls);
+        } else if (dxwrapper.contains("vegas")) {
+            Log.d(TAG, "Extracting VEGAS wrapper files, version: " + dxwrapper);
+
+            String[] parts = dxwrapper.split(";");
+            String vegasWrapper = parts.length > 0 ? parts[0] : "vegas-" + DefaultVersion.getVegasDefault();
+            String vkd3dWrapper = parts.length > 1 ? parts[1] : "None";
+            String ddrawrapper = parts.length > 2 ? parts[2] : "none";
+
+            ContentProfile vegasProfile = contentsManager.getProfileByEntryName(vegasWrapper);
+            if (vegasProfile != null) {
+                Log.d(TAG, "Applying user-defined VEGAS content profile: " + vegasWrapper);
+                contentsManager.applyContent(vegasProfile);
+            } else {
+                Log.d(TAG, "Extracting fallback VEGAS .tzst archive: " + vegasWrapper);
+                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "dxwrapper/" + vegasWrapper + ".tzst",
+                        windowsDir, onExtractFileListener);
+            }
+
+            if (vkd3dWrapper.contains("None")) {
+                Log.d(TAG, "No VKD3D has been selected for VEGAS, restoring original d3d12");
+                restoreOriginalDllFiles(new String[] { "d3d12.dll", "d3d12core.dll" });
+            } else {
+                ContentProfile vkd3dProfile = contentsManager.getProfileByEntryName(vkd3dWrapper);
+                if (vkd3dProfile != null) {
+                    Log.d(TAG, "Applying user-defined VKD3D content profile: " + vkd3dWrapper);
+                    contentsManager.applyContent(vkd3dProfile);
+                } else {
+                    Log.d(TAG, "Extracting fallback VKD3D .tzst archive: " + vkd3dWrapper);
+                    TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                            "dxwrapper/" + vkd3dWrapper + ".tzst", windowsDir, onExtractFileListener);
+                }
+            }
+
+            Log.d(TAG, "Extracting nglide wrapper");
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir,
+                    onExtractFileListener);
+
+            if (ddrawrapper.equalsIgnoreCase("none")) {
+                Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
+                restoreOriginalDllFiles(new String[] { "ddraw.dll", "d3dimm.dll" });
+            } else {
+                if (ddrawrapper.equals("cnc-ddraw"))
+                    envVars.put("CNC_DDRAW_CONFIG_FILE", "C:\\windows\\syswow64\\ddraw.ini");
+
+                Log.d(TAG, "Extracting ddrawrapper " + ddrawrapper);
+                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/" + ddrawrapper + ".tzst",
+                        windowsDir, onExtractFileListener);
+            }
+
+            Log.d(TAG, "Finished extraction of VEGAS wrapper files, version: " + dxwrapper);
         }
     }
 

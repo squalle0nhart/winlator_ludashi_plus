@@ -130,6 +130,10 @@ android {
         }
     }
 
+    lint {
+        disable 'ExpiredTargetSdkVersion'
+    }
+
     // If you want to be sure modern JNI packaging is used:
     packagingOptions {
         jniLibs {

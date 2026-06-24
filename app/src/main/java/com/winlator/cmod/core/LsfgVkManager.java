@@ -25,6 +25,7 @@ public abstract class LsfgVkManager {
     private static final String VERSION_FILENAME = ".lsfg_vk_runtime_version";
     private static final String LOSSLESS_DLL_NAME = "Lossless.dll";
     private static final String PROCESS_EXE_IDENTIFIER = "winlator-lsfg";
+    private static final String PRESENT_MODE = "fifo";
     private static final String RUNTIME_VERSION = "v1.4.0-android-arm64-v8a-ahb-no-props";
 
     public static final String EXTRA_ENABLED = "lsfgEnabled";
@@ -75,6 +76,24 @@ public abstract class LsfgVkManager {
     public static String containerDllPath(Shortcut shortcut) {
         File dllFile = containerDllFile(shortcut);
         return dllFile != null && dllFile.isFile() ? dllFile.getAbsolutePath() : null;
+    }
+
+    public static String layerDirPath(Container container) {
+        if (container == null || container.getRootDir() == null) return null;
+        return new File(container.getRootDir(), LAYER_RELATIVE_DIR).getAbsolutePath();
+    }
+
+    public static String layerDirPath(Shortcut shortcut) {
+        return shortcut == null ? null : layerDirPath(shortcut.container);
+    }
+
+    public static String configPath(Container container) {
+        if (container == null || container.getRootDir() == null) return null;
+        return configFile(container).getAbsolutePath();
+    }
+
+    public static String configPath(Shortcut shortcut) {
+        return shortcut == null ? null : configPath(shortcut.container);
     }
 
     public static boolean isEnabled(Container container) {
@@ -209,9 +228,10 @@ public abstract class LsfgVkManager {
         File configFile = configFile(container);
         if (!configFile.isFile()) return false;
 
-        int effectiveMultiplier = enabled && dllPath != null ? Math.max(2, Math.min(4, multiplier)) : 1;
-        boolean perfMode = enabled && performanceMode;
-        boolean ok = FileUtils.writeString(configFile, buildConfigToml(dllPath, true, effectiveMultiplier, flowScale, perfMode));
+        boolean active = enabled && dllPath != null;
+        int effectiveMultiplier = active ? Math.max(2, Math.min(4, multiplier)) : 1;
+        boolean perfMode = active && performanceMode;
+        boolean ok = FileUtils.writeString(configFile, buildConfigToml(dllPath, active, effectiveMultiplier, flowScale, perfMode));
         if (ok) FileUtils.chmod(configFile, 0644);
         return ok;
     }
@@ -223,9 +243,10 @@ public abstract class LsfgVkManager {
         File configFile = configFile(shortcut.container);
         if (!configFile.isFile()) return false;
 
-        int effectiveMultiplier = enabled && dllPath != null ? Math.max(2, Math.min(4, multiplier)) : 1;
-        boolean perfMode = enabled && performanceMode;
-        boolean ok = FileUtils.writeString(configFile, buildConfigToml(dllPath, true, effectiveMultiplier, flowScale, perfMode));
+        boolean active = enabled && dllPath != null;
+        int effectiveMultiplier = active ? Math.max(2, Math.min(4, multiplier)) : 1;
+        boolean perfMode = active && performanceMode;
+        boolean ok = FileUtils.writeString(configFile, buildConfigToml(dllPath, active, effectiveMultiplier, flowScale, perfMode));
         if (ok) FileUtils.chmod(configFile, 0644);
         return ok;
     }
@@ -233,9 +254,7 @@ public abstract class LsfgVkManager {
     public static boolean applyLaunchEnv(Container container, EnvVars envVars) {
         if (container == null || envVars == null || container.getRootDir() == null) return false;
 
-        envVars.remove("DISABLE_LSFG");
-        envVars.remove("LSFG_CONFIG");
-        envVars.remove("LSFG_PROCESS");
+        clearLaunchEnv(envVars);
 
         String dllPath = containerDllPath(container);
         boolean armed = isEnabled(container) && dllPath != null;
@@ -247,10 +266,13 @@ public abstract class LsfgVkManager {
 
         File layerDir = new File(container.getRootDir(), LAYER_RELATIVE_DIR);
         File manifestFile = new File(layerDir, MANIFEST_FILENAME);
-        if (!manifestFile.isFile()) return false;
+        if (!manifestFile.isFile()) {
+            envVars.put("DISABLE_LSFG", "1");
+            return false;
+        }
 
-        envVars.put("LSFG_CONFIG", configFile(container).getAbsolutePath());
-        envVars.put("LSFG_PROCESS", PROCESS_EXE_IDENTIFIER);
+        applyLaunchOverrides(envVars, configFile(container).getAbsolutePath(), dllPath,
+                multiplier(container), flowScale(container), performanceMode(container));
 
         String currentLayerPath = envVars.get("VK_LAYER_PATH");
         String layerPath = layerDir.getAbsolutePath();
@@ -266,9 +288,7 @@ public abstract class LsfgVkManager {
     public static boolean applyLaunchEnv(Shortcut shortcut, EnvVars envVars) {
         if (shortcut == null || shortcut.container == null || envVars == null || shortcut.container.getRootDir() == null) return false;
 
-        envVars.remove("DISABLE_LSFG");
-        envVars.remove("LSFG_CONFIG");
-        envVars.remove("LSFG_PROCESS");
+        clearLaunchEnv(envVars);
 
         String dllPath = containerDllPath(shortcut);
         boolean armed = isEnabled(shortcut) && dllPath != null;
@@ -280,10 +300,13 @@ public abstract class LsfgVkManager {
 
         File layerDir = new File(shortcut.container.getRootDir(), LAYER_RELATIVE_DIR);
         File manifestFile = new File(layerDir, MANIFEST_FILENAME);
-        if (!manifestFile.isFile()) return false;
+        if (!manifestFile.isFile()) {
+            envVars.put("DISABLE_LSFG", "1");
+            return false;
+        }
 
-        envVars.put("LSFG_CONFIG", configFile(shortcut.container).getAbsolutePath());
-        envVars.put("LSFG_PROCESS", PROCESS_EXE_IDENTIFIER);
+        applyLaunchOverrides(envVars, configFile(shortcut.container).getAbsolutePath(), dllPath,
+                multiplier(shortcut), flowScale(shortcut), performanceMode(shortcut));
 
         String currentLayerPath = envVars.get("VK_LAYER_PATH");
         String layerPath = layerDir.getAbsolutePath();
@@ -298,6 +321,32 @@ public abstract class LsfgVkManager {
 
     private static File configFile(Container container) {
         return new File(container.getRootDir(), CONFIG_RELATIVE_PATH);
+    }
+
+    public static void clearLaunchEnv(EnvVars envVars) {
+        envVars.remove("DISABLE_LSFG");
+        envVars.remove("LSFG_CONFIG");
+        envVars.remove("LSFG_PROCESS");
+        envVars.remove("LSFG_PROCESS_EXE");
+        envVars.remove("LSFG_DLL_PATH_UNIX");
+        envVars.remove("LSFG_MULTIPLIER");
+        envVars.remove("LSFG_FLOW_SCALE");
+        envVars.remove("LSFG_PERFORMANCE_MODE");
+        envVars.remove("LSFG_HDR_MODE");
+        envVars.remove("LSFG_EXPERIMENTAL_PRESENT_MODE");
+    }
+
+    private static void applyLaunchOverrides(EnvVars envVars, String configPath, String dllPath,
+                                             int multiplier, float flowScale, boolean performanceMode) {
+        envVars.put("LSFG_CONFIG", configPath);
+        envVars.put("LSFG_PROCESS", PROCESS_EXE_IDENTIFIER);
+        envVars.put("LSFG_PROCESS_EXE", PROCESS_EXE_IDENTIFIER);
+        envVars.put("LSFG_DLL_PATH_UNIX", dllPath);
+        envVars.put("LSFG_MULTIPLIER", Math.max(2, Math.min(4, multiplier)));
+        envVars.put("LSFG_FLOW_SCALE", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+        envVars.put("LSFG_PERFORMANCE_MODE", performanceMode ? "1" : "0");
+        envVars.put("LSFG_HDR_MODE", "0");
+        envVars.put("LSFG_EXPERIMENTAL_PRESENT_MODE", PRESENT_MODE);
     }
 
     private static void disableLayerInContainer(Container container) {
@@ -323,7 +372,7 @@ public abstract class LsfgVkManager {
             builder.append("flow_scale = ").append(String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale)))).append('\n');
             builder.append("performance_mode = ").append(performanceMode ? "true" : "false").append('\n');
             builder.append("hdr_mode = false\n");
-            builder.append("experimental_present_mode = ").append(tomlString("fifo")).append('\n');
+            builder.append("experimental_present_mode = ").append(tomlString(PRESENT_MODE)).append('\n');
         }
 
         return builder.toString();

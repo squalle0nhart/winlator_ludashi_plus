@@ -159,7 +159,9 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
-                public boolean supportsLsfg() { return true; }
+                public boolean supportsFrameGen() { return true; }
+                public String getFrameGenBackend() { return shortcut.getFrameGenBackend(); }
+                public void setFrameGenBackend(String val) { shortcut.setFrameGenBackend(val); }
                 public boolean isLsfgDllAvailable() {
                     return LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(shortcut) != null;
                 }
@@ -170,6 +172,12 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setLsfgFlowScale(float val) { shortcut.setLsfgFlowScale(val); }
                 public boolean getLsfgPerformanceMode() { return shortcut.getLsfgPerformanceMode(); }
                 public void setLsfgPerformanceMode(boolean val) { shortcut.setLsfgPerformanceMode(val); }
+                public int getBionicFgMultiplier() { return shortcut.getBionicFgMultiplier(); }
+                public void setBionicFgMultiplier(int val) { shortcut.setBionicFgMultiplier(val); }
+                public float getBionicFgFlowScale() { return shortcut.getBionicFgFlowScale(); }
+                public void setBionicFgFlowScale(float val) { shortcut.setBionicFgFlowScale(val); }
+                public int getBionicFgModel() { return shortcut.getBionicFgModel(); }
+                public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
             }, rendererNativeHolder[0]).show());
         }
 
@@ -845,7 +853,20 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             String contentsURL = PreferenceManager.getDefaultSharedPreferences(getContext())
                     .getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
             String json = Downloader.downloadString(contentsURL);
-            if (json != null) contentsManager.setRemoteProfiles(json);
+            boolean includeBannerlator = types.contains(ContentProfile.ContentType.CONTENT_TYPE_BOX64)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_VKD3D);
+            String bannerlatorJson = includeBannerlator
+                    ? Downloader.downloadString(ContentsManager.BANNERLATOR_REMOTE_PROFILES)
+                    : null;
+            boolean includeVegasDxvk = types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
+            String vegasJson = includeVegasDxvk ? Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API) : null;
+            contentsManager.clearRemoteProfiles();
+            if (json != null) contentsManager.appendRemoteProfiles(json);
+            if (bannerlatorJson != null) contentsManager.appendBannerlatorRemoteProfiles(bannerlatorJson);
+            if (vegasJson != null) contentsManager.appendVegasDxvkRemoteProfiles(vegasJson);
+            contentsManager.syncContents();
             List<ContentProfile> candidates = new ArrayList<>();
             for (ContentProfile.ContentType type : types) {
                 for (ContentProfile profile : contentsManager.getProfiles(type)) {
@@ -946,8 +967,10 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.startsWith("dxvk"))
-                    vDXWrapperConfig.setOnClickListener(v -> new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, ShortcutSettingsDialog.this, contentsManager).show());
+                if (dxwrapper.startsWith("dxvk") || dxwrapper.contains("vegas")) {
+                    boolean isVegas = dxwrapper.contains("vegas");
+                    vDXWrapperConfig.setOnClickListener(v -> new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, isVegas, ShortcutSettingsDialog.this, contentsManager).show());
+                }
                 else if (dxwrapper.equals("wined3d"))
                     vDXWrapperConfig.setOnClickListener(v -> new WineD3DConfigDialog(vDXWrapperConfig).show());
                 vDXWrapperConfig.setVisibility(View.VISIBLE);

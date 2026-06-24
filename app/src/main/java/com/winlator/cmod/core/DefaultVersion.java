@@ -9,4 +9,8 @@ public abstract class DefaultVersion {
     public static final String DXVK = GPUInformation.getRenderer(null, null).contains("Mali") ? "1.10.3" : "2.3.1";
     public static final String D8VK = "1.0";
     public static final String VKD3D = "None";
+
+    public static String getVegasDefault() {
+        return "2.7.3";
+    }
 }

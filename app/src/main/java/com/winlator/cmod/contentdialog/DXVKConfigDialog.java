@@ -45,6 +45,7 @@ public class DXVKConfigDialog extends ContentDialog {
     private final View llAsync;
     private final View llAsyncCache;
     private final Context context;
+    private final boolean isVegas;
     private final ContentInstallHost installHost;
     private final ContentsManager contentsManager;
     private static List<String> dxvkVersions;
@@ -83,17 +84,22 @@ public class DXVKConfigDialog extends ContentDialog {
     }
 
     public DXVKConfigDialog(View anchor, boolean isARM64EC) {
-        this(anchor, isARM64EC, null, new ContentsManager(anchor.getContext()));
+        this(anchor, isARM64EC, false, null, new ContentsManager(anchor.getContext()));
     }
 
     public DXVKConfigDialog(View anchor, boolean isARM64EC, ContentInstallHost installHost, ContentsManager contentsManager) {
+        this(anchor, isARM64EC, false, installHost, contentsManager);
+    }
+
+    public DXVKConfigDialog(View anchor, boolean isARM64EC, boolean isVegas, ContentInstallHost installHost, ContentsManager contentsManager) {
         super(anchor.getContext(), R.layout.dxvk_config_dialog);
         context = anchor.getContext();
+        this.isVegas = isVegas;
         this.installHost = installHost;
         this.contentsManager = contentsManager;
         findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(context), Math.round(UnitUtils.dpToPx(300)));
         setIcon(R.drawable.icon_monitor);
-        setTitle("DXVK "+context.getString(R.string.configuration));
+        setTitle((isVegas ? "VEGAS " : "DXVK ") + context.getString(R.string.configuration));
 
         final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
         final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);
@@ -109,7 +115,11 @@ public class DXVKConfigDialog extends ContentDialog {
         this.contentsManager.syncContents();
 
         KeyValueSet config = parseConfig(anchor.getTag());
-        loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
+        if (isVegas) {
+            loadVegasVersionSpinner(sDXVKVersion);
+        } else {
+            loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
+        }
         loadVkd3dVersionSpinner(this.contentsManager, sVKD3DVersion, isARM64EC);
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, VKD3D_FEATURE_LEVEL);
@@ -172,7 +182,11 @@ public class DXVKConfigDialog extends ContentDialog {
                     updateConfigVisibility(getDXVKType(sDXVKVersion.getSelectedItemPosition()));
                 }
                 else {
-                    loadDxvkVersionSpinner(DXVKConfigDialog.this.contentsManager, sDXVKVersion, isARM64EC);
+                    if (DXVKConfigDialog.this.isVegas) {
+                        loadVegasVersionSpinner(sDXVKVersion);
+                    } else {
+                        loadDxvkVersionSpinner(DXVKConfigDialog.this.contentsManager, sDXVKVersion, isARM64EC);
+                    }
                     AppUtils.setSpinnerSelectionFromIdentifier(sDXVKVersion, config.get("version"));
                 }
             }
@@ -184,19 +198,24 @@ public class DXVKConfigDialog extends ContentDialog {
 
 
         if (installHost != null) {
-            findViewById(R.id.BTDXVKInstall).setOnClickListener(v ->
-                    installHost.showInstallChoicePopup(v, Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_DXVK), () -> {
-                        this.contentsManager.syncContents();
-                        loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
-                    }));
+            if (isVegas) {
+                findViewById(R.id.BTDXVKInstall).setVisibility(View.GONE);
+                findViewById(R.id.BTDXVKRemove).setVisibility(View.GONE);
+            } else {
+                findViewById(R.id.BTDXVKInstall).setOnClickListener(v ->
+                        installHost.showInstallChoicePopup(v, Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_DXVK), () -> {
+                            this.contentsManager.syncContents();
+                            loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
+                        }));
 
-            findViewById(R.id.BTDXVKRemove).setOnClickListener(v ->
-                    installHost.removeSelectedContent(Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_DXVK),
-                            () -> sDXVKVersion.getSelectedItem() != null ? sDXVKVersion.getSelectedItem().toString() : "",
-                            () -> {
-                                this.contentsManager.syncContents();
-                                loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
-                            }));
+                findViewById(R.id.BTDXVKRemove).setOnClickListener(v ->
+                        installHost.removeSelectedContent(Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_DXVK),
+                                () -> sDXVKVersion.getSelectedItem() != null ? sDXVKVersion.getSelectedItem().toString() : "",
+                                () -> {
+                                    this.contentsManager.syncContents();
+                                    loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
+                                }));
+            }
 
             findViewById(R.id.BTVkd3dInstall).setOnClickListener(v ->
                     installHost.showInstallChoicePopup(v, Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_VKD3D), () -> {
@@ -344,6 +363,17 @@ public class DXVKConfigDialog extends ContentDialog {
         }
 
         itemList.removeIf(version -> !isVersionAllowedForArch(version, isARM64EC));
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
+        spinner.setAdapter(adapter);
+        configureContentSpinnerDropdown(spinner);
+        dxvkVersions = itemList;
+    }
+
+    private void loadVegasVersionSpinner(Spinner spinner) {
+        String[] originalItems = context.getResources().getStringArray(R.array.vegas_version_entries);
+        List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);

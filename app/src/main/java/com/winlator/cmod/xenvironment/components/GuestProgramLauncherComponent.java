@@ -19,9 +19,9 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.FrameGenManager;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
-import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -408,18 +408,28 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
 
         if (shortcut != null) {
-            LsfgVkManager.ensureRuntimeInstalled(context, shortcut);
-            LsfgVkManager.writeConfig(shortcut);
-            LsfgVkManager.applyLaunchEnv(shortcut, execEnvVars);
+            FrameGenManager.ensureRuntimeInstalled(context, shortcut);
+            FrameGenManager.writeConfig(shortcut);
+            FrameGenManager.applyLaunchEnv(shortcut, execEnvVars);
         } else {
-            // Keep the desktop container path free of the LSFG implicit layer.
+            // Keep the desktop container path free of frame generation layers.
             File lsfgManifest = new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json");
             if (lsfgManifest.exists() && !lsfgManifest.delete()) {
                 Log.w("GuestProgramLauncherComponent", "Failed to remove stale LSFG manifest: " + lsfgManifest);
             }
+            File bionicFgManifest = new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_BIONIC_framegen.json");
+            if (bionicFgManifest.exists() && !bionicFgManifest.delete()) {
+                Log.w("GuestProgramLauncherComponent", "Failed to remove stale Bionic-FG manifest: " + bionicFgManifest);
+            }
             execEnvVars.put("DISABLE_LSFG", "1");
             execEnvVars.remove("LSFG_CONFIG");
             execEnvVars.remove("LSFG_PROCESS");
+            execEnvVars.put("BIONIC_FG_DISABLE", "1");
+            execEnvVars.remove("BIONIC_FG_ENABLE");
+            execEnvVars.remove("BIONIC_FG_CONFIG");
+            execEnvVars.remove("BIONIC_FG_MULTIPLIER");
+            execEnvVars.remove("BIONIC_FG_FLOW_SCALE");
+            execEnvVars.remove("BIONIC_FG_MODEL");
         }
 
         String emulator = container.getEmulator();

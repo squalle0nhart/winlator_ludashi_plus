@@ -342,4 +342,60 @@ public class Shortcut {
     public void setLsfgPerformanceMode(boolean performanceMode) {
         putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
     }
+
+    public String getFrameGenBackend() {
+        String value = getExtra("frameGenBackend", null);
+        if (value != null && !value.isEmpty()) return value;
+        return container.getFrameGenBackend();
+    }
+
+    public void setFrameGenBackend(String backend) {
+        putExtra("frameGenBackend", backend != null && !backend.isEmpty() ? backend : "lsfg_vk");
+    }
+
+    public int getBionicFgMultiplier() {
+        String value = getExtra("bionicFgMultiplier", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    : container.getBionicFgMultiplier();
+        } catch (NumberFormatException e) {
+            return container.getBionicFgMultiplier();
+        }
+    }
+
+    public void setBionicFgMultiplier(int multiplier) {
+        putExtra("bionicFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getBionicFgFlowScale() {
+        String value = getExtra("bionicFgFlowScale", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getBionicFgFlowScale();
+        } catch (NumberFormatException e) {
+            return container.getBionicFgFlowScale();
+        }
+    }
+
+    public void setBionicFgFlowScale(float flowScale) {
+        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
+        putExtra("bionicFgFlowScale", String.format(Locale.US, "%.2f", clamped));
+    }
+
+    public int getBionicFgModel() {
+        String value = getExtra("bionicFgModel", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0, Math.min(1, Integer.parseInt(value)))
+                    : container.getBionicFgModel();
+        } catch (NumberFormatException e) {
+            return container.getBionicFgModel();
+        }
+    }
+
+    public void setBionicFgModel(int model) {
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+    }
 }

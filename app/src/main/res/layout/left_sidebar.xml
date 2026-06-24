@@ -319,14 +319,14 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="LSFG-VK"
+                        android:text="Frame Generation"
                         android:textStyle="bold"
                         android:textColor="#FF8C00"
                         android:textSize="10sp" />
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Lossless Scaling Frame Generation (Vulkan layer)."
+                        android:text="Choose LSFG-VK or Bionic-FG and tune frame interpolation."
                         android:textColor="#888888"
                         android:textSize="10sp"
                         android:paddingBottom="5dp"/>
@@ -347,7 +347,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="LSFG Settings..."
+                            android:text="Frame Gen Settings..."
                             android:textColor="#FF8C00"
                             android:textSize="13sp"
                             android:textStyle="bold"
