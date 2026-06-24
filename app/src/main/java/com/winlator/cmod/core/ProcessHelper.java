@@ -251,7 +251,9 @@ public abstract class ProcessHelper {
     private static void createWaitForThread(java.lang.Process process, final Callback<Integer> terminationCallback) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                terminationCallback.call(process.waitFor());
+                int status = process.waitFor();
+                Log.d("ProcessHelper", "Process exited with status: " + status);
+                terminationCallback.call(status);
             } catch (InterruptedException e) {
                 Log.e("ProcessHelper", "Error waiting for process termination", e);
             }

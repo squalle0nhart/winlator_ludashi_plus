@@ -21,6 +21,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.ProcessHelper;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -406,6 +407,21 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             execEnvVars.putAll(this.envVars);
         }
 
+        if (shortcut != null) {
+            LsfgVkManager.ensureRuntimeInstalled(context, shortcut);
+            LsfgVkManager.writeConfig(shortcut);
+            LsfgVkManager.applyLaunchEnv(shortcut, execEnvVars);
+        } else {
+            // Keep the desktop container path free of the LSFG implicit layer.
+            File lsfgManifest = new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json");
+            if (lsfgManifest.exists() && !lsfgManifest.delete()) {
+                Log.w("GuestProgramLauncherComponent", "Failed to remove stale LSFG manifest: " + lsfgManifest);
+            }
+            execEnvVars.put("DISABLE_LSFG", "1");
+            execEnvVars.remove("LSFG_CONFIG");
+            execEnvVars.remove("LSFG_PROCESS");
+        }
+
         String emulator = container.getEmulator();
         if (shortcut != null)
             emulator = shortcut.getExtra("emulator", container.getEmulator());
@@ -442,6 +458,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             synchronized (lock) {
                 pid = -1;
             }
+            Log.d("GuestProgramLauncherComponent", "Guest process exited with status: " + status);
 
             if (terminationCallback != null)
                 terminationCallback.call(status);

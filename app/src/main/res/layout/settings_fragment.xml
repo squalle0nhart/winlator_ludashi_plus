@@ -574,6 +574,42 @@
                     style="@style/FieldSetLabel"
                     android:text="@string/imagefs" />
             </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout style="@style/FieldSet">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="LSFG-VK Lossless.dll" />
+
+                    <TextView
+                        android:id="@+id/TVLosslessDllStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textSize="12sp" />
+
+                    <View style="@style/FieldSeparator" />
+
+                    <Button
+                        style="@style/ButtonPositive"
+                        android:id="@+id/BTImportLosslessDll"
+                        android:layout_width="240dp"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:text="Import Lossless.dll" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/TVLsfgVk"
+                    style="@style/FieldSetLabel"
+                    android:text="LSFG-VK" />
+            </FrameLayout>
         </LinearLayout>
     </ScrollView>
 

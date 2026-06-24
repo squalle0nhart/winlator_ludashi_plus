@@ -8,6 +8,19 @@ add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)
 add_subdirectory(adrenotools)
 
+find_program(GLSLC
+        NAMES glslc
+        HINTS
+        "$ENV{ANDROID_NDK}/shader-tools/darwin-x86_64"
+        "$ENV{ANDROID_NDK_HOME}/shader-tools/darwin-x86_64"
+        "$ENV{ANDROID_SDK_ROOT}/ndk/29.0.14206865/shader-tools/darwin-x86_64"
+        "$ENV{HOME}/Library/Android/sdk/ndk/29.0.14206865/shader-tools/darwin-x86_64"
+)
+
+if(NOT GLSLC)
+    message(FATAL_ERROR "glslc not found. Install Android NDK shader tools or expose them via ANDROID_NDK/ANDROID_SDK_ROOT.")
+endif()
+
 add_library(winlator SHARED
         xr/engine.c
         xr/framebuffer.c
@@ -51,46 +64,56 @@ target_link_libraries(fakeinput
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
-    COMMAND glslangValidator -V --vn window_vert_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} vert window_vert_code
             ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window.vert
+            ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window.vert
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
     COMMENT "Compiling window.vert → window_vert.h"
 )
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
-    COMMAND glslangValidator -V --vn window_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_frag_code
             ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
     COMMENT "Compiling window.frag → window_frag.h"
 )
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
-    COMMAND glslangValidator -V --vn window_sgsr_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_sgsr_frag_code
             ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_sgsr.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_sgsr.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
     COMMENT "Compiling window_sgsr.frag → window_sgsr_frag.h"
 )
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
-    COMMAND glslangValidator -V --vn window_stretch_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_stretch_frag_code
             ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_stretch.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_stretch.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
     COMMENT "Compiling window_stretch.frag → window_stretch_frag.h"
 )
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
-    COMMAND glslangValidator -V --vn window_postfx_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_postfx_frag_code
             ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_postfx.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_postfx.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
     COMMENT "Compiling window_postfx.frag → window_postfx_frag.h"
 )
 

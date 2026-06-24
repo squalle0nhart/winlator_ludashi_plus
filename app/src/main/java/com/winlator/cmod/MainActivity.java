@@ -32,7 +32,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
@@ -51,6 +50,11 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.store.AmazonMainActivity;
+import com.winlator.cmod.store.DownloadsActivity;
+import com.winlator.cmod.store.EpicMainActivity;
+import com.winlator.cmod.store.GogMainActivity;
+import com.winlator.cmod.store.SteamMainActivity;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
 
@@ -76,6 +80,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ContainerManager containerManager;
     private boolean isDarkMode;
 
+    private void startNotificationServiceIfPermitted() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ContextCompat.startForegroundService(this, notificationService);
+        } else {
+            startService(notificationService);
+        }
+    }
+
     private void createNotificationChannel() {
         String name = "Winlator";
         String description = "Winlator XServer Messages";
@@ -88,6 +105,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
 
         // Persist the default value on first run so all other components
@@ -99,14 +118,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
 
         if (isDarkMode) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
             setTheme(R.style.AppTheme_Dark);
         } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
             setTheme(R.style.AppTheme);
         }
-
-        super.onCreate(savedInstanceState);
 
         notificationService = new Intent(this, NotificationService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED))
@@ -170,8 +185,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             navigationView.setCheckedItem(menuItemId);
 
             if (!ImageFsInstaller.installIfNeeded(this, () -> requestAppPermissions())) {
-                if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
-                    startForegroundService(notificationService);
+                startNotificationServiceIfPermitted();
             }
         }
     }
@@ -211,7 +225,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         if (requestCode == PERMISSION_POST_NOTIFICATIONS_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
-                startForegroundService(notificationService);
+                startNotificationServiceIfPermitted();
         } else if (requestCode == PERMISSION_WRITE_EXTERNAL_STORAGE_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)
                 requestAppPermissions();
@@ -311,6 +325,26 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 break;
             case R.id.main_menu_about:
                 showAboutDialog();
+                break;
+            case R.id.main_menu_gog:
+                startActivity(new Intent(this, GogMainActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
+                break;
+            case R.id.main_menu_epic:
+                startActivity(new Intent(this, EpicMainActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
+                break;
+            case R.id.main_menu_amazon:
+                startActivity(new Intent(this, AmazonMainActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
+                break;
+            case R.id.main_menu_steam:
+                startActivity(new Intent(this, SteamMainActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
+                break;
+            case R.id.main_menu_downloads:
+                startActivity(new Intent(this, DownloadsActivity.class));
+                drawerLayout.closeDrawer(GravityCompat.START);
                 break;
         }
         return true;

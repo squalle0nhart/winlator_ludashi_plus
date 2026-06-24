@@ -60,6 +60,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProtonPackageManager;
 import com.winlator.cmod.core.StringUtils;
@@ -486,6 +487,51 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
                             public void setRendererSwapRB(boolean val) {
                                 rendererCfgHolder.setRendererSwapRB(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public boolean supportsLsfg() {
+                                return true;
+                            }
+
+                            public boolean isLsfgDllAvailable() {
+                                return LsfgVkManager.isGlobalDllAvailable(getContext())
+                                        || LsfgVkManager.containerDllPath(rendererCfgHolder) != null;
+                            }
+
+                            public int getLsfgMultiplier() {
+                                return rendererCfgHolder.getLsfgMultiplier();
+                            }
+
+                            public void setLsfgMultiplier(int val) {
+                                rendererCfgHolder.setLsfgMultiplier(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public void setLsfgEnabled(boolean val) {
+                                rendererCfgHolder.setLsfgEnabled(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public float getLsfgFlowScale() {
+                                return rendererCfgHolder.getLsfgFlowScale();
+                            }
+
+                            public void setLsfgFlowScale(float val) {
+                                rendererCfgHolder.setLsfgFlowScale(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
+                            public boolean getLsfgPerformanceMode() {
+                                return rendererCfgHolder.getLsfgPerformanceMode();
+                            }
+
+                            public void setLsfgPerformanceMode(boolean val) {
+                                rendererCfgHolder.setLsfgPerformanceMode(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
                             }

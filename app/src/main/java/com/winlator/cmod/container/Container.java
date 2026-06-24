@@ -20,6 +20,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.Iterator;
+import java.util.Locale;
 
 public class Container {
     public enum XrControllerMapping {
@@ -145,6 +146,53 @@ public class Container {
     public void setRendererFilterMode(int v) { this.rendererFilterMode = v; }
     public boolean getRendererSwapRB() { return rendererSwapRB; }
     public void setRendererSwapRB(boolean v) { this.rendererSwapRB = v; }
+
+    public boolean isLsfgEnabled() {
+        String value = getExtra("lsfgEnabled", "false");
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    public void setLsfgEnabled(boolean enabled) {
+        putExtra("lsfgEnabled", enabled ? "true" : "false");
+    }
+
+    public int getLsfgMultiplier() {
+        String value = getExtra("lsfgMultiplier", "0");
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed == 0) return 0;
+            return Math.max(2, Math.min(4, parsed));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public void setLsfgMultiplier(int multiplier) {
+        putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getLsfgFlowScale() {
+        String value = getExtra("lsfgFlowScale", "0.80");
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
+        } catch (NumberFormatException e) {
+            return 0.80f;
+        }
+    }
+
+    public void setLsfgFlowScale(float flowScale) {
+        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
+        putExtra("lsfgFlowScale", String.format(Locale.US, "%.2f", clamped));
+    }
+
+    public boolean getLsfgPerformanceMode() {
+        String value = getExtra("lsfgPerformanceMode", "true");
+        return !"0".equals(value) && !"false".equalsIgnoreCase(value);
+    }
+
+    public void setLsfgPerformanceMode(boolean performanceMode) {
+        putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
+    }
 
     public String getDXWrapper() {
         return dxwrapper;

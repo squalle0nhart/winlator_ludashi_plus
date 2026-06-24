@@ -78,6 +78,77 @@
                 android:layout_marginTop="8dp"
                 android:text="Swap red/blue channels" />
 
+            <LinearLayout
+                android:id="@+id/GroupLsfg"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <View
+                    style="@style/FieldSeparator"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="LSFG-VK"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
+
+                <TextView
+                    android:id="@+id/TVLsfgStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="8dp"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Frame Multiplier"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
+
+                <Spinner
+                    android:id="@+id/SPLsfgMultiplier"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Flow Scale" />
+
+                    <TextView
+                        android:id="@+id/TVLsfgFlowScale"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/SBLsfgFlowScale"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <CheckBox
+                    android:id="@+id/CBLsfgPerformanceMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Performance Mode" />
+            </LinearLayout>
+
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

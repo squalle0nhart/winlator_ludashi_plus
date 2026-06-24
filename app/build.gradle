@@ -12,7 +12,7 @@ buildscript {
     dependencies {
         // Adjust Gradle plugin versions if needed
         classpath 'com.android.tools.build:gradle:8.8.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21'
     }
 
 }
@@ -20,6 +20,8 @@ buildscript {
 plugins {
     id 'com.android.application'
 }
+
+apply plugin: 'kotlin-android'
 
 tasks.register("downloadImageFS") {
     def assetDir = new File(project.rootDir, ["app","src","main","assets"].join(File.separator))
@@ -107,6 +109,10 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
@@ -155,6 +161,10 @@ dependencies {
     implementation 'com.github.bumptech.glide:glide:4.11.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'in.dragonbra:javasteam:1.8.0'
+    implementation 'in.dragonbra:javasteam-depotdownloader:1.8.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
 }
 

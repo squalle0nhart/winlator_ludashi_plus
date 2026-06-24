@@ -43,6 +43,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -158,6 +159,17 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
+                public boolean supportsLsfg() { return true; }
+                public boolean isLsfgDllAvailable() {
+                    return LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(shortcut) != null;
+                }
+                public int getLsfgMultiplier() { return shortcut.getLsfgMultiplier(); }
+                public void setLsfgMultiplier(int val) { shortcut.setLsfgMultiplier(val); }
+                public void setLsfgEnabled(boolean val) { shortcut.setLsfgEnabled(val); }
+                public float getLsfgFlowScale() { return shortcut.getLsfgFlowScale(); }
+                public void setLsfgFlowScale(float val) { shortcut.setLsfgFlowScale(val); }
+                public boolean getLsfgPerformanceMode() { return shortcut.getLsfgPerformanceMode(); }
+                public void setLsfgPerformanceMode(boolean val) { shortcut.setLsfgPerformanceMode(val); }
             }, rendererNativeHolder[0]).show());
         }
 

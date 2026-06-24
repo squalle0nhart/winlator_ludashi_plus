@@ -4,7 +4,9 @@ import android.content.Context;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.SeekBar;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
@@ -13,6 +15,7 @@ import com.winlator.cmod.core.UnitUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class RendererOptionsDialog extends ContentDialog {
 
@@ -38,6 +41,16 @@ public class RendererOptionsDialog extends ContentDialog {
 
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
+
+        boolean supportsLsfg();
+        boolean isLsfgDllAvailable();
+        int getLsfgMultiplier();
+        void setLsfgMultiplier(int v);
+        void setLsfgEnabled(boolean v);
+        float getLsfgFlowScale();
+        void setLsfgFlowScale(float v);
+        boolean getLsfgPerformanceMode();
+        void setLsfgPerformanceMode(boolean v);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
@@ -51,6 +64,8 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
+    private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
+    private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
         super(anchorView.getContext(), R.layout.renderer_options_dialog);
@@ -63,6 +78,12 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
+        View groupLsfg = findViewById(R.id.GroupLsfg);
+        TextView tvLsfgStatus = findViewById(R.id.TVLsfgStatus);
+        Spinner spLsfgMultiplier = findViewById(R.id.SPLsfgMultiplier);
+        SeekBar sbLsfgFlowScale = findViewById(R.id.SBLsfgFlowScale);
+        TextView tvLsfgFlowScale = findViewById(R.id.TVLsfgFlowScale);
+        CheckBox cbLsfgPerformanceMode = findViewById(R.id.CBLsfgPerformanceMode);
 
         // Keep driver and filter controls available in both Vulkan and native modes.
         setGroupVisibility(R.id.GroupDriver,  View.VISIBLE);
@@ -99,13 +120,71 @@ public class RendererOptionsDialog extends ContentDialog {
         spFilter.setSelection(config.getRendererFilterMode());
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
+        boolean supportsLsfg = config.supportsLsfg();
+        if (groupLsfg != null) {
+            groupLsfg.setVisibility(supportsLsfg ? View.VISIBLE : View.GONE);
+        }
+        if (supportsLsfg && tvLsfgStatus != null && spLsfgMultiplier != null && sbLsfgFlowScale != null
+                && tvLsfgFlowScale != null && cbLsfgPerformanceMode != null) {
+            boolean dllAvailable = config.isLsfgDllAvailable();
+            tvLsfgStatus.setText(dllAvailable
+                    ? "LSFG-VK runtime will use the imported Lossless.dll at launch."
+                    : "Import Lossless.dll in app settings before enabling LSFG-VK.");
+
+            setAmoledAdapter(ctx, spLsfgMultiplier, LSFG_MULTIPLIER_LABELS);
+            int multiplierSelection = 0;
+            int currentMultiplier = config.getLsfgMultiplier();
+            for (int i = 0; i < LSFG_MULTIPLIER_VALUES.length; i++) {
+                if (LSFG_MULTIPLIER_VALUES[i] == currentMultiplier) {
+                    multiplierSelection = i;
+                    break;
+                }
+            }
+            spLsfgMultiplier.setSelection(multiplierSelection);
+
+            float flowScale = sanitizeFlowScale(config.getLsfgFlowScale());
+            sbLsfgFlowScale.setMax(75);
+            sbLsfgFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100.0f));
+            tvLsfgFlowScale.setText(String.format(Locale.US, "%.2f", flowScale));
+            sbLsfgFlowScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    float value = sanitizeFlowScale(0.25f + (progress / 100.0f));
+                    tvLsfgFlowScale.setText(String.format(Locale.US, "%.2f", value));
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {}
+            });
+
+            cbLsfgPerformanceMode.setChecked(config.getLsfgPerformanceMode());
+
+            spLsfgMultiplier.setEnabled(dllAvailable);
+            sbLsfgFlowScale.setEnabled(dllAvailable);
+            cbLsfgPerformanceMode.setEnabled(dllAvailable);
+        }
+
         // Save on confirm
         setOnConfirmCallback(() -> {
             config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
             config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererSwapRB(cbSwapRB.isChecked());
+            if (supportsLsfg && spLsfgMultiplier != null && sbLsfgFlowScale != null && cbLsfgPerformanceMode != null) {
+                int multiplier = LSFG_MULTIPLIER_VALUES[spLsfgMultiplier.getSelectedItemPosition()];
+                config.setLsfgMultiplier(multiplier);
+                config.setLsfgEnabled(multiplier >= 2);
+                config.setLsfgFlowScale(sanitizeFlowScale(0.25f + (sbLsfgFlowScale.getProgress() / 100.0f)));
+                config.setLsfgPerformanceMode(cbLsfgPerformanceMode.isChecked());
+            }
         });
+    }
+
+    private static float sanitizeFlowScale(float value) {
+        return Math.max(0.25f, Math.min(1.0f, value));
     }
 
     private void setAmoledAdapter(Context ctx, Spinner spinner, String[] items) {

@@ -7,7 +7,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
 import android.graphics.Rect;
 import android.graphics.Color;
@@ -48,7 +47,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
@@ -72,6 +70,8 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
+import com.winlator.cmod.core.LsfgQuickMenuHelper;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
@@ -128,6 +128,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -139,7 +140,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final boolean DISABLE_TOUCHSCREEN_AUTO_HIDE = true;
 
     public static String NOTIFICATION_CHANNEL_ID = "Winlator";
-    public static int NOTIFICATION_ID = -1;
     private XServerView xServerView;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
@@ -578,32 +578,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String controlsProfile = shortcut != null ? shortcut.getExtra("controlsProfile", "") : "";
 
-        createNotifcationChannel();
-
-        Intent notificationIntent = new Intent(this, XServerDisplayActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
-                PendingIntent.FLAG_IMMUTABLE);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_ab_gear_0011)
-                .setContentTitle("Winlator")
-                .setContentText("Winlator is running, do not kill or swipe this notification")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(false);
-
-        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, builder.build());
-
         Runnable runnable = () -> {
-            setupUI();
-            setupSidebarInputControls();
-            if (controlsProfile.isEmpty()) {
-
-                simulateConfirmInputControlsDialog();
-            }
             Executors.newSingleThreadExecutor().execute(() -> {
                 setupWineSystemFiles();
                 extractGraphicsDriverFiles();
                 changeWineAudioDriver();
+                CountDownLatch uiReady = new CountDownLatch(1);
+                runOnUiThread(() -> {
+                    setupUI();
+                    setupSidebarInputControls();
+                    if (controlsProfile.isEmpty()) {
+                        simulateConfirmInputControlsDialog();
+                    }
+                    uiReady.countDown();
+                });
+                try {
+                    uiReady.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
                 try {
                     setupXEnvironment();
                 } catch (PackageManager.NameNotFoundException e) {
@@ -794,7 +788,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void exit() {
-        NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID);
         boolean removeLoadingBar = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean("remove_loading_bar_when_booting_games", false);
         if (!removeLoadingBar) preloaderDialog.showOnUiThread(R.string.shutdown);
@@ -1312,6 +1305,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         toggleOnClick(R.id.BTItemGraphics, R.id.LLSubGraphics);
         toggleOnClick(R.id.BTItemScreen, R.id.LLSubScreen);
         openSidebarPanel(R.id.BTItemFPS, R.id.LLSubFPS);
+
+        View btLsfg = findViewById(R.id.BTLsfgSettings);
+        if (btLsfg != null) {
+            btLsfg.setOnClickListener(v -> showLsfgQuickDialog());
+        }
 
         ViewGroup btItemPause = (ViewGroup) findViewById(R.id.BTItemPause);
         if (btItemPause != null) {
@@ -1864,7 +1862,118 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-        private void setupSidebarInputControls() {
+    private void showLsfgQuickDialog() {
+        if (container == null) {
+            AppUtils.showToast(this, "Container is not ready");
+            return;
+        }
+
+        boolean dllAvailable = shortcut != null
+                ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
+                : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
+        if (!dllAvailable) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("LSFG-VK")
+                    .setMessage("Lossless.dll not found. Import it from app settings or place it inside the container.")
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+
+        LsfgQuickMenuHelper.Settings currentSettings = shortcut != null
+                ? LsfgQuickMenuHelper.readSettings(shortcut)
+                : LsfgQuickMenuHelper.readSettings(container);
+        final int[] selectedMultiplier = {currentSettings.multiplier};
+        final float[] selectedFlowScale = {currentSettings.flowScale};
+        final boolean[] selectedPerformanceMode = {currentSettings.performanceMode};
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int padding = Math.round(getResources().getDisplayMetrics().density * 16.0f);
+        layout.setPadding(padding, padding / 2, padding, 0);
+
+        TextView description = new TextView(this);
+        description.setText("Frame multiplier - generates intermediate frames between rendered ones.");
+        layout.addView(description);
+
+        android.widget.RadioGroup multiplierGroup = new android.widget.RadioGroup(this);
+        multiplierGroup.setOrientation(android.widget.RadioGroup.VERTICAL);
+        int[] multiplierValues = {0, 2, 3, 4};
+        for (int value : multiplierValues) {
+            android.widget.RadioButton radioButton = new android.widget.RadioButton(this);
+            radioButton.setId(View.generateViewId());
+            radioButton.setTag(value);
+            radioButton.setText(value == 0 ? "Off" : value + "x");
+            boolean checked = value == selectedMultiplier[0] || (value == 0 && selectedMultiplier[0] < 2);
+            radioButton.setChecked(checked);
+            multiplierGroup.addView(radioButton);
+        }
+        multiplierGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            View checkedView = group.findViewById(checkedId);
+            Object tag = checkedView != null ? checkedView.getTag() : null;
+            if (tag instanceof Integer) selectedMultiplier[0] = (Integer) tag;
+        });
+        layout.addView(multiplierGroup);
+
+        TextView flowLabel = new TextView(this);
+        flowLabel.setPadding(0, padding, 0, 0);
+        flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", selectedFlowScale[0]));
+        layout.addView(flowLabel);
+
+        android.widget.SeekBar flowSeekBar = new android.widget.SeekBar(this);
+        flowSeekBar.setMax(75);
+        flowSeekBar.setProgress(Math.round((selectedFlowScale[0] - 0.25f) * 100.0f));
+        flowSeekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                selectedFlowScale[0] = LsfgQuickMenuHelper.sanitizeFlowScale(0.25f + (progress / 100.0f));
+                flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", selectedFlowScale[0]));
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
+        });
+        layout.addView(flowSeekBar);
+
+        CheckBox performanceMode = new CheckBox(this);
+        performanceMode.setText("Performance mode");
+        performanceMode.setChecked(selectedPerformanceMode[0]);
+        performanceMode.setOnCheckedChangeListener((buttonView, isChecked) -> selectedPerformanceMode[0] = isChecked);
+        layout.addView(performanceMode);
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("LSFG-VK")
+                .setView(layout)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    LsfgQuickMenuHelper.Settings newSettings = new LsfgQuickMenuHelper.Settings(
+                            selectedMultiplier[0],
+                            selectedFlowScale[0],
+                            selectedPerformanceMode[0]);
+                    if (shortcut != null) {
+                        LsfgQuickMenuHelper.applySettings(shortcut, newSettings);
+                        if (selectedMultiplier[0] >= 2) {
+                            LsfgVkManager.ensureRuntimeInstalled(this, shortcut);
+                            LsfgVkManager.writeConfig(shortcut);
+                        }
+                    } else {
+                        LsfgQuickMenuHelper.applySettings(container, newSettings);
+                        if (selectedMultiplier[0] >= 2) {
+                            LsfgVkManager.ensureRuntimeInstalled(this, container);
+                            LsfgVkManager.writeConfig(container);
+                        }
+                    }
+                    AppUtils.showToast(this, selectedMultiplier[0] >= 2
+                            ? "LSFG enabled: " + selectedMultiplier[0] + "x"
+                            : "LSFG disabled");
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void setupSidebarInputControls() {
         if (inputControlsView == null || inputControlsManager == null) return;
 
         Spinner spInputControlsProfile = findViewById(R.id.SPInputControlsProfile);
