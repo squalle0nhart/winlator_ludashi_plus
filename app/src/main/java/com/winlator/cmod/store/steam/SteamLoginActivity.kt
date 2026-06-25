@@ -66,6 +66,9 @@ class SteamLoginActivity : Activity(), SteamAuthManager.AuthListener {
         mainHandler.removeCallbacks(connectTimeoutRunnable)
         connectWaitListener?.let { SteamRepository.getInstance().removeListener(it) }
         connectWaitListener = null
+        if (isFinishing && !isChangingConfigurations && !SteamPrefs.isLoggedIn) {
+            SteamForegroundService.stop(this)
+        }
         super.onDestroy()
         SteamAuthManager.getInstance().cancelAuth()
     }

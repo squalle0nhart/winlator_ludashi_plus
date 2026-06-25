@@ -124,7 +124,10 @@ public class ContainerManager {
             data.put("id", id);
 
             File containerDir = new File(homeDir, ImageFs.USER+"-"+id);
-            if (!containerDir.mkdirs()) return null;
+            if (!containerDir.mkdirs()) {
+                Log.e("ContainerManager", "Failed to create container directory: " + containerDir.getAbsolutePath());
+                return null;
+            }
 
             Container container = new Container(id, this);
             container.setRootDir(containerDir);
@@ -133,6 +136,7 @@ public class ContainerManager {
             container.setWineVersion(data.getString("wineVersion"));
 
             if (!extractContainerPatternFile(container, container.getWineVersion(), contentsManager, containerDir, null)) {
+                Log.e("ContainerManager", "Failed to extract container pattern for wineVersion=" + container.getWineVersion());
                 FileUtils.delete(containerDir);
                 return null;
             }
@@ -256,13 +260,19 @@ public class ContainerManager {
 
     public boolean extractContainerPatternFile(Container container, String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {
         WineInfo wineInfo = WineInfo.fromIdentifier(context, contentsManager, wineVersion);
-        if (wineInfo.path == null || wineInfo.path.isEmpty()) return false;
-        String containerPattern = wineVersion + "_container_pattern.tzst";
+        if (wineInfo.path == null || wineInfo.path.isEmpty()) {
+            Log.e("ContainerManager", "Wine path is empty for wineVersion=" + wineVersion);
+            return false;
+        }
+        String containerPattern = wineInfo.identifier() + "_container_pattern.tzst";
         boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
 
         if (!result) {
             File containerPatternFile = new File(wineInfo.path + "/prefixPack.txz");
             result = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, containerPatternFile, containerDir);
+            if (!result) {
+                Log.e("ContainerManager", "Failed to extract prefix pack from " + containerPatternFile.getAbsolutePath());
+            }
         }
 
         if (result) {
@@ -275,6 +285,7 @@ public class ContainerManager {
                 extractCommonDlls(wineInfo, "i386-windows", "syswow64", containerDir, onExtractFileListener);
             }
             catch (JSONException e) {
+                Log.e("ContainerManager", "Failed to extract Wine DLLs for " + wineInfo.identifier(), e);
                 return false;
             }
         }

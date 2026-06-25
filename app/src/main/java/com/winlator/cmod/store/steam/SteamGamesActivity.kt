@@ -49,6 +49,9 @@ class SteamGamesActivity : Activity(), SteamRepository.SteamEventListener {
 
     override fun onDestroy() {
         SteamRepository.getInstance().removeListener(this)
+        if (isFinishing && !isChangingConfigurations) {
+            SteamForegroundService.stop(this)
+        }
         super.onDestroy()
     }
 

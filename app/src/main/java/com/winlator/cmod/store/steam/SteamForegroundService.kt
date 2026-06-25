@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 
 /**
  * Foreground service that keeps the Steam CM connection alive while downloading
@@ -32,7 +33,7 @@ class SteamForegroundService : Service() {
 
         /** Start the service from any Context. */
         fun start(ctx: Context) {
-            ctx.startService(Intent(ctx, SteamForegroundService::class.java))
+            ContextCompat.startForegroundService(ctx, Intent(ctx, SteamForegroundService::class.java))
         }
 
         /** Stop the service from any Context. */
@@ -60,13 +61,21 @@ class SteamForegroundService : Service() {
         SteamRepository.getInstance().initialize(this)
         SteamRepository.getInstance().connect()
 
-        return START_STICKY   // restart if killed by OS
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         Log.i(TAG, "Service destroyed — disconnecting")
+        stopForeground(STOP_FOREGROUND_REMOVE)
         SteamRepository.getInstance().disconnect()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "Task removed — stopping Steam foreground service")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
