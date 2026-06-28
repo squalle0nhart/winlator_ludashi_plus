@@ -117,6 +117,9 @@ struct WindowPushConstantsSGSR  { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAl
                                   int   effectId;   
                                   float resW;       
                                   float sharpness; };
+struct WindowPushConstantsNis   { float ndcX0, ndcY0, ndcX1, ndcY1;
+                                  float invSrcW, invSrcH, srcW, srcH;
+                                  float sharpness; };
 struct WindowPushConstantsStretch { float ndcX0, ndcY0, ndcX1, ndcY1; int useTexAlpha; float strength; float profile; };
 
 struct WindowPushConstantsPostFX  { float ndcX0, ndcY0, ndcX1, ndcY1;
@@ -315,8 +318,10 @@ private:
     VkDescriptorSetLayout dsLayout    = VK_NULL_HANDLE;
     VkPipelineLayout      pipeLayout  = VK_NULL_HANDLE;
 
-    VkPipeline            pipeline    = VK_NULL_HANDLE;
+    VkPipeline            pipeline       = VK_NULL_HANDLE;
     VkPipeline            sgsrPipeline   = VK_NULL_HANDLE;
+    VkPipeline            nisPipeline    = VK_NULL_HANDLE;
+    VkPipeline            legacyUpscalePipeline = VK_NULL_HANDLE;
     VkPipeline            stretchPipeline= VK_NULL_HANDLE;
     VkPipeline            postfxPipeline = VK_NULL_HANDLE;
 
@@ -353,6 +358,8 @@ private:
     void createDSLayout();
     void createPipeline(bool blend, VkPipeline& out);
     void createSgsrPipeline();
+    void createNisPipeline();
+    void createLegacyUpscalePipeline();
     void createStretchPipeline();
     void createPostFXPipeline();
     void createFramebuffers();

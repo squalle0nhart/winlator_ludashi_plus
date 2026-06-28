@@ -52,7 +52,8 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
     public void sendEvent(Event event) {
         try {
             event.send(sequenceNumber, outputStream);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -71,26 +72,25 @@ public class XClient implements XResourceManager.OnResourceLifecycleListener {
     }
 
     public void freeResources() {
-        for (int i = 0; i < xServer.extensions.size(); i++) {
-            xServer.extensions.valueAt(i).onClientDisconnected(this);
-        }
-
         try (XLock lock = xServer.lockAll()) {
             while (!resources.isEmpty()) {
-                XResource resource = resources.remove(resources.size() - 1);
+                XResource resource = resources.remove(resources.size()-1);
                 if (resource instanceof Window) {
                     xServer.windowManager.destroyWindow(resource.id);
-                } else if (resource instanceof Pixmap) {
+                }
+                else if (resource instanceof Pixmap) {
                     xServer.pixmapManager.freePixmap(resource.id);
-                } else if (resource instanceof GraphicsContext) {
+                }
+                else if (resource instanceof GraphicsContext) {
                     xServer.graphicsContextManager.freeGraphicsContext(resource.id);
-                } else if (resource instanceof Cursor) {
+                }
+                else if (resource instanceof Cursor) {
                     xServer.cursorManager.freeCursor(resource.id);
                 }
             }
 
             while (!eventListeners.isEmpty()) {
-                int i = eventListeners.size() - 1;
+                int i = eventListeners.size()-1;
                 eventListeners.keyAt(i).removeEventListener(eventListeners.removeAt(i));
             }
 

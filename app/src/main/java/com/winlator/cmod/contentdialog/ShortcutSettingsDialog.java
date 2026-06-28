@@ -137,6 +137,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
 
+        final String[] rendererTypeHolder = new String[] { shortcut.getRenderer() };
         final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
@@ -144,13 +145,22 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final boolean[] rendererSwapRBHolder = new boolean[] { shortcut.getRendererSwapRB() };
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
-            tvRendererMode.setText(rendererNativeHolder[0] ? "Native Rendering+" : "Vulkan");
+            tvRendererMode.setText("gl".equalsIgnoreCase(rendererTypeHolder[0]) ? "OpenGL"
+                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger" : "Vulkan");
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
-        if (btRendererOptions != null) {
-            btRendererOptions.setOnClickListener(v -> new com.winlator.cmod.contentdialog.RendererOptionsDialog(v, new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
+        View rendererTrigger = findViewById(R.id.TVRendererMode);
+        View.OnClickListener openRendererOptions = v -> new com.winlator.cmod.contentdialog.RendererOptionsDialog(btRendererOptions != null ? btRendererOptions : v, new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
+                public String getRenderer() { return rendererTypeHolder[0]; }
+                public void setRenderer(String val) {
+                    rendererTypeHolder[0] = val;
+                    if (tvRendererMode != null) {
+                        tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
+                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                    }
+                }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
-                public void setRendererNative(boolean val) { rendererNativeHolder[0] = val; if (tvRendererMode != null) tvRendererMode.setText(val ? "Native Rendering+" : "Vulkan"); }
+                public void setRendererNative(boolean val) { rendererNativeHolder[0] = val; }
                 public String getRendererPresentMode() { return rendererPresentModeHolder[0]; }
                 public void setRendererPresentMode(String val) { rendererPresentModeHolder[0] = val; }
                 public String getRendererDriverId() { return rendererDriverHolder[0]; }
@@ -159,6 +169,30 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
+                public int getGraphicsFilterMode() {
+                    String v = shortcut.getExtra("graphicsFilterMode", shortcut.container.getExtra("graphicsFilterMode", "0"));
+                    try { return Integer.parseInt(v); } catch (NumberFormatException e) { return 0; }
+                }
+                public void setGraphicsFilterMode(int val) { shortcut.putExtra("graphicsFilterMode", String.valueOf(val)); }
+                public boolean getGraphicsSupersamplingEnabled() {
+                    String v = shortcut.getExtra("graphicsStretchMode", shortcut.container.getExtra("graphicsStretchMode", "0"));
+                    return "1".equals(v) || "true".equalsIgnoreCase(v);
+                }
+                public void setGraphicsSupersamplingEnabled(boolean val) {
+                    shortcut.putExtra("graphicsStretchMode", val ? "1" : "0");
+                }
+                public int getGraphicsPostFXMode() {
+                    String v = shortcut.getExtra("graphicsPostFXMode", shortcut.container.getExtra("graphicsPostFXMode", "0"));
+                    try { return Integer.parseInt(v); } catch (NumberFormatException e) { return 0; }
+                }
+                public void setGraphicsPostFXMode(int val) { shortcut.putExtra("graphicsPostFXMode", String.valueOf(val)); }
+                public float getGraphicsSharpness() {
+                    String v = shortcut.getExtra("graphicsSharpness", shortcut.container.getExtra("graphicsSharpness", "0.50"));
+                    try { return Float.parseFloat(v); } catch (NumberFormatException e) { return 0.50f; }
+                }
+                public void setGraphicsSharpness(float val) {
+                    shortcut.putExtra("graphicsSharpness", String.format(java.util.Locale.US, "%.2f", val));
+                }
                 public boolean supportsFrameGen() { return true; }
                 public String getFrameGenBackend() { return shortcut.getFrameGenBackend(); }
                 public void setFrameGenBackend(String val) { shortcut.setFrameGenBackend(val); }
@@ -178,8 +212,9 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setBionicFgFlowScale(float val) { shortcut.setBionicFgFlowScale(val); }
                 public int getBionicFgModel() { return shortcut.getBionicFgModel(); }
                 public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
-            }, rendererNativeHolder[0]).show());
-        }
+            }, rendererNativeHolder[0]).show();
+        if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
+        if (rendererTrigger != null) rendererTrigger.setOnClickListener(openRendererOptions);
 
         final Spinner sAudioDriver = findViewById(R.id.SAudioDriver);
         AppUtils.setSpinnerSelectionFromIdentifier(sAudioDriver, shortcut.getExtra("audioDriver", shortcut.container.getAudioDriver()));
@@ -474,6 +509,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("dxwrapper", dxwrapper);
                 shortcut.putExtra("dxwrapperConfig", dxwrapperConfig);
                 shortcut.putExtra("audioDriver", audioDriver);
+                shortcut.setRenderer(rendererTypeHolder[0]);
                 shortcut.setRendererNative(rendererNativeHolder[0]);
                 shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);

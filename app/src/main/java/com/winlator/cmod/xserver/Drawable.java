@@ -20,6 +20,11 @@ public class Drawable extends XResource {
     private Callback<Drawable> onDestroyListener;
     public final Object renderLock = new Object();
     private boolean directScanout = false;
+    private static boolean DRAWABLE_FOR_ASR = false;
+
+    public static void setAsrMode(boolean value) {
+        DRAWABLE_FOR_ASR = value;
+    }
 
     static {
         System.loadLibrary("winlator");
@@ -30,7 +35,19 @@ public class Drawable extends XResource {
         this.width = (short)width;
         this.height = (short)height;
         this.visual = visual;
-        this.data = ByteBuffer.allocateDirect(width * height * 4).order(ByteOrder.LITTLE_ENDIAN);
+        if (DRAWABLE_FOR_ASR && width > 0 && height > 0) {
+            GPUImage g = new GPUImage((short) width, (short) height);
+            ByteBuffer vd = g.getHardwareBufferPtr() != 0 ? g.getVirtualData() : null;
+            if (vd != null) {
+                this.texture = g;
+                this.data = vd;
+            } else {
+                g.destroy();
+            }
+        }
+        if (this.data == null) {
+            this.data = ByteBuffer.allocateDirect(width * height * 4).order(ByteOrder.LITTLE_ENDIAN);
+        }
         if (this.data == null) {
             throw new IllegalStateException("Drawable.data initialized as null!");
         }
@@ -53,6 +70,13 @@ public class Drawable extends XResource {
 
         }
         this.texture = texture;
+    }
+
+    public void refreshDataFromTexture() {
+        if (texture instanceof GPUImage) {
+            ByteBuffer vd = ((GPUImage) texture).getVirtualData();
+            if (vd != null) data = vd;
+        }
     }
 
     public ByteBuffer getData() {
@@ -139,6 +163,8 @@ public class Drawable extends XResource {
         dstY = (short)Mathf.clamp(dstY, 0, this.height-1);
         if ((dstX + width) > this.width) width = (short)(this.width - dstX);
         if ((dstY + height) > this.height) height = (short)(this.height - dstY);
+
+        if (drawable.data == null || this.data == null) return;
 
         if (gcFunction == GraphicsContext.Function.COPY) {
             copyArea(srcX, srcY, dstX, dstY, width, height, drawable.getStride(), this.getStride(), drawable.data, this.data);

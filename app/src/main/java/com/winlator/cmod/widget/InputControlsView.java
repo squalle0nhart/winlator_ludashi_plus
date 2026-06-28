@@ -36,7 +36,7 @@ import com.winlator.cmod.inputcontrols.ExternalController;
 import com.winlator.cmod.inputcontrols.ExternalControllerBinding;
 import com.winlator.cmod.inputcontrols.GamepadState;
 import com.winlator.cmod.math.Mathf;
-
+import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.XServer;
@@ -416,15 +416,16 @@ public class InputControlsView extends View {
     }
 
     private void createMouseMoveTimer() {
+        WinHandler winHandler = xServer.getWinHandler();
         if (mouseMoveTimer == null && profile != null) {
             final float cursorSpeed = profile.getCursorSpeed();
             mouseMoveTimer = new Timer();
             mouseMoveTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {
+                    if (mouseMoveOffset.x != 0 || mouseMoveOffset.y != 0) {// Only move if there's an offset
                         if (xServer.isRelativeMouseMovement())
-                            xServer.emitRelativeMotion(mouseMoveOffset.x * cursorSpeed * 10, mouseMoveOffset.y * cursorSpeed * 10);
+                            winHandler.mouseEvent(MouseEventFlags.MOVE, (int) (mouseMoveOffset.x * cursorSpeed * 10), (int) (mouseMoveOffset.y * cursorSpeed * 10), 0);
                         else
                             xServer.injectPointerMoveDelta(
                                 (int) (mouseMoveOffset.x * cursorSpeed * 10),
@@ -829,13 +830,22 @@ public class InputControlsView extends View {
                 Pointer.Button pointerButton = binding.getPointerButton();
                 if (isActionDown) {
                     if (pointerButton != null) {
-                        xServer.injectPointerButtonPress(pointerButton);
+                        if (xServer.isRelativeMouseMovement()) {
+                            int wheelDelta = pointerButton == Pointer.Button.BUTTON_SCROLL_UP ? MOUSE_WHEEL_DELTA : (pointerButton == Pointer.Button.BUTTON_SCROLL_DOWN ? -MOUSE_WHEEL_DELTA : 0);
+                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, true), 0, 0, wheelDelta);
+                        } else {
+                            xServer.injectPointerButtonPress(pointerButton);
+                        }
                     }
                     else xServer.injectKeyPress(binding.keycode);
                 }
                 else {
                     if (pointerButton != null) {
-                        xServer.injectPointerButtonRelease(pointerButton);
+                        if (xServer.isRelativeMouseMovement()) {
+                            winHandler.mouseEvent(MouseEventFlags.getFlagFor(pointerButton, false), 0, 0, 0);
+                        } else {
+                            xServer.injectPointerButtonRelease(pointerButton);
+                        }
                     }
                     else xServer.injectKeyRelease(binding.keycode);
                 }

@@ -434,13 +434,28 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 : new com.winlator.cmod.container.Container(-1);
         final android.widget.TextView tvRendererMode = view.findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
-            tvRendererMode.setText(rendererCfgHolder.isRendererNative() ? "Native Rendering+" : "Vulkan");
+            tvRendererMode.setText("gl".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "OpenGL"
+                    : "surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "SurfaceFlinger"
+                    : "Vulkan");
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
-        if (btRendererOptions != null) {
-            btRendererOptions.setOnClickListener(v -> {
-                new com.winlator.cmod.contentdialog.RendererOptionsDialog(v,
+        View rendererTrigger = view.findViewById(R.id.TVRendererMode);
+        View.OnClickListener openRendererOptions = v -> {
+                new com.winlator.cmod.contentdialog.RendererOptionsDialog(btRendererOptions != null ? btRendererOptions : v,
                         new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
+                            public String getRenderer() {
+                                return rendererCfgHolder.getRenderer();
+                            }
+
+                            public void setRenderer(String val) {
+                                rendererCfgHolder.setRenderer(val);
+                                if (tvRendererMode != null) {
+                                    tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
+                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                                }
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
                             public boolean getRendererNative() {
                                 return rendererCfgHolder.isRendererNative();
                             }
@@ -489,6 +504,55 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setRendererSwapRB(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
+                            }
+
+                            public int getGraphicsFilterMode() {
+                                try {
+                                    return Integer.parseInt(rendererCfgHolder.getExtra("graphicsFilterMode", "0"));
+                                } catch (NumberFormatException e) {
+                                    return 0;
+                                }
+                            }
+
+                            public void setGraphicsFilterMode(int val) {
+                                rendererCfgHolder.putExtra("graphicsFilterMode", String.valueOf(val));
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public boolean getGraphicsSupersamplingEnabled() {
+                                String value = rendererCfgHolder.getExtra("graphicsStretchMode", "0");
+                                return "1".equals(value) || "true".equalsIgnoreCase(value);
+                            }
+
+                            public void setGraphicsSupersamplingEnabled(boolean val) {
+                                rendererCfgHolder.putExtra("graphicsStretchMode", val ? "1" : "0");
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public int getGraphicsPostFXMode() {
+                                try {
+                                    return Integer.parseInt(rendererCfgHolder.getExtra("graphicsPostFXMode", "0"));
+                                } catch (NumberFormatException e) {
+                                    return 0;
+                                }
+                            }
+
+                            public void setGraphicsPostFXMode(int val) {
+                                rendererCfgHolder.putExtra("graphicsPostFXMode", String.valueOf(val));
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public float getGraphicsSharpness() {
+                                try {
+                                    return Float.parseFloat(rendererCfgHolder.getExtra("graphicsSharpness", "0.50"));
+                                } catch (NumberFormatException e) {
+                                    return 0.50f;
+                                }
+                            }
+
+                            public void setGraphicsSharpness(float val) {
+                                rendererCfgHolder.putExtra("graphicsSharpness", String.format(java.util.Locale.US, "%.2f", val));
+                                if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
                             public boolean supportsFrameGen() {
@@ -576,8 +640,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
                         }, rendererCfgHolder.isRendererNative()).show();
-            });
-        }
+            };
+        if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
+        if (rendererTrigger != null) rendererTrigger.setOnClickListener(openRendererOptions);
 
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
         AppUtils.setSpinnerSelectionFromIdentifier(sAudioDriver,
@@ -893,6 +958,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("graphicsDriver", graphicsDriver);
                     data.put("graphicsDriverConfig", graphicsDriverConfig);
                     data.put("dxwrapper", dxwrapper);
+                    data.put("renderer", rendererCfgHolder.getRenderer());
                     data.put("rendererNative", rendererCfgHolder.isRendererNative());
                     data.put("rendererPresentMode", rendererCfgHolder.getRendererPresentMode());
                     if (!rendererCfgHolder.getRendererDriverId().isEmpty())
@@ -922,6 +988,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("lc_all", lc_all);
                     data.put("primaryController", primaryController);
                     data.put("controllerMapping", controllerMapping);
+                    if (rendererCfgHolder.getExtraData() != null && rendererCfgHolder.getExtraData().length() > 0) {
+                        data.put("extraData", rendererCfgHolder.getExtraData());
+                    }
 
                     PreloaderDialog creationDialog = new PreloaderDialog(getActivity());
                     creationDialog.show(R.string.creating_container);

@@ -17,7 +17,8 @@ import com.winlator.cmod.core.CubicBezierInterpolator;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.widget.InputControlsView;
 import com.winlator.cmod.widget.TouchpadView;
-
+import com.winlator.cmod.winhandler.MouseEventFlags;
+import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xserver.XServer;
 
 import org.json.JSONArray;
@@ -80,10 +81,10 @@ public class ControlElement {
     private boolean selected = false;
     private boolean toggleSwitch = false;
     private float opacity = 1.0f;
-    private int customColor = 0; 
+    private int customColor = 0; // 0 = usa a cor padrão do tema (WINLATOR_BLUE)
     private ColorFilter customColorFilter = null;
     private ColorFilter themeColorFilter = null;
-    private int themeColorFilterColor = 1; 
+    private int themeColorFilterColor = 1; // valor inválido proposital pra forçar a 1ª construção
     private boolean mouseMoveMode = false;
     private int currentPointerId = -1;
     private final Rect boundingBox = new Rect();
@@ -357,6 +358,8 @@ public class ControlElement {
         return boundingBox;
     }
 
+
+
     private String getBindingTextAt(int index) {
         Binding binding = getBindingAt(index);
         String text = binding.toString().replace("NUMPAD ", "NP").replace("BUTTON ", "");
@@ -430,11 +433,17 @@ public class ControlElement {
         return ((a & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
     }
 
+    // Combina a opacidade própria do elemento com a opacidade global da view (overlay_opacity).
+    // Em modo de edição, o valor é limitado a um mínimo de 35% para o controle nunca ficar
+    // invisível/inselecionável enquanto está sendo editado.
     private float getEffectiveOpacity() {
         float combined = opacity * inputControlsView.getOverlayOpacity();
         return inputControlsView.isEditMode() ? Math.max(0.35f, combined) : combined;
     }
 
+    // Agora é um método de instância (antes era static) para que toda chamada existente que já
+    // passava por withAlpha(...) passe a respeitar a opacidade automaticamente. Isso corrige o
+    // problema de opacidade não fazer efeito nos controles.
     private int withAlpha(int color, int alpha) {
         int scaledAlpha = (int)(alpha * getEffectiveOpacity());
         if (scaledAlpha < 0) scaledAlpha = 0;
@@ -446,6 +455,8 @@ public class ControlElement {
     private static final int DARK_SURFACE = 0xff06111d;
     private static final int EDGE_SOFT = 0xff7fa8d8;
 
+    // Cor de tema deste elemento: usa a cor customizada do próprio elemento se houver;
+    // senão, a cor do esquema (definida pra todo o perfil); senão, o azul padrão do app.
     private int getThemeColor() {
         if (customColor != 0) return customColor;
         ControlsProfile profile = inputControlsView.getProfile();
@@ -464,7 +475,7 @@ public class ControlElement {
     private void invalidateSelf() {
         Rect rect = getBoundingBox();
         int pad = Math.max(4, inputControlsView.getSnappingSize() * 2);
-
+        // InputControlsView in this mod exposes invalidateElement(Rect). This keeps redraw cheap.
         inputControlsView.invalidateElement(expandedBounds(rect, pad));
     }
 
@@ -492,6 +503,7 @@ public class ControlElement {
     private void drawSoftRoundRect(Canvas canvas, float left, float top, float right, float bottom, float radius, boolean active) {
         Paint paint = inputControlsView.getPaint();
 
+        // Faux gaussian edge: a few cheap strokes. No BlurMaskFilter, no ShadowLayer.
         setupPaint(paint, Paint.Style.STROKE, withAlpha(getThemeColor(), active ? 64 : 16), Math.max(1f, inputControlsView.getSnappingSize() * 0.55f * scale));
         canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint);
 
@@ -501,6 +513,7 @@ public class ControlElement {
         setupPaint(paint, Paint.Style.FILL, active ? withAlpha(getThemeColor(), 190) : withAlpha(DARK_SURFACE, 135), 0);
         canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint);
 
+        // Inner top highlight, gives the "OLED glass" look without a blur pass.
         float inset = Math.max(1f, inputControlsView.getSnappingSize() * 0.35f * scale);
         setupPaint(paint, Paint.Style.STROKE, withAlpha(0xffffffff, active ? 58 : 24), Math.max(1f, inputControlsView.getSnappingSize() * 0.08f * scale));
         canvas.drawRoundRect(left + inset, top + inset, right - inset, bottom - inset, Math.max(0, radius - inset), Math.max(0, radius - inset), paint);
@@ -527,22 +540,22 @@ public class ControlElement {
         Path path = inputControlsView.getPath();
         path.reset();
 
-        if (direction == 0) { 
+        if (direction == 0) { // up
             path.moveTo(cx, cy - size);
             path.lineTo(cx - size * 0.85f, cy + size * 0.65f);
             path.lineTo(cx + size * 0.85f, cy + size * 0.65f);
         }
-        else if (direction == 1) { 
+        else if (direction == 1) { // right
             path.moveTo(cx + size, cy);
             path.lineTo(cx - size * 0.65f, cy - size * 0.85f);
             path.lineTo(cx - size * 0.65f, cy + size * 0.85f);
         }
-        else if (direction == 2) { 
+        else if (direction == 2) { // down
             path.moveTo(cx, cy + size);
             path.lineTo(cx - size * 0.85f, cy - size * 0.65f);
             path.lineTo(cx + size * 0.85f, cy - size * 0.65f);
         }
-        else { 
+        else { // left
             path.moveTo(cx - size, cy);
             path.lineTo(cx + size * 0.65f, cy - size * 0.85f);
             path.lineTo(cx + size * 0.65f, cy + size * 0.85f);
@@ -589,7 +602,7 @@ public class ControlElement {
 
                 switch (shape) {
                     case CIRCLE: {
-
+                        // Face buttons stay subtle; they only fill strongly when touched.
                         drawSoftCircle(canvas, cx, cy, w * 0.5f, active, accent, true);
                         break;
                     }
@@ -620,11 +633,16 @@ public class ControlElement {
                 float cx = boundingBox.centerX();
                 float cy = boundingBox.centerY();
 
+                // Steam Deck OLED style cross, with each piece as a distinct button.
+                // dist > piece keeps the 4 pieces from overlapping diagonally
+                // (with dist < piece their rounded squares overlapped at the corners,
+                // making the D-pad look like one fused blob instead of 4 buttons).
                 float base = Math.min(boundingBox.width(), boundingBox.height());
-                float piece = base * 0.30f;       
-                float dist = piece * 1.15f;       
-                float centerSize = piece * 0.26f; 
+                float piece = base * 0.30f;       // size of each directional piece
+                float dist = piece * 1.15f;       // center-to-piece distance: > piece avoids corner overlap
+                float centerSize = piece * 0.26f; // subtle bridge only
 
+                // Very subtle center bridge: visually connects the D-pad without becoming a fifth button.
                 setupPaint(paint, Paint.Style.FILL, withAlpha(DARK_SURFACE, active ? 72 : 42), 0);
                 canvas.drawRoundRect(
                         cx - centerSize * 0.5f,
@@ -659,6 +677,8 @@ public class ControlElement {
                 path.addRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, Path.Direction.CW);
                 canvas.clipPath(path);
 
+                // Destaca apenas o segmento que está realmente sendo pressionado no momento
+                // (em vez de iluminar a faixa toda), igual ao feedback visual dos outros botões.
                 boolean isPressingSegment = currentPointerId != -1 && !scroller.isScrolling();
                 Binding pressedBinding = scroller.getBinding();
 
@@ -704,14 +724,17 @@ public class ControlElement {
                 float innerRing = outer * 0.52f;
                 float thumbRadius = outer * 0.42f;
 
+                // Outer base: dark, subtle, no gray blob.
                 setupPaint(paint, Paint.Style.FILL, withAlpha(DARK_SURFACE, active ? 155 : 118), 0);
                 canvas.drawCircle(cx, cy, outer, paint);
 
+                // Soft edge, cheap fake glow.
                 setupPaint(paint, Paint.Style.STROKE, withAlpha(EDGE_SOFT, active ? 62 : 26), Math.max(1f, snappingSize * 0.20f * scale));
                 canvas.drawCircle(cx, cy, outer * 0.96f, paint);
                 setupPaint(paint, Paint.Style.STROKE, withAlpha(getThemeColor(), active ? 72 : 20), Math.max(1f, snappingSize * 0.50f * scale));
                 canvas.drawCircle(cx, cy, outer * 0.98f, paint);
 
+                // The blue inner ring is the main identity.
                 setupPaint(paint, Paint.Style.STROKE, withAlpha(getThemeColor(), active ? 235 : 205), Math.max(1f, snappingSize * 0.22f * scale));
                 canvas.drawCircle(cx, cy, innerRing, paint);
 
@@ -727,7 +750,7 @@ public class ControlElement {
             }
 
             case TRACKPAD: {
-
+                // Discreet touchpad. It should not steal attention from the desktop.
                 float radius = boundingBox.height() * 0.18f;
                 drawSoftRoundRect(canvas, boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, active);
                 drawMouseGlyph(canvas, boundingBox.centerX(), boundingBox.centerY(), Math.min(boundingBox.width(), boundingBox.height()) * 0.45f, withAlpha(getThemeColor(), active ? 220 : 95));
@@ -740,10 +763,23 @@ public class ControlElement {
         Paint paint = inputControlsView.getPaint();
         Bitmap icon = inputControlsView.getIcon((byte)iconId);
 
+        // Start/Select/Menu icons must stay readable over the dark glass button.
+        // The old paint state could inherit a low alpha from the previous shape draw,
+        // making these icons look almost black. Force a bright white icon here, then
+        // scale by the effective opacity so icons fade out together with the rest of
+        // the control instead of staying fully opaque.
+        // IMPORTANT: setColor() must come BEFORE setAlpha() - Paint.setColor() resets
+        // alpha to the color's own alpha byte (0xff here), which was silently undoing
+        // the setAlpha() call below it and making icon opacity never change.
         paint.setColor(0xffffffff);
         int iconAlpha = (int)(230 * getEffectiveOpacity());
         paint.setAlpha(Math.max(0, Math.min(255, iconAlpha)));
 
+        // O filtro fixo da view (inputControlsView.getColorFilter()) é sempre azul e não
+        // sabia nada sobre customColor nem sobre a cor do esquema - por isso Start/Select
+        // (que são desenhados como ícone/bitmap, não como forma vetorial) ficavam presos
+        // no azul mesmo trocando a cor do tema. Agora deriva sempre de getThemeColor(),
+        // só reconstruindo o filtro quando a cor resolvida muda (evita recriar a cada frame).
         if (customColorFilter != null) {
             paint.setColorFilter(customColorFilter);
         }
@@ -806,6 +842,8 @@ public class ControlElement {
         return !toggleSwitch && (binding == Binding.GAMEPAD_BUTTON_L3 || binding == Binding.GAMEPAD_BUTTON_R3);
     }
 
+    // Dispara/solta TODOS os bindings não-NONE do botão (suporta combos com mais de 2 teclas,
+    // em vez de disparar só os índices 0 e 1 fixos).
     private void setButtonBindingsActive(boolean active) {
         for (int i = 0; i < bindings.length; i++) {
             if (bindings[i] != Binding.NONE) inputControlsView.handleInputEvent(bindings[i], active);
@@ -886,7 +924,7 @@ public class ControlElement {
                 currentPosition.y = boundingBox.top + deltaY * radius + radius;
                 float adjDeltaX = (Math.abs(deltaX) < Math.abs(deltaY) * STICK_CROSS_ZONE) ? 0 : deltaX;
                 float adjDeltaY = (Math.abs(deltaY) < Math.abs(deltaX) * STICK_CROSS_ZONE) ? 0 : deltaY;
-
+                
                 Binding firstBinding = getBindingAt(0);
                 if (firstBinding.isGamepad()) {
                     float valueX = Mathf.clamp(Math.max(0, Math.abs(adjDeltaX) - 0.01f) * Mathf.sign(adjDeltaX) * STICK_SENSITIVITY, -1, 1);
@@ -908,31 +946,33 @@ public class ControlElement {
                 invalidateSelf();
             }
             else if (type == Type.TRACKPAD) {
-
+                // Check if gamepad bindings - use unified handling
                 Binding firstBinding = getBindingAt(0);
                 if (firstBinding.isGamepad()) {
-
+                    // Apply interpolation to both axes
                     if (interpolator == null) interpolator = new CubicBezierInterpolator();
                     interpolator.set(0.075f, 0.95f, 0.45f, 0.95f);
-
+                    
                     float valueX = deltaX;
                     float valueY = deltaY;
                     if (Math.abs(valueX) > TRACKPAD_ACCELERATION_THRESHOLD) valueX *= STICK_SENSITIVITY;
                     if (Math.abs(valueY) > TRACKPAD_ACCELERATION_THRESHOLD) valueY *= STICK_SENSITIVITY;
-
+                    
                     float interpX = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueX / TRACKPAD_MAX_SPEED)));
                     float interpY = interpolator.getInterpolation(Math.min(1.0f, Math.abs(valueY / TRACKPAD_MAX_SPEED)));
-
+                    
                     float finalX = Mathf.clamp(interpX * Mathf.sign(valueX), -1, 1);
                     float finalY = Mathf.clamp(interpY * Mathf.sign(valueY), -1, 1);
-
+                    
+                    // Use unified stick input
                     inputControlsView.handleStickInput(firstBinding, finalX, finalY);
-
+                    
+                    // Mark all as active
                     for (byte i = 0; i < 4; i++) {
                         this.states[i] = true;
                     }
                 } else {
-
+                    // Mouse movement handling
                     final boolean[] states = {deltaY <= -TRACKPAD_MIN_SPEED, deltaX >= TRACKPAD_MIN_SPEED, deltaY >= TRACKPAD_MIN_SPEED, deltaX <= -TRACKPAD_MIN_SPEED};
                     int cursorDx = 0;
                     int cursorDy = 0;
@@ -956,7 +996,7 @@ public class ControlElement {
                     if (cursorDx != 0 || cursorDy != 0)  {
                         XServer xServer = inputControlsView.getXServer();
                         if (xServer.isRelativeMouseMovement())
-                            xServer.emitRelativeMotion(cursorDx, cursorDy);
+                            xServer.getWinHandler().mouseEvent(MouseEventFlags.MOVE, cursorDx, cursorDy, 0);
                         else
                             inputControlsView.getXServer().injectPointerMoveDelta(cursorDx, cursorDy);
                     }
@@ -1010,9 +1050,19 @@ public class ControlElement {
                 }
             }
             else if (type == Type.RANGE_BUTTON || type == Type.D_PAD || type == Type.STICK || type == Type.TRACKPAD) {
-                for (byte i = 0; i < states.length; i++) {
-                    if (states[i]) inputControlsView.handleInputEvent(getBindingAt(i), false);
-                    states[i] = false;
+                // Para STICK/TRACKPAD com binding analógico (gamepad), o reset correto é
+                // handleStickInput(0,0) — não handleInputEvent, que é a API digital.
+                // Sem isso o eixo fica no último valor e o personagem continua andando
+                // depois de soltar o dedo ("sticky sticks").
+                if ((type == Type.STICK || type == Type.TRACKPAD) && getBindingAt(0).isGamepad()) {
+                    inputControlsView.handleStickInput(getBindingAt(0), 0f, 0f);
+                    for (byte i = 0; i < states.length; i++) states[i] = false;
+                }
+                else {
+                    for (byte i = 0; i < states.length; i++) {
+                        if (states[i]) inputControlsView.handleInputEvent(getBindingAt(i), false);
+                        states[i] = false;
+                    }
                 }
 
                 if (type == Type.RANGE_BUTTON) {
@@ -1033,17 +1083,18 @@ public class ControlElement {
 
     public PointF getCurrentPosition() {
         if (currentPosition == null) {
-            currentPosition = new PointF(x, y); 
+            currentPosition = new PointF(x, y); // Initialize to the center (same as outer circle)
         }
         return currentPosition;
     }
 
+    // New setter for current position to allow resetting
     public void setCurrentPosition(float x, float y) {
         if (currentPosition == null) {
             currentPosition = new PointF();
         }
         currentPosition.set(x, y);
-
+        // Optionally invalidate the view to trigger a redraw
         invalidateSelf();
     }
 }

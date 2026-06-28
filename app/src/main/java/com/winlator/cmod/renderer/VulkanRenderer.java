@@ -23,7 +23,8 @@ import com.winlator.cmod.xserver.XServer;
 import java.util.ArrayList;
 
 public class VulkanRenderer implements WindowManager.OnWindowModificationListener,
-                                       Pointer.OnPointerMotionListener {
+                                       Pointer.OnPointerMotionListener,
+                                       HostRenderer {
 
     static { System.loadLibrary("vulkan_renderer"); }
 
@@ -184,7 +185,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                             releaseScanoutSurfaces();
                             if (android.os.Build.VERSION.SDK_INT >= 29) {
                                 try {
-                                    android.view.SurfaceControl xsc = xServerView.getSurfaceControl();
+                                    android.view.SurfaceControl xsc = (android.view.SurfaceControl) xServerView.getSurfaceControl();
                                     scanoutGameSC = new android.view.SurfaceControl.Builder()
                                         .setParent(xsc).setName("winlator_game").setOpaque(true).build();
                                     scanoutGameSurface = new android.view.Surface(scanoutGameSC);
@@ -374,15 +375,11 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 viewTransformation.viewHeight);
         }
 
-        
-        
-        
-        
-        
-        
-        
-        
-        boolean needScissor = !(fullscreen && zoom == 1.0f);
+        boolean viewportClipped = viewTransformation.viewOffsetX != 0
+            || viewTransformation.viewOffsetY != 0
+            || viewTransformation.viewWidth != surfaceWidth
+            || viewTransformation.viewHeight != surfaceHeight;
+        boolean needScissor = zoom != 1.0f || viewportClipped;
         if (needScissor) {
             nativeSetCustomScissor(nativeHandle,
                 viewTransformation.viewOffsetX,
@@ -677,7 +674,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             xServerView.post(() -> {
                 if (android.os.Build.VERSION.SDK_INT >= 29) {
                     try {
-                        android.view.SurfaceControl xsc = xServerView.getSurfaceControl();
+                        android.view.SurfaceControl xsc = (android.view.SurfaceControl) xServerView.getSurfaceControl();
                         scanoutGameSC = new android.view.SurfaceControl.Builder()
                             .setParent(xsc).setName("winlator_game").setOpaque(true).build();
                         scanoutGameSurface = new android.view.Surface(scanoutGameSC);
@@ -734,6 +731,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public boolean isNativeMode() { return nativeMode; }
+    @Override
+    public void setRenderingEnabled(boolean enabled) {
+        xServer.setRenderingEnabled(enabled);
+    }
 
     public void setDriverInfo(String driverPath, String libraryName, String nativeLibDir) {
         this.driverPath = driverPath;
@@ -811,7 +812,13 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         synchronized (lock) { updateTransform(); }
     }
     public float getMagnifierZoom() { return magnifierZoom; }
+    @Override
+    public XServerView getXServerView() { return xServerView; }
     public void setUnviewableWMClasses(String... classes) { this.unviewableWMClasses = classes; }
+    @Override
+    public void setUnviewableWMClasses(String wmClasses) {
+        this.unviewableWMClasses = wmClasses != null ? wmClasses.split(";") : null;
+    }
     private int fpsLimit = 0;
     private int     pendingPresentMode    = 2;
     private int     pendingStretchMode    = 0;
@@ -833,6 +840,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         }
     }
     public void setPipMode(boolean pip) { inPipMode = pip; }
+    @Override
+    public void onHostSurfaceChanged(int width, int height) { onSurfaceChanged(width, height); }
     public int getSurfaceWidth() { return surfaceWidth; }
     public int getSurfaceHeight() { return surfaceHeight; }
     public void requestRender() {}

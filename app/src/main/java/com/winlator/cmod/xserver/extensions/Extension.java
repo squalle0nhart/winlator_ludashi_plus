@@ -17,14 +17,4 @@ public interface Extension {
     byte getFirstEventId();
 
     void handleRequest(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError;
-
-    default int getNumEvents() { return 0; }
-
-    default int getNumErrors() { return 0; }
-
-    default void setFirstEventId(byte id) {}
-
-    default void setFirstErrorId(byte id) {}
-
-    default void onClientDisconnected(XClient client) {}
 }

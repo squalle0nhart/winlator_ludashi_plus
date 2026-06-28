@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 
 public class GPUImage extends Texture {
     private long hardwareBufferPtr;
+    private long imageKHRPtr;
     private ByteBuffer virtualData;
     private short stride;
     private static boolean supported = false;
@@ -27,14 +28,36 @@ public class GPUImage extends Texture {
 
     public GPUImage(int socketFd) {
         hardwareBufferPtr = hardwareBufferFromSocket(socketFd);
+        if (hardwareBufferPtr != 0) {
+            virtualData = lockHardwareBuffer(hardwareBufferPtr);
+            if (virtualData == null) {
+                destroyHardwareBuffer(hardwareBufferPtr);
+                hardwareBufferPtr = 0;
+            }
+        }
     }
 
     @Override
     public void allocateTexture(short width, short height, ByteBuffer data) {
+        if (isAllocated()) return;
+        super.allocateTexture(width, height, null);
+        if (hardwareBufferPtr != 0) {
+            try {
+                imageKHRPtr = createImageKHR(hardwareBufferPtr, textureId);
+            } catch (UnsatisfiedLinkError e) {
+                android.util.Log.w("GPUImage", "createImageKHR JNI is unavailable; disabling EGLImage path", e);
+                imageKHRPtr = -1;
+            }
+            if (imageKHRPtr == 0) {
+                destroyHardwareBuffer(hardwareBufferPtr);
+                hardwareBufferPtr = 0;
+            }
+        }
     }
 
     @Override
     public void updateFromDrawable(Drawable drawable) {
+        if (!isAllocated()) allocateTexture(drawable.width, drawable.height, null);
         needsUpdate = false;
     }
 
@@ -55,8 +78,14 @@ public class GPUImage extends Texture {
         return virtualData;
     }
 
+    public void lock() {
+        if (hardwareBufferPtr != 0 && virtualData == null) {
+            virtualData = lockHardwareBuffer(hardwareBufferPtr);
+        }
+    }
+
     public int unlock() {
-        if (hardwareBufferPtr != 0) {
+        if (hardwareBufferPtr != 0 && virtualData != null) {
             int fence = unlockHardwareBuffer(hardwareBufferPtr);
             virtualData = null;
             return fence;
@@ -64,14 +93,18 @@ public class GPUImage extends Texture {
         return -1;
     }
 
-    public void lock() {
-        if (hardwareBufferPtr != 0) {
-            virtualData = lockHardwareBuffer(hardwareBufferPtr);
-        }
-    }
-
     @Override
     public void destroy() {
+        if (imageKHRPtr > 0) {
+            try {
+                destroyImageKHR(imageKHRPtr);
+            } catch (UnsatisfiedLinkError e) {
+                android.util.Log.w("GPUImage", "destroyImageKHR JNI is unavailable; skipping EGLImage cleanup", e);
+            }
+            imageKHRPtr = 0;
+        } else if (imageKHRPtr < 0) {
+            imageKHRPtr = 0;
+        }
         if (hardwareBufferPtr != 0) {
             destroyHardwareBuffer(hardwareBufferPtr);
             hardwareBufferPtr = 0;
@@ -87,7 +120,13 @@ public class GPUImage extends Texture {
     public static void checkIsSupported() {
         final short size = 8;
         GPUImage gpuImage = new GPUImage(size, size);
-        supported = gpuImage.hardwareBufferPtr != 0 && gpuImage.virtualData != null;
+        try {
+            gpuImage.allocateTexture(size, size, null);
+            supported = gpuImage.hardwareBufferPtr != 0 && gpuImage.imageKHRPtr > 0 && gpuImage.virtualData != null;
+        } catch (UnsatisfiedLinkError e) {
+            supported = false;
+            android.util.Log.w("GPUImage", "GPUImage native EGLImage hooks are unavailable; falling back", e);
+        }
         android.util.Log.d("GPUImage", "checkIsSupported: supported=" + supported);
         gpuImage.destroy();
     }
@@ -97,4 +136,6 @@ public class GPUImage extends Texture {
     private native void destroyHardwareBuffer(long hardwareBufferPtr);
     private native int  unlockHardwareBuffer(long hardwareBufferPtr);
     private native ByteBuffer lockHardwareBuffer(long hardwareBufferPtr);
+    private native long createImageKHR(long hardwareBufferPtr, int textureId);
+    private native void destroyImageKHR(long imageKHRPtr);
 }

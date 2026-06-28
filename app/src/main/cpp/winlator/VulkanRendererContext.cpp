@@ -10,6 +10,8 @@
 #include "window_vert.h"
 #include "window_frag.h"
 #include "window_sgsr_frag.h"
+#include "window_nis_frag.h"
+#include "window_legacy_upscale_frag.h"
 #include "window_stretch_frag.h"
 #include "window_postfx_frag.h"
 
@@ -47,6 +49,8 @@ VulkanRendererContext::~VulkanRendererContext() {
     vk_.DestroySampler(device, sampler, nullptr);
     vk_.DestroyDescriptorPool(device, winTexPool, nullptr);
     if (sgsrPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, sgsrPipeline, nullptr);
+    if (nisPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, nisPipeline, nullptr);
+    if (legacyUpscalePipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, legacyUpscalePipeline, nullptr);
     if (stretchPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, stretchPipeline, nullptr);
     if (postfxPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, postfxPipeline, nullptr);
     vk_.DestroyPipeline(device, pipeline, nullptr);
@@ -407,6 +411,57 @@ void VulkanRendererContext::createSgsrPipeline() {
     vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
     RLOG("createSgsrPipeline: done");
 }
+
+void VulkanRendererContext::createNisPipeline() {
+    if (nisPipeline != VK_NULL_HANDLE) return;
+    auto vert=makeShader(window_vert_code,sizeof(window_vert_code));
+    auto frag=makeShader(window_nis_frag_code,sizeof(window_nis_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT; stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&nisPipeline)!=VK_SUCCESS) throw std::runtime_error("nis_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createNisPipeline: done");
+}
+
+void VulkanRendererContext::createLegacyUpscalePipeline() {
+    if (legacyUpscalePipeline != VK_NULL_HANDLE) return;
+    auto vert = makeShader(window_vert_code, sizeof(window_vert_code));
+    auto frag = makeShader(window_legacy_upscale_frag_code, sizeof(window_legacy_upscale_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT; stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&legacyUpscalePipeline)!=VK_SUCCESS) throw std::runtime_error("legacy_upscale_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createLegacyUpscalePipeline: done");
+}
+
 void VulkanRendererContext::createStretchPipeline() {
     if (stretchPipeline != VK_NULL_HANDLE) return;
     auto vert=makeShader(window_vert_code,sizeof(window_vert_code));
@@ -464,7 +519,8 @@ void VulkanRendererContext::setPostFXMode(int mode) {
     postFXMode = mode;
     if (mode > 0) {
 
-        if (filterMode != 2 && postfxPipeline == VK_NULL_HANDLE)
+        if (filterMode != 2 && filterMode != 3 && filterMode != 4 && filterMode != 5
+            && postfxPipeline == VK_NULL_HANDLE)
             createPostFXPipeline();
     } else {
 
@@ -868,10 +924,15 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     }
 
     bool useSgsr    = (filterMode == 2) && (sgsrPipeline    != VK_NULL_HANDLE);
-    bool usePostFX  = (postFXMode  > 0) && (postfxPipeline  != VK_NULL_HANDLE);
+    bool useNis     = (filterMode == 3) && (nisPipeline     != VK_NULL_HANDLE);
+    bool useLegacyUpscale = (filterMode == 4 || filterMode == 5) && (legacyUpscalePipeline != VK_NULL_HANDLE);
+    bool usePostFX  = (postFXMode  > 0) && !useNis && !useLegacyUpscale
+        && (postfxPipeline  != VK_NULL_HANDLE);
     bool useStretch = (stretchMode == 1) && (stretchPipeline != VK_NULL_HANDLE);
 
     VkPipeline activePipeline = useSgsr   ? sgsrPipeline
+                              : useNis    ? nisPipeline
+                              : useLegacyUpscale ? legacyUpscalePipeline
                               : usePostFX ? postfxPipeline
                               : useStretch? stretchPipeline
                               : pipeline;
@@ -898,6 +959,31 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
             pc.effectId = postFXMode;  
             pc.resW     = 0.0f;        
             pc.sharpness = sharpness;
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        } else if (useNis) {
+            WindowPushConstantsNis pc{};
+            pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            float sw = (float)std::max(d.w, 1);
+            float sh = (float)std::max(d.h, 1);
+            pc.invSrcW = 1.0f / sw;
+            pc.invSrcH = 1.0f / sh;
+            pc.srcW = sw;
+            pc.srcH = sh;
+            pc.sharpness = sharpness;
+            vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+        } else if (useLegacyUpscale) {
+            WindowPushConstantsPostFX pc{};
+            pc.ndcX0=(ox+(float)d.x*sx)/cw*2.f-1.f;
+            pc.ndcY0=(oy+(float)d.y*sy)/ch*2.f-1.f;
+            pc.ndcX1=(ox+(float)(d.x+d.w)*sx)/cw*2.f-1.f;
+            pc.ndcY1=(oy+(float)(d.y+d.h)*sy)/ch*2.f-1.f;
+            pc.effectId  = filterMode == 5 ? 2 : 1;
+            pc.sharpness = sharpness;
+            pc.resW      = (float)std::max(d.w, 1);
+            pc.resH      = (float)std::max(d.h, 1);
             vk_.CmdPushConstants(cb, pipeLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
         } else if (usePostFX) {
             WindowPushConstantsPostFX pc{};
@@ -934,7 +1020,9 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
 
     if (cursorDrawn) {
 
-        if (useSgsr || useStretch || usePostFX) vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        if (useSgsr || useNis || useLegacyUpscale || useStretch || usePostFX) {
+            vk_.CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        }
         vk_.CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeLayout, 0, 1, &cursorDS, 0, nullptr);
         float cx=(float)std::max(0,(int)ptrX-curHotX), cy=(float)std::max(0,(int)ptrY-curHotY);
         WindowPushConstants cpc{};
@@ -1347,7 +1435,9 @@ void VulkanRendererContext::dumpRendererInfo() {
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "SupportedPresentModes: [%s] current=%d",pmList.c_str(),(int)requestedPresentMode);
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
-        "Filter: mode=%d (%s)", filterMode, filterMode==2?"SGSR":filterMode==1?"NEAREST":"LINEAR");
+        "Filter: mode=%d (%s)", filterMode,
+        filterMode==5?"DLS":filterMode==4?"FSR":filterMode==3?"NIS":
+        filterMode==2?"SGSR":filterMode==1?"NEAREST":"LINEAR");
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "Scanout: active=%d gameFrameDelivered=%d scanoutGameSC=%p",
         (int)scanoutActive.load(),(int)gameFrameDelivered.load(),scanoutGameSC);
@@ -1358,11 +1448,15 @@ void VulkanRendererContext::dumpRendererInfo() {
 }
 
 void VulkanRendererContext::setFilterMode(int mode) {
-    auto modeName=[](int m){ return m==1?"NEAREST":m==2?"SGSR":"LINEAR"; };
+    auto modeName=[](int m){ return m==5?"DLS":m==4?"FSR":m==3?"NIS":m==2?"SGSR":m==1?"NEAREST":"LINEAR"; };
     RLOG("setFilterMode: %d -> %d (%s->%s)", filterMode, mode, modeName(filterMode), modeName(mode));
     if (filterMode==mode) { RLOG("setFilterMode: already set, skipping"); return; }
     filterMode=mode;
     if (mode == 2 && sgsrPipeline == VK_NULL_HANDLE) createSgsrPipeline();
+    if (mode == 3 && nisPipeline == VK_NULL_HANDLE) createNisPipeline();
+    if ((mode == 4 || mode == 5) && legacyUpscalePipeline == VK_NULL_HANDLE) {
+        createLegacyUpscalePipeline();
+    }
     vk_.DeviceWaitIdle(device);
     if (sampler!=VK_NULL_HANDLE){vk_.DestroySampler(device,sampler,nullptr);sampler=VK_NULL_HANDLE;}
     createSampler();

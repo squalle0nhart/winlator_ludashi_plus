@@ -96,6 +96,28 @@ add_custom_command(
 )
 
 add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_nis_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_nis_frag_code
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_nis.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_nis_frag.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_nis.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+    COMMENT "Compiling window_nis.frag → window_nis_frag.h"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_legacy_upscale_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag window_legacy_upscale_frag_code
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_legacy_upscale.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/window_legacy_upscale_frag.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/window_legacy_upscale.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+    COMMENT "Compiling window_legacy_upscale.frag → window_legacy_upscale_frag.h"
+)
+
+add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
             ${GLSLC} frag window_stretch_frag_code
@@ -127,6 +149,8 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_nis_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_legacy_upscale_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
 )

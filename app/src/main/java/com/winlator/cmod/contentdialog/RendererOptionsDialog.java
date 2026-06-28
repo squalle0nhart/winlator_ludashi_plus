@@ -15,6 +15,7 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.UnitUtils;
+import com.winlator.cmod.renderer.ASurfaceRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,9 @@ public class RendererOptionsDialog extends ContentDialog {
     }
 
     public interface Config {
+        String getRenderer();
+        void setRenderer(String v);
+
         boolean getRendererNative();
         void setRendererNative(boolean v);
 
@@ -44,6 +48,18 @@ public class RendererOptionsDialog extends ContentDialog {
 
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
+
+        int getGraphicsFilterMode();
+        void setGraphicsFilterMode(int v);
+
+        boolean getGraphicsSupersamplingEnabled();
+        void setGraphicsSupersamplingEnabled(boolean v);
+
+        int getGraphicsPostFXMode();
+        void setGraphicsPostFXMode(int v);
+
+        float getGraphicsSharpness();
+        void setGraphicsSharpness(float v);
 
         boolean supportsFrameGen();
         String getFrameGenBackend();
@@ -79,6 +95,9 @@ public class RendererOptionsDialog extends ContentDialog {
     };
     private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg"};
     private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG"};
+    private static final String[] UPSCALER_LABELS = {"SGSR", "FSR", "DLS", "NVScaler"};
+    private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
+    private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
     private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
     private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1};
@@ -100,10 +119,17 @@ public class RendererOptionsDialog extends ContentDialog {
             scrollView.setLayoutParams(params);
         }
 
+        Spinner  spRenderer = findViewById(R.id.SPRendererType);
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
+        CheckBox cbDefaultUpscaler = findViewById(R.id.CBDefaultUpscaler);
+        CheckBox cbDefaultSupersampling = findViewById(R.id.CBDefaultSupersampling);
+        Spinner spDefaultUpscaler = findViewById(R.id.SPDefaultUpscalerMode);
+        Spinner spDefaultPostFX = findViewById(R.id.SPDefaultPostFXMode);
+        com.winlator.cmod.widget.SeekBar sbDefaultSharpness = findViewById(R.id.SBDefaultSharpness);
+        TextView tvDefaultSharpnessValue = findViewById(R.id.TVDefaultSharpnessValue);
         View groupLsfg = findViewById(R.id.GroupLsfg);
         Spinner spFrameGenBackend = findViewById(R.id.SPFrameGenBackend);
         TextView tvLsfgStatus = findViewById(R.id.TVLsfgStatus);
@@ -114,9 +140,46 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner spBionicFgModel = findViewById(R.id.SPBionicFgModel);
         CheckBox cbLsfgPerformanceMode = findViewById(R.id.CBLsfgPerformanceMode);
 
-        // Keep driver and filter controls available in both Vulkan and native modes.
-        setGroupVisibility(R.id.GroupDriver,  View.VISIBLE);
-        setGroupVisibility(R.id.GroupFilter,  View.VISIBLE);
+        List<String> rendererIds = new ArrayList<>();
+        List<String> rendererLabels = new ArrayList<>();
+        rendererIds.add("gl");
+        rendererLabels.add("OpenGL");
+        rendererIds.add("vulkan");
+        rendererLabels.add("Vulkan");
+        if (ASurfaceRenderer.isSupported()) {
+            rendererIds.add("surfaceflinger");
+            rendererLabels.add("SurfaceFlinger");
+        }
+
+        setAmoledAdapter(ctx, spRenderer, rendererLabels);
+        int rendererSel = 1;
+        String currentRenderer = config.getRenderer();
+        for (int i = 0; i < rendererIds.size(); i++) {
+            if (rendererIds.get(i).equalsIgnoreCase(currentRenderer)) {
+                rendererSel = i;
+                break;
+            }
+        }
+        spRenderer.setSelection(rendererSel);
+
+        Runnable syncRendererUi = () -> {
+            boolean isVulkanRenderer = spRenderer.getSelectedItemPosition() == 1;
+            setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
+            setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
+            if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+            if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
+            if (cbSwapRB != null) cbSwapRB.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+        };
+        spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                syncRendererUi.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        syncRendererUi.run();
 
         // Present Mode (visible in both modes)
         setAmoledAdapter(ctx, spPresent, PRESENT_MODE_LABELS);
@@ -148,6 +211,20 @@ public class RendererOptionsDialog extends ContentDialog {
         setAmoledAdapter(ctx, spFilter, FILTER_LABELS);
         spFilter.setSelection(config.getRendererFilterMode());
         cbSwapRB.setChecked(config.getRendererSwapRB());
+
+        setAmoledAdapter(ctx, spDefaultUpscaler, UPSCALER_LABELS);
+        setAmoledAdapter(ctx, spDefaultPostFX, POSTFX_LABELS);
+        int currentGraphicsFilter = config.getGraphicsFilterMode();
+        cbDefaultUpscaler.setChecked(currentGraphicsFilter > 0);
+        cbDefaultSupersampling.setChecked(config.getGraphicsSupersamplingEnabled());
+        spDefaultUpscaler.setSelection(getUpscalerSelection(currentGraphicsFilter));
+        int currentPostFX = Math.max(0, Math.min(POSTFX_LABELS.length - 1, config.getGraphicsPostFXMode()));
+        spDefaultPostFX.setSelection(currentPostFX);
+        float currentSharpness = Math.max(0f, Math.min(100f, config.getGraphicsSharpness() * 100f));
+        sbDefaultSharpness.setValue(currentSharpness);
+        tvDefaultSharpnessValue.setText(String.valueOf(Math.round(currentSharpness)));
+        sbDefaultSharpness.setOnValueChangeListener((seekBar, value) ->
+            tvDefaultSharpnessValue.setText(String.valueOf(Math.round(value))));
 
         boolean supportsFrameGen = config.supportsFrameGen();
         if (groupLsfg != null) {
@@ -268,6 +345,12 @@ public class RendererOptionsDialog extends ContentDialog {
 
             // Save on confirm
             setOnConfirmCallback(() -> {
+                config.setRenderer(rendererIds.get(spRenderer.getSelectedItemPosition()));
+                config.setGraphicsFilterMode(cbDefaultUpscaler.isChecked()
+                        ? getSelectedUpscalerFilterMode(spDefaultUpscaler) : 0);
+                config.setGraphicsSupersamplingEnabled(cbDefaultSupersampling.isChecked());
+                config.setGraphicsPostFXMode(spDefaultPostFX.getSelectedItemPosition());
+                config.setGraphicsSharpness(sbDefaultSharpness.getValue() / 100f);
                 config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
                 config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
                 config.setRendererFilterMode(spFilter.getSelectedItemPosition());
@@ -288,6 +371,12 @@ public class RendererOptionsDialog extends ContentDialog {
 
         // Save on confirm
         setOnConfirmCallback(() -> {
+            config.setRenderer(rendererIds.get(spRenderer.getSelectedItemPosition()));
+            config.setGraphicsFilterMode(cbDefaultUpscaler.isChecked()
+                    ? getSelectedUpscalerFilterMode(spDefaultUpscaler) : 0);
+            config.setGraphicsSupersamplingEnabled(cbDefaultSupersampling.isChecked());
+            config.setGraphicsPostFXMode(spDefaultPostFX.getSelectedItemPosition());
+            config.setGraphicsSharpness(sbDefaultSharpness.getValue() / 100f);
             config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
             config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
@@ -297,6 +386,19 @@ public class RendererOptionsDialog extends ContentDialog {
 
     private static float sanitizeFlowScale(float value) {
         return Math.max(0.25f, Math.min(1.0f, value));
+    }
+
+    private static int getUpscalerSelection(int filterMode) {
+        for (int i = 0; i < UPSCALER_FILTER_VALUES.length; i++) {
+            if (UPSCALER_FILTER_VALUES[i] == filterMode) return i;
+        }
+        return 0;
+    }
+
+    private static int getSelectedUpscalerFilterMode(Spinner spinner) {
+        int index = spinner != null ? spinner.getSelectedItemPosition() : 0;
+        if (index < 0 || index >= UPSCALER_FILTER_VALUES.length) index = 0;
+        return UPSCALER_FILTER_VALUES[index];
     }
 
     private void setAmoledAdapter(Context ctx, Spinner spinner, String[] items) {

@@ -19,6 +19,21 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="Renderer"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:paddingBottom="8dp"/>
+            <Spinner
+                android:id="@+id/SPRendererType"
+                style="@style/ComboBoxCompact"
+                android:background="@drawable/combo_box_no_arrow_dark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dropdown"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:text="Present Mode"
                 android:textAppearance="?android:attr/textAppearanceMedium"
                 android:paddingBottom="8dp"/>
@@ -78,6 +93,91 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Swap red/blue channels" />
+
+            <LinearLayout
+                android:id="@+id/GroupGraphicsDefaults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+                <View
+                    style="@style/FieldSeparator"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Graphics Defaults"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingBottom="8dp"/>
+
+                <CheckBox
+                    android:id="@+id/CBDefaultUpscaler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Enable upscaler before launch" />
+
+                <CheckBox
+                    android:id="@+id/CBDefaultSupersampling"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Enable Supersampling before launch" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Upscaler"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"/>
+                <Spinner
+                    android:id="@+id/SPDefaultUpscalerMode"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Post-processing"
+                    android:textAppearance="?android:attr/textAppearanceMedium"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"/>
+                <Spinner
+                    android:id="@+id/SPDefaultPostFXMode"
+                    style="@style/ComboBoxCompact"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:spinnerMode="dropdown"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Sharpness" />
+
+                    <TextView
+                        android:id="@+id/TVDefaultSharpnessValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="50" />
+                </LinearLayout>
+
+                <com.winlator.cmod.widget.SeekBar
+                    android:id="@+id/SBDefaultSharpness"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/GroupLsfg"

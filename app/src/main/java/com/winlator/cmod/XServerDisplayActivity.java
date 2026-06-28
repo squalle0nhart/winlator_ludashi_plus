@@ -91,7 +91,17 @@ import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
+import com.winlator.cmod.renderer.ASurfaceRenderer;
+import com.winlator.cmod.renderer.GLRenderer;
+import com.winlator.cmod.renderer.HostRenderer;
 import com.winlator.cmod.renderer.VulkanRenderer;
+import com.winlator.cmod.renderer.effects.CRTEffect;
+import com.winlator.cmod.renderer.effects.ColorEffect;
+import com.winlator.cmod.renderer.effects.FSREffect;
+import com.winlator.cmod.renderer.effects.FXAAEffect;
+import com.winlator.cmod.renderer.effects.HDREffect;
+import com.winlator.cmod.renderer.effects.NTSCCombinedEffect;
+import com.winlator.cmod.renderer.effects.ToonEffect;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.SeekBar;
 import com.winlator.cmod.widget.WinlatorHUD;
@@ -100,6 +110,7 @@ import com.winlator.cmod.widget.LogView;
 import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerView;
+import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
@@ -137,6 +148,7 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
+    private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
 
     private static final boolean DISABLE_TOUCHSCREEN_AUTO_HIDE = true;
 
@@ -178,11 +190,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private DebugDialog debugDialog;
     private short taskAffinityMask = 0;
     private short taskAffinityMaskWoW64 = 0;
-    private short systemAffinityMask = 0;
     private String wineCpuTopologyValue = "";
-    private java.util.concurrent.ScheduledExecutorService affinityWatcher;
-    private final java.util.Set<Integer> seenAffinityPids =
-            java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private int frameRatingWindowId = -1;
 
     private int activeRendererWindowId = -1;
@@ -210,6 +218,53 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Handler handler;
     private Runnable savePlaytimeRunnable;
     private static final long SAVE_INTERVAL_MS = 1000;
+
+    private String getLaunchGraphicsExtra(String key, String fallback) {
+        if (shortcut != null) {
+            return shortcut.getExtra(key, container != null ? container.getExtra(key, fallback) : fallback);
+        }
+        return container != null ? container.getExtra(key, fallback) : fallback;
+    }
+
+    private int getSavedUpscalerSelection(String savedFilter) {
+        if (savedFilter == null || savedFilter.isEmpty()) return 0;
+        try {
+            int mode = Integer.parseInt(savedFilter);
+            for (int i = 0; i < VULKAN_UPSCALER_FILTER_VALUES.length; i++) {
+                if (VULKAN_UPSCALER_FILTER_VALUES[i] == mode) return i;
+            }
+            return 0;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private int getSelectedUpscalerFilterMode(Spinner spinner) {
+        int index = spinner != null ? spinner.getSelectedItemPosition() : 0;
+        if (index < 0 || index >= VULKAN_UPSCALER_FILTER_VALUES.length) index = 0;
+        return VULKAN_UPSCALER_FILTER_VALUES[index];
+    }
+
+    private void saveLaunchGraphicsExtra(String key, String value) {
+        if (shortcut != null) {
+            shortcut.putExtra(key, value);
+        } else if (container != null) {
+            container.putExtra(key, value);
+        }
+    }
+
+    private void persistLaunchGraphicsPreset() {
+        if (shortcut != null) {
+            shortcut.saveData();
+        } else if (container != null) {
+            container.saveData();
+        }
+    }
+
+    private boolean getLaunchGraphicsBoolean(String key, boolean fallback) {
+        String value = getLaunchGraphicsExtra(key, fallback ? "1" : "0");
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
 
     private Handler timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
@@ -411,14 +466,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         wineCpuTopologyValue = "";
         if (syncCpuTopology && affinityCpuList != null && !affinityCpuList.isEmpty()) {
             int coreCount = affinityCpuList.split(",").length;
-
             wineCpuTopologyValue = coreCount + ":" + affinityCpuList;
         }
-
-        int numProcessors = Runtime.getRuntime().availableProcessors();
-        int allCoresMask = ProcessHelper.getAffinityMask(0, numProcessors);
-        int complementMask = allCoresMask & ~taskAffinityMask;
-        systemAffinityMask = (short) (complementMask != 0 ? complementMask : taskAffinityMask);
 
         String wmClass = shortcut != null ? shortcut.getExtra("wmClass", "") : "";
         Log.d("XServerDisplayActivity", "Startup wmClass: " + wmClass);
@@ -648,22 +697,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
         switch (event.getAction()) {
             case MotionEvent.ACTION_BUTTON_PRESS: {
                 int button = event.getActionButton();
-                if (button == MotionEvent.BUTTON_PRIMARY)
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
-                else if (button == MotionEvent.BUTTON_SECONDARY)
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
-                else if (button == MotionEvent.BUTTON_TERTIARY)
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_MIDDLE);
+                if (button == MotionEvent.BUTTON_PRIMARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.LEFTDOWN, 0, 0, 0);
+                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_LEFT);
+                } else if (button == MotionEvent.BUTTON_SECONDARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.RIGHTDOWN, 0, 0, 0);
+                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_RIGHT);
+                } else if (button == MotionEvent.BUTTON_TERTIARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.MIDDLEDOWN, 0, 0, 0);
+                    else xServer.injectPointerButtonPress(Pointer.Button.BUTTON_MIDDLE);
+                }
                 break;
             }
             case MotionEvent.ACTION_BUTTON_RELEASE: {
                 int button = event.getActionButton();
-                if (button == MotionEvent.BUTTON_PRIMARY)
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
-                else if (button == MotionEvent.BUTTON_SECONDARY)
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
-                else if (button == MotionEvent.BUTTON_TERTIARY)
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE);
+                if (button == MotionEvent.BUTTON_PRIMARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.LEFTUP, 0, 0, 0);
+                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_LEFT);
+                } else if (button == MotionEvent.BUTTON_SECONDARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.RIGHTUP, 0, 0, 0);
+                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_RIGHT);
+                } else if (button == MotionEvent.BUTTON_TERTIARY) {
+                    if (xServer.isRelativeMouseMovement()) winHandler.mouseEvent(MouseEventFlags.MIDDLEUP, 0, 0, 0);
+                    else xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_MIDDLE);
+                }
                 break;
             }
             case MotionEvent.ACTION_MOVE:
@@ -672,18 +729,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 int dx = (int) p[0];
                 int dy = (int) p[1];
                 if (xServer.isRelativeMouseMovement())
-                    xServer.emitRelativeMotion(dx, dy);
-                xServer.injectPointerMoveDelta(dx, dy);
+                    winHandler.mouseEvent(MouseEventFlags.MOVE, dx, dy, 0);
+                else
+                    xServer.injectPointerMoveDelta(dx, dy);
                 break;
             }
             case MotionEvent.ACTION_SCROLL: {
                 float scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
                 if (scrollY <= -1.0f) {
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                    if (xServer.isRelativeMouseMovement()) {
+                        winHandler.mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int) scrollY * 270);
+                    } else {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_DOWN);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_DOWN);
+                    }
                 } else if (scrollY >= 1.0f) {
-                    xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
-                    xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                    if (xServer.isRelativeMouseMovement()) {
+                        winHandler.mouseEvent(MouseEventFlags.WHEEL, 0, 0, (int) scrollY * 270);
+                    } else {
+                        xServer.injectPointerButtonPress(Pointer.Button.BUTTON_SCROLL_UP);
+                        xServer.injectPointerButtonRelease(Pointer.Button.BUTTON_SCROLL_UP);
+                    }
                 }
                 break;
             }
@@ -760,7 +826,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (xServerView == null) return;
                 int w = xServerView.getWidth();
                 int h = xServerView.getHeight();
-                if (w > 0 && h > 0) xServerView.getRenderer().onSurfaceChanged(w, h);
+                if (w > 0 && h > 0) xServerView.getRenderer().onHostSurfaceChanged(w, h);
             });
         }
     }
@@ -809,7 +875,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (environment != null)
             environment.stopEnvironmentComponents();
-        stopAffinityWatcher();
         if (winHandler != null)
             winHandler.stop();
         if (wineRequestHandler != null)
@@ -1092,30 +1157,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         winHandler.start();
 
-        winHandler.setWineExecCallback(command -> {
-            String wineBin  = imageFs.getWinePath() + "/bin/wine";
-            String box64Bin = imageFs.getBinDir() + "/box64";
-            File   rootDir  = imageFs.getRootDir();
-
-            EnvVars execEnvVars = new EnvVars();
-            execEnvVars.putAll(envVars);
-            execEnvVars.put("PATH",
-                imageFs.getWinePath() + "/bin:" + rootDir.getPath() + "/usr/bin");
-
-            java.io.File sysvshm = new java.io.File(imageFs.getLibDir(), "libandroid-sysvshm.so");
-            if (sysvshm.exists()) execEnvVars.put("LD_PRELOAD", sysvshm.getAbsolutePath());
-
-            String launcher = wineInfo.isArm64EC()
-                ? wineBin
-                : (box64Bin + " " + wineBin);
-
-            ProcessHelper.exec(
-                launcher + " start " + command,
-                execEnvVars.toStringArray(),
-                rootDir,
-                null);
-        });
-
         if (wineRequestHandler != null)
             wineRequestHandler.start();
 
@@ -1132,44 +1173,56 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void setupUI() {
         FrameLayout rootView = findViewById(R.id.FLXServerDisplay);
         xServerView = new XServerView(this, xServer);
-        final VulkanRenderer renderer = xServerView.getRenderer();
+        String rendererType = shortcut != null ? shortcut.getRenderer()
+                : (container != null ? container.getRenderer() : "vulkan");
+        if ("surfaceflinger".equalsIgnoreCase(rendererType) && !ASurfaceRenderer.isSupported()) {
+            rendererType = "vulkan";
+        }
+        xServerView.initRenderer(rendererType);
+        final HostRenderer renderer = xServerView.getRenderer();
         renderer.setCursorVisible(false);
+        final String rendererLabel = "gl".equalsIgnoreCase(rendererType) ? "OpenGL"
+                : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger" : "Vulkan";
 
-        String rendererDriverId = shortcut != null ? shortcut.getRendererDriverId()
-                : (container != null ? container.getRendererDriverId() : "");
-        if (rendererDriverId == null || rendererDriverId.isEmpty()) {
-            rendererDriverId = graphicsDriverConfig != null ? graphicsDriverConfig.get("version") : null;
-        }
-        if (rendererDriverId != null && !rendererDriverId.isEmpty() && !rendererDriverId.equalsIgnoreCase("system")) {
-            try {
-                String driverPath = getFilesDir().getAbsolutePath() + "/contents/adrenotools/" + rendererDriverId + "/";
-                AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
-                String libraryName = adrenotoolsManager.getLibraryName(rendererDriverId);
-                String nativeLibDir = AppUtils.getNativeLibDir(this);
-                if (!libraryName.isEmpty())
-                    renderer.setDriverInfo(driverPath, libraryName, nativeLibDir);
-            } catch (Exception ignored) {
+        if (renderer instanceof VulkanRenderer) {
+            VulkanRenderer vkRenderer = (VulkanRenderer) renderer;
+            String rendererDriverId = shortcut != null ? shortcut.getRendererDriverId()
+                    : (container != null ? container.getRendererDriverId() : "");
+            if (rendererDriverId == null || rendererDriverId.isEmpty()) {
+                rendererDriverId = graphicsDriverConfig != null ? graphicsDriverConfig.get("version") : null;
             }
-        }
+            if (rendererDriverId != null && !rendererDriverId.isEmpty() && !rendererDriverId.equalsIgnoreCase("system")) {
+                try {
+                    String driverPath = getFilesDir().getAbsolutePath() + "/contents/adrenotools/" + rendererDriverId + "/";
+                    AdrenotoolsManager adrenotoolsManager = new AdrenotoolsManager(this);
+                    String libraryName = adrenotoolsManager.getLibraryName(rendererDriverId);
+                    String nativeLibDir = AppUtils.getNativeLibDir(this);
+                    if (!libraryName.isEmpty()) vkRenderer.setDriverInfo(driverPath, libraryName, nativeLibDir);
+                } catch (Exception ignored) {
+                }
+            }
 
-        String presentMode = shortcut != null ? shortcut.getRendererPresentMode()
-                : (container != null ? container.getRendererPresentMode() : "fifo");
-        renderer.setVkPresentMode(com.winlator.cmod.contentdialog.RendererOptionsDialog.toVkPresentMode(presentMode));
-        renderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
-                : (container != null ? container.getRendererFilterMode() : 0));
-        renderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
-                : (container != null && container.getRendererSwapRB()));
+            String presentMode = shortcut != null ? shortcut.getRendererPresentMode()
+                    : (container != null ? container.getRendererPresentMode() : "fifo");
+            vkRenderer.setVkPresentMode(com.winlator.cmod.contentdialog.RendererOptionsDialog.toVkPresentMode(presentMode));
+            vkRenderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
+                    : (container != null ? container.getRendererFilterMode() : 0));
+            vkRenderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
+                    : (container != null && container.getRendererSwapRB()));
+            softStretchEnabled = getLaunchGraphicsBoolean("graphicsStretchMode", false);
+            vkRenderer.setStretchMode(softStretchEnabled ? 1 : 0);
+
+            boolean nativeMode = shortcut != null ? shortcut.getRendererNative()
+                    : (container != null && container.isRendererNative());
+            String nativeColorFormatExtra = shortcut != null ? shortcut.getExtra("nativeColorFormat", "0") : "0";
+            int nativeColorFormat = nativeColorFormatExtra.isEmpty() ? 0 : Integer.parseInt(nativeColorFormatExtra);
+            vkRenderer.setNativeMode(nativeMode);
+            vkRenderer.setNativeColorFormat(nativeColorFormat);
+        }
 
         if (shortcut != null) {
             renderer.setUnviewableWMClasses("explorer.exe");
         }
-
-        boolean nativeMode = shortcut != null ? shortcut.getRendererNative()
-                : (container != null && container.isRendererNative());
-        String nativeColorFormatExtra = shortcut != null ? shortcut.getExtra("nativeColorFormat", "0") : "0";
-        int nativeColorFormat = nativeColorFormatExtra.isEmpty() ? 0 : Integer.parseInt(nativeColorFormatExtra);
-        renderer.setNativeMode(nativeMode);
-        renderer.setNativeColorFormat(nativeColorFormat);
 
         xServer.setRenderer(renderer);
         rootView.addView(xServerView);
@@ -1219,6 +1272,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 classicHud.setVisibility(View.GONE);
                 rootView.addView(classicHud);
                 renderer.setFrameRating(classicHud);
+                classicHud.setRenderer(rendererLabel);
             } else if (hudMode == 2) {
 
                 modernHud = new WinlatorHUD(this);
@@ -1226,6 +1280,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 rootView.addView(modernHud);
                 modernHud.enableByUser();
                 renderer.setFrameRating(modernHud);
+                modernHud.setRenderer(rendererLabel);
             }
         }
 
@@ -1266,6 +1321,69 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
+    }
+
+    private void applyScreenEffects(GLRenderer renderer, float brightness, float contrast, float gamma,
+            boolean fxaaEn, boolean crtEn, boolean toonEn, boolean ntscEn) {
+        ColorEffect ce = (ColorEffect) renderer.getEffectComposer().getEffect(ColorEffect.class);
+        if (brightness == 0 && contrast == 0 && gamma == 1.0f) {
+            if (ce != null) renderer.getEffectComposer().removeEffect(ce);
+        } else {
+            if (ce == null) ce = new ColorEffect();
+            ce.setBrightness(brightness / 100f);
+            ce.setContrast(contrast / 100f);
+            ce.setGamma(gamma);
+            renderer.getEffectComposer().addEffect(ce);
+        }
+
+        FXAAEffect fxaa = (FXAAEffect) renderer.getEffectComposer().getEffect(FXAAEffect.class);
+        if (fxaaEn) {
+            if (fxaa == null) renderer.getEffectComposer().addEffect(new FXAAEffect());
+        } else if (fxaa != null) {
+            renderer.getEffectComposer().removeEffect(fxaa);
+        }
+
+        CRTEffect crt = (CRTEffect) renderer.getEffectComposer().getEffect(CRTEffect.class);
+        if (crtEn) {
+            if (crt == null) renderer.getEffectComposer().addEffect(new CRTEffect());
+        } else if (crt != null) {
+            renderer.getEffectComposer().removeEffect(crt);
+        }
+
+        ToonEffect toon = (ToonEffect) renderer.getEffectComposer().getEffect(ToonEffect.class);
+        if (toonEn) {
+            if (toon == null) renderer.getEffectComposer().addEffect(new ToonEffect());
+        } else if (toon != null) {
+            renderer.getEffectComposer().removeEffect(toon);
+        }
+
+        NTSCCombinedEffect ntsc = (NTSCCombinedEffect) renderer.getEffectComposer().getEffect(NTSCCombinedEffect.class);
+        if (ntscEn) {
+            if (ntsc == null) renderer.getEffectComposer().addEffect(new NTSCCombinedEffect());
+        } else if (ntsc != null) {
+            renderer.getEffectComposer().removeEffect(ntsc);
+        }
+    }
+
+    private void saveScreenEffectProfile(String name, float brightness, float contrast, float gamma,
+            boolean fxaa, boolean crt, boolean toon, boolean ntsc) {
+        KeyValueSet settings = new KeyValueSet();
+        settings.put("brightness", brightness);
+        settings.put("contrast", contrast);
+        settings.put("gamma", gamma);
+        settings.put("fxaa", fxaa);
+        settings.put("crt_shader", crt);
+        settings.put("toon_shader", toon);
+        settings.put("ntsc_effect", ntsc);
+
+        java.util.Set<String> oldProfiles = new java.util.LinkedHashSet<>(
+                preferences.getStringSet("screen_effect_profiles", new java.util.LinkedHashSet<>()));
+        java.util.Set<String> newProfiles = new java.util.LinkedHashSet<>();
+        for (String p : oldProfiles) {
+            String n = p.split(":")[0];
+            newProfiles.add(n.equals(name) ? name + ":" + settings.toString() : p);
+        }
+        preferences.edit().putStringSet("screen_effect_profiles", newProfiles).apply();
     }
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1410,7 +1528,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (btItemMagnifier != null) {
             btItemMagnifier.setOnClickListener(v -> {
                 if (xServerView != null) {
-                    final VulkanRenderer renderer = xServerView.getRenderer();
+                    final HostRenderer renderer = xServerView.getRenderer();
                     if (magnifierView == null) {
                         FrameLayout flContainer = findViewById(R.id.FLXServerDisplay);
                         magnifierView = new MagnifierView(this);
@@ -1432,16 +1550,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         View btItemSoftStretch = findViewById(R.id.BTItemSoftStretch);
         if (btItemSoftStretch != null) {
+            btItemSoftStretch.setSelected(softStretchEnabled);
             btItemSoftStretch.setOnClickListener(v -> {
                 if (xServerView != null) {
                     softStretchEnabled = !softStretchEnabled;
-                    VulkanRenderer rendererRef = xServerView.getRenderer();
+                    HostRenderer rendererRef = xServerView.getRenderer();
 
                     if (softStretchEnabled && !rendererRef.isFullscreen()) {
                         rendererRef.toggleFullscreen();
                         if (touchpadView != null) touchpadView.toggleFullscreen();
                     }
-                    rendererRef.setStretchMode(softStretchEnabled ? 1 : 0);
+                    if (rendererRef instanceof VulkanRenderer) {
+                        ((VulkanRenderer) rendererRef).setStretchMode(softStretchEnabled ? 1 : 0);
+                    }
                     btItemSoftStretch.setSelected(softStretchEnabled);
                 }
                 drawerLayout.closeDrawers();
@@ -1681,7 +1802,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void enableHudLazily(int style) {
         FrameLayout rootView = findViewById(R.id.FLXServerDisplay);
         if (rootView == null || xServerView == null) return;
-        final VulkanRenderer renderer = xServerView.getRenderer();
+        final HostRenderer renderer = xServerView.getRenderer();
 
         boolean rendererAlreadyActive = (activeRendererWindowId != -1);
 
@@ -1742,7 +1863,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void setupSidebarGraphicsControls() {
         if (xServerView == null) return;
-        final VulkanRenderer renderer = xServerView.getRenderer();
+        final HostRenderer renderer = xServerView.getRenderer();
+        final VulkanRenderer vkRenderer = renderer instanceof VulkanRenderer ? (VulkanRenderer) renderer : null;
+        final GLRenderer glRenderer = renderer instanceof GLRenderer ? (GLRenderer) renderer : null;
 
         Spinner spNativeFPS        = findViewById(R.id.SPNativeFPS);
         View    llStandardOptions  = findViewById(R.id.LLStandardOptions);
@@ -1767,7 +1890,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(fpsLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spNativeFPS.setAdapter(a);
-            String savedFps = container != null ? container.getExtra("graphicsFpsPreset") : "";
+            String savedFps = getLaunchGraphicsExtra("graphicsFpsPreset", "");
             int savedFpsPos = savedFps.isEmpty() ? 0 : Integer.parseInt(savedFps);
             if (savedFpsPos < 0 || savedFpsPos >= fpsLabels.length) savedFpsPos = 0;
             spNativeFPS.setSelection(savedFpsPos);
@@ -1781,26 +1904,37 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        final String[] upscalerLabels = {"SGSR"};
+        final String[] upscalerLabels = {"SGSR", "FSR", "DLS", "NVScaler"};
+        final Runnable[] applyGlEffectsRef = new Runnable[1];
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spUpscalerMode.setAdapter(a);
+            spUpscalerMode.setSelection(getSavedUpscalerSelection(
+                getLaunchGraphicsExtra("graphicsFilterMode", "")));
             spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (swEnableFSR != null && swEnableFSR.isChecked())
-                        renderer.setFilterMode(pos + 2);
+                    if (swEnableFSR != null && swEnableFSR.isChecked()) {
+                        if (vkRenderer != null) renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
+                        else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                    }
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
             });
         }
 
-        String savedSharp = container != null ? container.getExtra("graphicsSharpness") : "";
+        String savedSharp = getLaunchGraphicsExtra("graphicsSharpness", "");
         float  initSharp  = savedSharp.isEmpty() ? 50f : Float.parseFloat(savedSharp);
         if (sbSharpness != null) {
             sbSharpness.setValue(initSharp);
-            renderer.setSharpness(initSharp / 100f);
-            sbSharpness.setOnValueChangeListener((sb, v) -> renderer.setSharpness(v / 100f));
+            if (vkRenderer != null) {
+                vkRenderer.setSharpness(initSharp / 100f);
+                sbSharpness.setOnValueChangeListener((sb, v) -> vkRenderer.setSharpness(v / 100f));
+            } else if (glRenderer != null) {
+                sbSharpness.setOnValueChangeListener((sb, v) -> {
+                    if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                });
+            }
         }
 
         Runnable updateSharpnessVis = () -> {
@@ -1811,21 +1945,25 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (sbSharpness        != null) sbSharpness.setVisibility(vis);
         };
 
-        String savedFilter = container != null ? container.getExtra("graphicsFilterMode") : "";
+        String savedFilter = getLaunchGraphicsExtra("graphicsFilterMode", "");
         boolean fsrOn = !savedFilter.isEmpty() && Integer.parseInt(savedFilter) > 0;
         if (swEnableFSR != null) {
             swEnableFSR.setChecked(fsrOn);
             if (spUpscalerMode != null)
                 spUpscalerMode.setVisibility(fsrOn ? View.VISIBLE : View.GONE);
             if (fsrOn)
-                renderer.setFilterMode(spUpscalerMode != null
-                    ? spUpscalerMode.getSelectedItemPosition() + 2 : 2);
+                if (vkRenderer != null) renderer.setFilterMode(spUpscalerMode != null
+                    ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0]);
             swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
                 if (spUpscalerMode != null)
                     spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
-                renderer.setFilterMode(checked
-                    ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2)
-                    : (container != null ? container.getRendererFilterMode() : 0));
+                if (vkRenderer != null) {
+                    renderer.setFilterMode(checked
+                        ? (spUpscalerMode != null ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0])
+                        : (container != null ? container.getRendererFilterMode() : 0));
+                } else if (applyGlEffectsRef[0] != null) {
+                    applyGlEffectsRef[0].run();
+                }
                 updateSharpnessVis.run();
             });
         }
@@ -1836,23 +1974,63 @@ public class XServerDisplayActivity extends AppCompatActivity {
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spPostFXMode.setAdapter(a);
 
-            String savedPFX = container != null ? container.getExtra("graphicsPostFXMode") : "";
+            String savedPFX = getLaunchGraphicsExtra("graphicsPostFXMode", "");
             int initPFX = savedPFX.isEmpty() ? 0 : Integer.parseInt(savedPFX);
             if (initPFX < 0 || initPFX >= pfxLabels.length) initPFX = 0;
 
             spPostFXMode.setSelection(initPFX, false);
-            if (initPFX > 0) renderer.setPostFXMode(initPFX);
+            if (initPFX > 0 && vkRenderer != null) vkRenderer.setPostFXMode(initPFX);
 
             spPostFXMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    renderer.setPostFXMode(pos);
+                    if (vkRenderer != null) vkRenderer.setPostFXMode(pos);
+                    else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
                     updateSharpnessVis.run();
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
             });
         }
 
-        String savedPFXInit = container != null ? container.getExtra("graphicsPostFXMode") : "";
+        if (glRenderer != null) {
+            applyGlEffectsRef[0] = () -> {
+                FSREffect fsrEffect = (FSREffect) glRenderer.getEffectComposer().getEffect(FSREffect.class);
+                if (fsrEffect != null) glRenderer.getEffectComposer().removeEffect(fsrEffect);
+                CRTEffect crtEffect = (CRTEffect) glRenderer.getEffectComposer().getEffect(CRTEffect.class);
+                if (crtEffect != null) glRenderer.getEffectComposer().removeEffect(crtEffect);
+                HDREffect hdrEffect = (HDREffect) glRenderer.getEffectComposer().getEffect(HDREffect.class);
+                if (hdrEffect != null) glRenderer.getEffectComposer().removeEffect(hdrEffect);
+                ColorEffect colorEffect = (ColorEffect) glRenderer.getEffectComposer().getEffect(ColorEffect.class);
+                if (colorEffect != null) glRenderer.getEffectComposer().removeEffect(colorEffect);
+
+                int sharpnessPos = sbSharpness != null ? Math.round(sbSharpness.getValue()) : 50;
+                boolean fsrEnabled = swEnableFSR != null && swEnableFSR.isChecked();
+                int postFxPos = spPostFXMode != null ? spPostFXMode.getSelectedItemPosition() : 0;
+
+                if (fsrEnabled) {
+                    FSREffect newFsr = new FSREffect();
+                    newFsr.setMode(postFxPos == 1 ? FSREffect.MODE_DLS : FSREffect.MODE_SUPER_RESOLUTION);
+                    newFsr.setLevel((float) sharpnessPos / 25.0f + 1.0f);
+                    glRenderer.getEffectComposer().addEffect(newFsr);
+                }
+
+                if (postFxPos == 2) {
+                    glRenderer.getEffectComposer().addEffect(new CRTEffect());
+                } else if (postFxPos == 3) {
+                    HDREffect newHdr = new HDREffect();
+                    newHdr.setStrength(1.0f);
+                    glRenderer.getEffectComposer().addEffect(newHdr);
+                } else if (postFxPos == 4) {
+                    ColorEffect natural = new ColorEffect();
+                    natural.setContrast(0.10f);
+                    natural.setGamma(1.05f);
+                    glRenderer.getEffectComposer().addEffect(natural);
+                }
+                glRenderer.getXServerView().requestRender();
+            };
+            applyGlEffectsRef[0].run();
+        }
+
+        String savedPFXInit = getLaunchGraphicsExtra("graphicsPostFXMode", "");
         boolean dlsRestored = !savedPFXInit.isEmpty() && Integer.parseInt(savedPFXInit) == 1;
         int sharpVis = (fsrOn || dlsRestored) ? View.VISIBLE : View.GONE;
         if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
@@ -1860,17 +2038,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (btSaveGraphicsPreset != null) {
             btSaveGraphicsPreset.setOnClickListener(v -> {
-                if (container == null) return;
-                container.putExtra("graphicsFpsPreset",
+                if (container == null && shortcut == null) return;
+                saveLaunchGraphicsExtra("graphicsFpsPreset",
                     String.valueOf(spNativeFPS != null ? spNativeFPS.getSelectedItemPosition() : 0));
-                container.putExtra("graphicsFilterMode",
+                saveLaunchGraphicsExtra("graphicsFilterMode",
                     String.valueOf(swEnableFSR != null && swEnableFSR.isChecked()
-                        ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2) : 0));
-                container.putExtra("graphicsSharpness",
+                        ? (spUpscalerMode != null ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0]) : 0));
+                saveLaunchGraphicsExtra("graphicsStretchMode", softStretchEnabled ? "1" : "0");
+                saveLaunchGraphicsExtra("graphicsSharpness",
                     String.valueOf(sbSharpness != null ? sbSharpness.getValue() : 50f));
-                container.putExtra("graphicsPostFXMode",
+                saveLaunchGraphicsExtra("graphicsPostFXMode",
                     String.valueOf(spPostFXMode != null ? spPostFXMode.getSelectedItemPosition() : 0));
-                container.putExtra("graphicsColorMode", "0");
+                saveLaunchGraphicsExtra("graphicsColorMode", "0");
+                persistLaunchGraphicsPreset();
                 Toast.makeText(this, "Preset saved", Toast.LENGTH_SHORT).show();
             });
         }
@@ -2831,33 +3011,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
-    public void execWineCommand(String command) {
-        String wineBin  = imageFs.getWinePath() + "/bin/wine";
-        String box64Bin = imageFs.getBinDir()    + "/box64";
-        File   rootDir  = imageFs.getRootDir();
-
-        EnvVars execEnvVars = new EnvVars();
-        execEnvVars.putAll(envVars);
-        execEnvVars.put("PATH",
-            imageFs.getWinePath() + "/bin:" + rootDir.getPath() + "/usr/bin");
-
-        File sysvshm = new File(imageFs.getLibDir(), "libandroid-sysvshm.so");
-        if (sysvshm.exists())
-            execEnvVars.put("LD_PRELOAD", sysvshm.getAbsolutePath());
-
-        String launcher = wineInfo.isArm64EC()
-            ? wineBin
-            : (box64Bin + " " + wineBin);
-
-        ProcessHelper.exec(
-            launcher + " " + command,
-            execEnvVars.toStringArray(),
-            rootDir,
-            null);
-    }
-
     private String getWineStartCommand() {
+        // Initialize overrideEnvVars if not already done
         EnvVars envVars = getOverrideEnvVars();
+
+        // Define default arguments
         String args = "";
 
         if (shortcut != null) {
@@ -2867,43 +3025,49 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (shortcut.path.endsWith(".lnk")) {
                 args += "\"" + shortcut.path + "\"" + execArgs;
             } else {
-                String fullPath = shortcut.path.replace("\"", "").trim();
+                String fullPath = shortcut.path.replace("\"", "");
                 String exeDir;
                 String filename;
 
                 if (fullPath.contains("\\")) {
                     int lastSlash = fullPath.lastIndexOf("\\");
-                    exeDir   = fullPath.substring(0, lastSlash);
-                    filename = fullPath.substring(lastSlash + 1);
+                    if (lastSlash != -1) {
+                        exeDir = fullPath.substring(0, lastSlash);
+                        filename = fullPath.substring(lastSlash + 1);
+                    } else {
+                        exeDir = "D:\\";
+                        filename = fullPath;
+                    }
                 } else {
-                    exeDir   = FileUtils.getDirname(fullPath);
+                    exeDir = FileUtils.getDirname(fullPath);
                     filename = FileUtils.getName(fullPath);
                 }
 
-                int dotIndex   = filename.lastIndexOf(".");
+                int dotIndex = filename.lastIndexOf(".");
                 int spaceIndex = (dotIndex != -1) ? filename.indexOf(" ", dotIndex) : -1;
+
                 if (spaceIndex != -1) {
                     execArgs = filename.substring(spaceIndex + 1) + execArgs;
                     filename = filename.substring(0, spaceIndex);
                 }
 
-                String escapedDir = exeDir.replace(" ", "\\ ");
-                args += "/dir " + escapedDir + " \"" + filename + "\"" + execArgs;
+                args += "/dir " + StringUtils.escapeDOSPath(exeDir) + " \"" + filename + "\"" + execArgs;
             }
         } else {
+            // Append EXTRA_EXEC_ARGS from overrideEnvVars if it exists
             if (envVars.has("EXTRA_EXEC_ARGS")) {
                 args += " " + envVars.get("EXTRA_EXEC_ARGS");
-                envVars.remove("EXTRA_EXEC_ARGS");
+                envVars.remove("EXTRA_EXEC_ARGS"); // Remove the key after use
             } else {
                 args += "\"wfm.exe\"";
             }
         }
+        // Construct the final command
+        String command = "winhandler.exe " + args;
 
-        String affinityArg = (taskAffinityMask != 0)
-                ? "/affinity " + Integer.toHexString(taskAffinityMask & 0xFFFF) + " "
-                : "";
-        return "winlauncher.exe " + affinityArg + args;
+        return command;
     }
+
     private String getExecutable() {
         String filename = "wfm.exe";
         if (shortcut != null && shortcut.path != null) {
@@ -2911,7 +3075,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             int lastSlash = cleanPath.lastIndexOf('/');
             int lastBackslash = cleanPath.lastIndexOf('\\');
             int lastSeparator = Math.max(lastSlash, lastBackslash);
-            filename = lastSeparator != -1 ? cleanPath.substring(lastSeparator + 1) : cleanPath;
+            if (lastSeparator != -1) {
+                filename = cleanPath.substring(lastSeparator + 1);
+            } else {
+                filename = cleanPath;
+            }
         }
         return filename;
     }
@@ -2970,101 +3138,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void assignTaskAffinity(Window window) {
-        if (taskAffinityMask == 0) return;
+        if (taskAffinityMask == 0 || taskAffinityMaskWoW64 == 0)
+            return;
         int processId = window.getProcessId();
-        if (processId <= 0) return;
-        String cmdline = readAffinityCmdline(new java.io.File("/proc/" + processId + "/cmdline"));
+        String className = window.getClassName();
+        int processAffinity = window.isWoW64() ? taskAffinityMaskWoW64 : taskAffinityMask;
 
-        int mask;
-        if (cmdline != null && isAffinityExcluded(cmdline)) {
-            mask = systemAffinityMask;
-        } else {
-            mask = window.isWoW64() ? taskAffinityMaskWoW64 : taskAffinityMask;
+        if (processId > 0) {
+            winHandler.setProcessAffinity(processId, processAffinity);
+        } else if (!className.isEmpty()) {
+            winHandler.setProcessAffinity(window.getClassName(), processAffinity);
         }
-        if (mask != 0) ProcessHelper.setProcessAffinity(processId, mask);
-    }
-
-    private void startAffinityWatcher() {
-        if (taskAffinityMask == 0) return;
-        affinityWatcher = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
-        scheduleAffinityScan(1);
-    }
-
-    private void scheduleAffinityScan(int delaySeconds) {
-        if (affinityWatcher == null || affinityWatcher.isShutdown()) return;
-        affinityWatcher.schedule(() -> {
-            boolean foundNewExe = runAffinityScan();
-            int nextDelay = foundNewExe ? 1 : Math.min(delaySeconds + 1, 5);
-            scheduleAffinityScan(nextDelay);
-        }, delaySeconds, java.util.concurrent.TimeUnit.SECONDS);
-    }
-
-    private boolean runAffinityScan() {
-        boolean foundNewExe = false;
-        try {
-            String[] names = new java.io.File("/proc").list();
-            if (names == null) return false;
-            for (String name : names) {
-                if (name.isEmpty()) continue;
-                boolean numeric = true;
-                for (int i = 0; i < name.length(); i++) {
-                    if (!Character.isDigit(name.charAt(i))) { numeric = false; break; }
-                }
-                if (!numeric) continue;
-
-                int pid;
-                try { pid = Integer.parseInt(name); }
-                catch (NumberFormatException e) { continue; }
-                if (!seenAffinityPids.add(pid)) continue;
-
-                String cmdline = readAffinityCmdline(new java.io.File("/proc/" + pid + "/cmdline"));
-                if (cmdline == null || !cmdline.contains(".exe")) continue;
-                foundNewExe = true;
-
-                int mask = isAffinityExcluded(cmdline)
-                        ? systemAffinityMask
-                        : (isWow64AffinityCmdline(cmdline) ? taskAffinityMaskWoW64 : taskAffinityMask);
-                if (mask != 0) ProcessHelper.setProcessAffinity(pid, mask);
-            }
-        } catch (Exception ignored) {}
-        return foundNewExe;
-    }
-
-    private void stopAffinityWatcher() {
-        if (affinityWatcher != null) {
-            affinityWatcher.shutdownNow();
-            affinityWatcher = null;
-        }
-        seenAffinityPids.clear();
-    }
-
-    private static final String[] AFFINITY_EXCLUDED_EXE = {
-        "wineserver", "services.exe", "svchost.exe", "rpcss.exe", "plugplay.exe",
-        "winedevice.exe", "explorer.exe", "spoolsv.exe", "wineboot.exe",
-        "winemenubuilder.exe", "conhost.exe", "start.exe", "winlauncher.exe",
-        "wfm.exe", "crashpad_handler"
-    };
-
-    private static boolean isAffinityExcluded(String cmdline) {
-        String lower = cmdline.toLowerCase(java.util.Locale.ROOT);
-        for (String name : AFFINITY_EXCLUDED_EXE) {
-            if (lower.contains(name)) return true;
-        }
-        return false;
-    }
-
-    private static String readAffinityCmdline(java.io.File file) {
-        try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
-            byte[] buf = new byte[512];
-            int len = fis.read(buf);
-            if (len <= 0) return null;
-            for (int i = 0; i < len; i++) if (buf[i] == 0) buf[i] = ' ';
-            return new String(buf, 0, len).trim();
-        } catch (java.io.IOException e) { return null; }
-    }
-
-    private static boolean isWow64AffinityCmdline(String cmdline) {
-        return cmdline.contains("wine") && !cmdline.contains("wine64");
     }
 
     private void changeFrameRatingVisibility(Window window, Property property) {

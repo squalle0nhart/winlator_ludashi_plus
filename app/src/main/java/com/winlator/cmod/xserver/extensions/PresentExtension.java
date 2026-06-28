@@ -5,8 +5,11 @@ import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCC
 import android.util.SparseArray;
 
 import com.winlator.cmod.renderer.GPUImage;
+import com.winlator.cmod.renderer.HostRenderer;
+import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.Texture;
 import com.winlator.cmod.renderer.VulkanRenderer;
+import com.winlator.cmod.renderer.ASurfaceRenderer;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
@@ -243,10 +246,15 @@ public class PresentExtension implements Extension {
         if (pixmap == null) throw new BadPixmap(pixmapId);
 
         Drawable content = window.getContent();
-        if (content.visual.depth != pixmap.drawable.visual.depth) throw new BadMatch();
+        int contentDepth = content.visual.depth;
+        int pixmapDepth = pixmap.drawable.visual.depth;
+        boolean depthCompat = (contentDepth == pixmapDepth) ||
+            ((contentDepth == 24 || contentDepth == 32) && (pixmapDepth == 24 || pixmapDepth == 32));
+        if (!depthCompat) throw new BadMatch();
 
-        VulkanRenderer renderer = client.xServer.getRenderer();
-        int targetFps = renderer != null ? renderer.getFpsLimit() : 0;
+        HostRenderer xr = client.xServer.getRenderer();
+        VulkanRenderer renderer = xr instanceof VulkanRenderer ? (VulkanRenderer) xr : null;
+        int targetFps = xr != null ? xr.getFpsLimit() : 0;
 
         long ust = System.nanoTime() / 1000;
         long msc = ust / (targetFps > 0 ? (1_000_000L / targetFps) : (1_000_000L / 60));
@@ -254,14 +262,31 @@ public class PresentExtension implements Extension {
         synchronized (content.renderLock) {
             boolean isNative = renderer != null && renderer.isNativeMode();
 
-            if (isNative && pixmap.drawable.isDirectScanout()) {
+            if (xr instanceof ASurfaceRenderer) {
+                ASurfaceRenderer asr = (ASurfaceRenderer) xr;
+                if (window.attributes.isMapped()
+                        && pixmap.drawable.getTexture() instanceof GPUImage
+                        && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
+                    content.setTexture(pixmap.drawable.getTexture());
+                    content.setDirectScanout(true);
+                    sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
+                    asr.presentWindow(window, content);
+                } else {
+                    content.copyArea((short) 0, (short) 0, xOff, yOff,
+                        pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);
+                    sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
+                }
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
+            } else if (isNative && pixmap.drawable.isDirectScanout()) {
                 content.setTexture(pixmap.drawable.getTexture());
                 content.setDirectScanout(true);
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
                 if (window.attributes.isMapped() && renderer != null)
                     renderer.onUpdateWindowContent(window);
                 scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
-            } else if (renderer != null && window.attributes.isMapped()) {
+            } else if (renderer != null && window.attributes.isMapped()
+                    && pixmap.drawable.getTexture() instanceof GPUImage
+                    && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
                 renderer.onUpdateWindowContentDirect(window, pixmap.drawable, xOff, yOff);
                 scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
@@ -287,9 +312,8 @@ public class PresentExtension implements Extension {
             Drawable content = window.getContent();
             final Texture oldTexture = content.getTexture();
             if (oldTexture != null && !(oldTexture instanceof GPUImage)) {
-                VulkanRenderer r = client.xServer.getRenderer();
-                if (r != null)
-                    r.xServerView.queueEvent(oldTexture::destroy);
+                HostRenderer r = client.xServer.getRenderer();
+                if (r != null) r.getXServerView().queueEvent(oldTexture::destroy);
             }
             if (!(content.getTexture() instanceof GPUImage))
                 content.setTexture(new GPUImage(content.width, content.height));
