@@ -55,6 +55,7 @@ You can find updated components (known as `wcps`) to improve compatibility and p
   - **Original Winlator** by [brunodev85](https://github.com/brunodev85/winlator)
   - **Original Winlator Bionic** by [Pipetto-crypto](https://github.com/Pipetto-crypto/winlator)
   - **Winlator (coffincolors fork)** by [coffincolors](https://github.com/coffincolors/winlator)
+  - **Winlator Ludashi** by [StevenMXZ](https://github.com/StevenMXZ/Winlator-Ludashi)
   - Ubuntu RootFs (Bionic Beaver): [releases.ubuntu.com/bionic](https://www.google.com/search?q=https://releases.ubuntu.com/bionic)
   - Wine: [winehq.org](https://www.winehq.org/)
   - Box86/Box64 by [ptitseb](https://github.com/ptitSeb)
