@@ -133,7 +133,8 @@ public class ContentsManager {
                 try {
                     JSONObject object = content.getJSONObject(i);
                     String remoteUrl = object.optString("remoteUrl", "");
-                    if (remoteUrl.isEmpty() || !remoteUrl.endsWith(".wcp")) {
+                    if (remoteUrl.isEmpty()
+                            || (!remoteUrl.endsWith(".wcp") && !remoteUrl.endsWith(".wcp.xz"))) {
                         continue;
                     }
 

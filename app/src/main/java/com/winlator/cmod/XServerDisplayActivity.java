@@ -266,6 +266,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return "1".equals(value) || "true".equalsIgnoreCase(value);
     }
 
+    private float getLaunchGraphicsSharpnessPercent() {
+        String savedSharp = getLaunchGraphicsExtra("graphicsSharpness", "");
+        if (savedSharp == null || savedSharp.isEmpty()) return 50f;
+        try {
+            float raw = Float.parseFloat(savedSharp);
+            // Renderer defaults store 0.00..1.00 while the sidebar preset stores 0..100.
+            if (raw <= 1.0f && savedSharp.contains(".")) raw *= 100f;
+            return Math.max(0f, Math.min(100f, raw));
+        } catch (NumberFormatException ignored) {
+            return 50f;
+        }
+    }
+
     private Handler timeoutHandler = new Handler(Looper.getMainLooper());
     private Runnable hideControlsRunnable;
 
@@ -1211,13 +1224,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : (container != null && container.getRendererSwapRB()));
             softStretchEnabled = getLaunchGraphicsBoolean("graphicsStretchMode", false);
             vkRenderer.setStretchMode(softStretchEnabled ? 1 : 0);
-
+        } else if (renderer instanceof GLRenderer) {
+            GLRenderer glRenderer = (GLRenderer) renderer;
+            glRenderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
+                    : (container != null ? container.getRendererFilterMode() : 0));
+            glRenderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
+                    : (container != null && container.getRendererSwapRB()));
             boolean nativeMode = shortcut != null ? shortcut.getRendererNative()
                     : (container != null && container.isRendererNative());
-            String nativeColorFormatExtra = shortcut != null ? shortcut.getExtra("nativeColorFormat", "0") : "0";
-            int nativeColorFormat = nativeColorFormatExtra.isEmpty() ? 0 : Integer.parseInt(nativeColorFormatExtra);
-            vkRenderer.setNativeMode(nativeMode);
-            vkRenderer.setNativeColorFormat(nativeColorFormat);
+            glRenderer.setInitialNativeMode(nativeMode);
+        } else if (renderer instanceof ASurfaceRenderer) {
+            ASurfaceRenderer asrRenderer = (ASurfaceRenderer) renderer;
+            asrRenderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
+                    : (container != null && container.getRendererSwapRB()));
         }
 
         if (shortcut != null) {
@@ -1894,6 +1913,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             int savedFpsPos = savedFps.isEmpty() ? 0 : Integer.parseInt(savedFps);
             if (savedFpsPos < 0 || savedFpsPos >= fpsLabels.length) savedFpsPos = 0;
             spNativeFPS.setSelection(savedFpsPos);
+            renderer.setFpsLimit(savedFpsPos < fpsValues.length ? fpsValues[savedFpsPos] : 0);
             spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
@@ -1904,7 +1924,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        final String[] upscalerLabels = {"SGSR", "FSR", "DLS", "NVScaler"};
+        final String[] upscalerLabels = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
         final Runnable[] applyGlEffectsRef = new Runnable[1];
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
@@ -1923,8 +1943,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        String savedSharp = getLaunchGraphicsExtra("graphicsSharpness", "");
-        float  initSharp  = savedSharp.isEmpty() ? 50f : Float.parseFloat(savedSharp);
+        float initSharp = getLaunchGraphicsSharpnessPercent();
         if (sbSharpness != null) {
             sbSharpness.setValue(initSharp);
             if (vkRenderer != null) {
@@ -2676,6 +2695,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
         envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
+
+        String timelineSemaphores = graphicsDriverConfig.get("timelineSemaphores");
+        if ("1".equals(timelineSemaphores)) {
+            envVars.remove("DXVK_DISABLE_TIMELINE_SEMAPHORES");
+        } else {
+            envVars.put("DXVK_DISABLE_TIMELINE_SEMAPHORES", "1");
+        }
+
+        String tuDebugSysmem = graphicsDriverConfig.get("tuDebugSysmem");
+        envVars.put("TU_DEBUG", "1".equals(tuDebugSysmem) ? "noconform,sysmem" : "noconform");
+
+        String mesaGlthread = graphicsDriverConfig.get("mesaGlthread");
+        envVars.put("mesa_glthread", "1".equals(mesaGlthread) ? "true" : "false");
 
         String bcnEmulation = graphicsDriverConfig.get("bcnEmulation");
         String bcnEmulationType = graphicsDriverConfig.get("bcnEmulationType");

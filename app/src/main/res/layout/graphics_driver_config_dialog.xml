@@ -179,5 +179,20 @@
         android:layout_height="wrap_content"
         android:id="@+id/CBDisablePresentWait"
         android:text="@string/graphics_driver_disable_present_wait" />
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/CBTimelineSemaphores"
+        android:text="@string/graphics_driver_timeline_semaphores" />
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/CBTuDebugSysmem"
+        android:text="@string/graphics_driver_tu_debug_sysmem" />
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/CBMesaGlthread"
+        android:text="@string/graphics_driver_mesa_glthread" />
 </LinearLayout>
 

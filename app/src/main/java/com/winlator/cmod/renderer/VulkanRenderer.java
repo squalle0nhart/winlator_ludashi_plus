@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.view.Surface;
-import android.widget.Toast;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.widget.FrameRating;
@@ -666,71 +665,19 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public boolean isCursorVisible() { return cursorVisible; }
 
     public void setNativeMode(boolean mode) {
-        if (this.nativeMode == mode) return;
-        this.nativeMode = mode;
+        if (!this.nativeMode && !mode) return;
+        this.nativeMode = false;
         xRenderingPausedForScanout = false;
-        if (mode) {
-            xServer.setRenderingEnabled(true);
-            xServerView.post(() -> {
-                if (android.os.Build.VERSION.SDK_INT >= 29) {
-                    try {
-                        android.view.SurfaceControl xsc = (android.view.SurfaceControl) xServerView.getSurfaceControl();
-                        scanoutGameSC = new android.view.SurfaceControl.Builder()
-                            .setParent(xsc).setName("winlator_game").setOpaque(true).build();
-                        scanoutGameSurface = new android.view.Surface(scanoutGameSC);
-                        scanoutCursorSC = new android.view.SurfaceControl.Builder()
-                            .setParent(xsc).setName("winlator_cursor").setFormat(1).build();
-                        scanoutCursorSurface = new android.view.Surface(scanoutCursorSC);
-                        android.view.SurfaceControl.Transaction scTxn =
-                            new android.view.SurfaceControl.Transaction()
-                            .setLayer(scanoutGameSC,   1)
-                            .setLayer(scanoutCursorSC, 2)
-                            .setVisibility(scanoutGameSC,   true)
-                            .setVisibility(scanoutCursorSC, true);
-
-                        if (android.os.Build.VERSION.SDK_INT >= 30) {
-                            float targetFps = fpsLimit > 0 ? (float)fpsLimit
-                                : xServerView.getDisplay() != null
-                                    ? xServerView.getDisplay().getRefreshRate() : 60f;
-                            scTxn.setFrameRate(scanoutGameSC, targetFps,
-                                android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
-                        }
-                        scTxn.apply();
-                        applyScanoutSwapTransform();
-                        synchronized (lock) {
-                            if (nativeHandle != 0) {
-                                nativeSetScanoutWindow(nativeHandle,
-                                    scanoutGameSurface, scanoutCursorSurface);
-                                updateTransform();
-                            }
-                        }
-                    } catch (Exception e) {
-                        android.util.Log.w("VulkanRenderer", "Sibling SC failed, using child SC: " + e);
-                        synchronized (lock) {
-                            if (nativeHandle != 0) nativeInitScanout(nativeHandle);
-                        }
-                    }
-                } else {
-                    synchronized (lock) { if (nativeHandle != 0) nativeInitScanout(nativeHandle); }
-                }
-            });
-        } else {
-            synchronized (lock) {
-                if (nativeHandle != 0) nativeDestroyScanout(nativeHandle);
-            }
-
-            xServerView.post(() -> {
-                xServer.setRenderingEnabled(true);
-                releaseScanoutSurfaces();
-            });
+        synchronized (lock) {
+            if (nativeHandle != 0) nativeDestroyScanout(nativeHandle);
         }
-        if (hudRef != null) hudRef.setIsNative(mode && nativeHandle != 0 && nativeIsGameFrameDelivered(nativeHandle));
+        xServer.setRenderingEnabled(true);
+        xServerView.post(this::releaseScanoutSurfaces);
+        if (hudRef != null) hudRef.setIsNative(false);
         xServerView.queueEvent(this::updateScene);
-        final String msg = mode ? "Native Rendering+ Enabled" : "Native Rendering+ Disabled";
-        xServerView.post(() -> Toast.makeText(xServerView.getContext(), msg, Toast.LENGTH_SHORT).show());
     }
 
-    public boolean isNativeMode() { return nativeMode; }
+    public boolean isNativeMode() { return false; }
     @Override
     public void setRenderingEnabled(boolean enabled) {
         xServer.setRenderingEnabled(enabled);

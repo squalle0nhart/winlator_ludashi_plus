@@ -15,6 +15,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.AppUtils;
@@ -49,6 +50,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private Spinner sBCnEmulationCache;
     private CheckBox cbSyncFrame;
     private CheckBox cbDisablePresentWait;
+    private CheckBox cbTimelineSemaphores;
+    private CheckBox cbTuDebugSysmem;
+    private CheckBox cbMesaGlthread;
 
     private static String selectedVulkanVersion;
     private static String selectedVersion;
@@ -63,6 +67,31 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private static String selectedBCnEmulation;
     private static String selectedBCnEmulationType;
     private static String isBCnCacheEnabled;
+    private static String isTimelineSemaphoresEnabled;
+    private static String isTuDebugSysmemEnabled;
+    private static String isMesaGlthreadEnabled;
+
+    private static HashMap<String, String> parseGraphicsDriverConfigRaw(String graphicsDriverConfig) {
+        HashMap<String, String> mappedConfig = new HashMap<>();
+        if (graphicsDriverConfig == null || graphicsDriverConfig.isEmpty()) return mappedConfig;
+        String[] configElements = graphicsDriverConfig.split(";");
+        for (String element : configElements) {
+            String[] splitElement = element.split("=", 2);
+            String key = splitElement[0];
+            String value = splitElement.length > 1 ? splitElement[1] : "";
+            mappedConfig.put(key, value);
+        }
+        return mappedConfig;
+    }
+
+    private static void applyConfigDefaults(HashMap<String, String> config) {
+        HashMap<String, String> defaults = parseGraphicsDriverConfigRaw(Container.DEFAULT_GRAPHICSDRIVERCONFIG);
+        for (Map.Entry<String, String> entry : defaults.entrySet()) {
+            if (!config.containsKey(entry.getKey())) {
+                config.put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
 
     private void loadGPUNameSpinner(Context context, Spinner spinner)  {
         String gpuNameList = FileUtils.readString(context, "gpu_cards.json");
@@ -85,23 +114,13 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     }
 
     public static HashMap<String, String> parseGraphicsDriverConfig(String graphicsDriverConfig) {
-        HashMap<String, String> mappedConfig = new HashMap<>();
-        String[] configElements = graphicsDriverConfig.split(";");
-        for (String element : configElements) {
-            String key;
-            String value;
-            String[] splittedElement = element.split("=");
-            key = splittedElement[0];
-            if (splittedElement.length > 1)
-                value = element.split("=")[1];
-            else
-                value = "";
-            mappedConfig.put(key, value);
-        }
+        HashMap<String, String> mappedConfig = parseGraphicsDriverConfigRaw(graphicsDriverConfig);
+        applyConfigDefaults(mappedConfig);
         return mappedConfig;
     }
 
     public static String toGraphicsDriverConfig(HashMap<String, String> config) {
+        applyConfigDefaults(config);
         String graphicsDriverConfig = "";
         for (Map.Entry<String, String> entry : config.entrySet()) {
             graphicsDriverConfig += entry.getKey() + "=" + entry.getValue() + ";";
@@ -127,6 +146,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 "presentMode=" + selectedPresentMode + ";" +
                 "syncFrame=" + isSyncFrame + ";" +
                 "disablePresentWait=" + isDisablePresentWait + ";" +
+                "timelineSemaphores=" + isTimelineSemaphoresEnabled + ";" +
+                "tuDebugSysmem=" + isTuDebugSysmemEnabled + ";" +
+                "mesaGlthread=" + isMesaGlthreadEnabled + ";" +
                 "resourceType=" + selectedResourceType + ";" +
                 "bcnEmulation=" + selectedBCnEmulation + ";" +
                 "bcnEmulationType=" + selectedBCnEmulationType + ";" +
@@ -174,6 +196,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sBCnEmulationCache = findViewById(R.id.SGraphicsDriverBCnEmulationCache);
         cbSyncFrame = findViewById(R.id.CBSyncFrame);
         cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
+        cbTimelineSemaphores = findViewById(R.id.CBTimelineSemaphores);
+        cbTuDebugSysmem = findViewById(R.id.CBTuDebugSysmem);
+        cbMesaGlthread = findViewById(R.id.CBMesaGlthread);
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
@@ -184,6 +209,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         String maxDeviceMemory = config.get("maxDeviceMemory");
         String syncFrame = config.get("syncFrame");
         String disablePresentWait = config.get("disablePresentWait");
+        String timelineSemaphores = config.get("timelineSemaphores");
+        String tuDebugSysmem = config.get("tuDebugSysmem");
+        String mesaGlthread = config.get("mesaGlthread");
         String presentMode = config.get("presentMode");
         String resourceType = config.get("resourceType");
         String bcnEmulation = config.get("bcnEmulation");
@@ -324,6 +352,24 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         cbDisablePresentWait.setChecked(isDisablePresentWait.equals("1") ? true : false);
         cbDisablePresentWait.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isDisablePresentWait = isChecked ? "1" : "0";
+        });
+
+        isTimelineSemaphoresEnabled = timelineSemaphores;
+        cbTimelineSemaphores.setChecked(isTimelineSemaphoresEnabled.equals("1"));
+        cbTimelineSemaphores.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isTimelineSemaphoresEnabled = isChecked ? "1" : "0";
+        });
+
+        isTuDebugSysmemEnabled = tuDebugSysmem;
+        cbTuDebugSysmem.setChecked(isTuDebugSysmemEnabled.equals("1"));
+        cbTuDebugSysmem.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isTuDebugSysmemEnabled = isChecked ? "1" : "0";
+        });
+
+        isMesaGlthreadEnabled = mesaGlthread;
+        cbMesaGlthread.setChecked(isMesaGlthreadEnabled.equals("1"));
+        cbMesaGlthread.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isMesaGlthreadEnabled = isChecked ? "1" : "0";
         });
 
         // Ensure ContentsManager syncContents is called

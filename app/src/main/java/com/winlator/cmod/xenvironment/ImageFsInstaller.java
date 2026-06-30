@@ -1,6 +1,7 @@
 package com.winlator.cmod.xenvironment;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -13,6 +14,7 @@ import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DownloadProgressDialog;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -28,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class ImageFsInstaller {
     public static final byte LATEST_VERSION = 22;
+    private static final String TAG = "ImageFsInstaller";
     
     public abstract interface onInstallationFinish {
         public void call();
@@ -62,17 +65,30 @@ public abstract class ImageFsInstaller {
         for (String version : versions) {
             File outFile = new File(rootDir, "opt/" + version);
             outFile.mkdirs();
-            final long contentLength = (long)(FileUtils.getSize(activity, version + ".tar.zst") * (100.0f / compressionRatio));
+            final String zstdAsset = version + ".tar.zst";
+            final String xzAsset = version + ".txz";
+            final boolean useZstd = FileUtils.getSize(activity, zstdAsset) > 0;
+            final long assetSize = FileUtils.getSize(activity, useZstd ? zstdAsset : xzAsset);
+            final long contentLength = (long)(assetSize * (100.0f / compressionRatio));
             AtomicLong totalSizeRef = new AtomicLong();
 
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, activity, version + ".tar.zst", outFile, (file, size) -> {
+            OnExtractFileListener progressListener = (file, size) -> {
                 if (size > 0) {
                     long totalSize = totalSizeRef.addAndGet(size);
                     final int progress = (int)(((float)totalSize / contentLength) * 100);
                     activity.runOnUiThread(() -> dialog.setProgress(progress));
                 }
                 return file;
-            });
+            };
+
+            boolean success = useZstd && TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, activity, zstdAsset, outFile, progressListener);
+            if (!success) {
+                totalSizeRef.set(0);
+                success = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, activity, xzAsset, outFile, progressListener);
+            }
+            if (!success) {
+                Log.e(TAG, "Failed to extract bundled wine runtime for " + version);
+            }
          }
     }
 
@@ -110,17 +126,27 @@ public abstract class ImageFsInstaller {
         Executors.newSingleThreadExecutor().execute(() -> {
             clearRootDir(rootDir);
             final byte compressionRatio = 22;
-            final long contentLength = (long)(FileUtils.getSize(activity, "imagefs.tar.zst") * (100.0f / compressionRatio));
+            final String zstdAsset = "imagefs.tar.zst";
+            final String xzAsset = "imagefs.txz";
+            final boolean useZstd = FileUtils.getSize(activity, zstdAsset) > 0;
+            final long assetSize = FileUtils.getSize(activity, useZstd ? zstdAsset : xzAsset);
+            final long contentLength = (long)(assetSize * (100.0f / compressionRatio));
             AtomicLong totalSizeRef = new AtomicLong();
 
-            boolean success = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, activity, "imagefs.tar.zst", rootDir, (file, size) -> {
+            OnExtractFileListener progressListener = (file, size) -> {
                 if (size > 0) {
                     long totalSize = totalSizeRef.addAndGet(size);
                     final int progress = (int)(((float)totalSize / contentLength) * 100);
                     activity.runOnUiThread(() -> dialog.setProgress(progress));
                 }
                 return file;
-            });
+            };
+
+            boolean success = useZstd && TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, activity, zstdAsset, rootDir, progressListener);
+            if (!success) {
+                totalSizeRef.set(0);
+                success = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, activity, xzAsset, rootDir, progressListener);
+            }
 
             if (success) {
                 installWineFromAssets(dialog, activity);
@@ -129,7 +155,10 @@ public abstract class ImageFsInstaller {
                 FileUtils.symlink("libSDL2-2.0.so", new File(imageFs.getLibDir(), "libSDL2-2.0.so.0").getAbsolutePath());
                 resetContainerImgVersions(activity);
             }
-            else AppUtils.showToast(activity, R.string.unable_to_install_system_files);
+            else {
+                Log.e(TAG, "Failed to extract imagefs from bundled assets");
+                AppUtils.showToast(activity, R.string.unable_to_install_system_files);
+            }
             
             dialog.closeOnUiThread();
             activity.runOnUiThread(() -> {if (callback != null) callback.call();});
@@ -139,12 +168,27 @@ public abstract class ImageFsInstaller {
     public static boolean installIfNeeded(final MainActivity activity, onInstallationFinish callback) {
         ImageFs imageFs = ImageFs.find(activity);
         
-        if (!imageFs.isValid() || imageFs.getVersion() < LATEST_VERSION) {
+        if (!imageFs.isValid() || imageFs.getVersion() < LATEST_VERSION || !hasBundledWineRuntime(activity, imageFs)) {
             installFromAssets(activity, callback);
             return true;
         }    
         
         return false;
+    }
+
+    private static boolean hasBundledWineRuntime(Context context, ImageFs imageFs) {
+        File rootDir = imageFs.getRootDir();
+        String[] versions = context.getResources().getStringArray(R.array.wine_entries);
+        for (String version : versions) {
+            File wineDir = new File(rootDir, "opt/" + version);
+            File libWineDir = new File(wineDir, "lib/wine");
+            File prefixPack = new File(wineDir, "prefixPack.txz");
+            if (!wineDir.isDirectory() || (!libWineDir.isDirectory() && !prefixPack.isFile())) {
+                Log.w(TAG, "Missing bundled wine runtime for " + version + " under " + wineDir.getAbsolutePath());
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void clearOptDir(File optDir) {

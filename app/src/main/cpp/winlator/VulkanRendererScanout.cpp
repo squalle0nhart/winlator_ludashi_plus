@@ -168,6 +168,8 @@ void VulkanRendererContext::scanoutSetBuffer(AHardwareBuffer* ahb, int x, int y,
             (int)scanoutActive.load(), scanoutGameSC, (void*)ahb, scanoutGameTx);
         return;
     }
+    (void)x;
+    (void)y;
 
     AHardwareBuffer_acquire(ahb);
 
@@ -202,7 +204,6 @@ void VulkanRendererContext::scanoutSetBuffer(AHardwareBuffer* ahb, int x, int y,
 }
 
 void VulkanRendererContext::applyScanoutBuffer() {
-
     bool hasImage=false, hasPos=false;
     short cx=0, cy=0, chx=0, chy=0;
 

@@ -62,7 +62,7 @@ public class FEXCorePresetManager {
             envVars.put("FEX_X87REDUCEDPRECISION", "1");
             envVars.put("FEX_MULTIBLOCK", "1");
             envVars.put("FEX_DYNAMICL1CACHE", "1");
-            envVars.put("FEX_DISABLEL2CACHE", "1");
+            envVars.put("FEX_DISABLEL2CACHE", "0");
         }
         else if (id.equals(FEXCorePreset.DENUVO)) {
             envVars.put("FEX_TSOENABLED", "0");

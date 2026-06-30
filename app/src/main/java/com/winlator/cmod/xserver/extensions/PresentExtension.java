@@ -260,8 +260,6 @@ public class PresentExtension implements Extension {
         long msc = ust / (targetFps > 0 ? (1_000_000L / targetFps) : (1_000_000L / 60));
 
         synchronized (content.renderLock) {
-            boolean isNative = renderer != null && renderer.isNativeMode();
-
             if (xr instanceof ASurfaceRenderer) {
                 ASurfaceRenderer asr = (ASurfaceRenderer) xr;
                 if (window.attributes.isMapped()
@@ -277,19 +275,21 @@ public class PresentExtension implements Extension {
                     sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
                 }
                 scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
-            } else if (isNative && pixmap.drawable.isDirectScanout()) {
-                content.setTexture(pixmap.drawable.getTexture());
-                content.setDirectScanout(true);
-                sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
-                if (window.attributes.isMapped() && renderer != null)
-                    renderer.onUpdateWindowContent(window);
-                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
             } else if (renderer != null && window.attributes.isMapped()
                     && pixmap.drawable.getTexture() instanceof GPUImage
                     && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
                 renderer.onUpdateWindowContentDirect(window, pixmap.drawable, xOff, yOff);
                 scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
+            } else if (xr instanceof GLRenderer
+                    && ((GLRenderer) xr).isNativeMode()
+                    && pixmap.drawable.getTexture() instanceof GPUImage
+                    && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
+                content.setTexture(pixmap.drawable.getTexture());
+                content.setDirectScanout(true);
+                sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
+                ((GLRenderer) xr).presentScanout(window, content);
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, null);
             } else {
                 content.copyArea((short)0, (short)0, xOff, yOff,
                     pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);

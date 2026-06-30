@@ -629,6 +629,9 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="graphics_driver_max_device_memory">Max Device Memory</string>
     <string name="graphics_driver_sync_frame">Sync Every Frame</string>
     <string name="graphics_driver_disable_present_wait">Disable KHR_present_wait</string>
+    <string name="graphics_driver_timeline_semaphores">Enable DXVK timeline semaphores</string>
+    <string name="graphics_driver_tu_debug_sysmem">Force Turnip sysmem path</string>
+    <string name="graphics_driver_mesa_glthread">Enable Mesa GL threading</string>
     <string name="graphics_driver_present_modes">Present Modes</string>
     <string name="graphics_driver_resource_type">Memory Resource Type</string>
     <string name="graphics_driver_vulkan_version">Vulkan Version</string>

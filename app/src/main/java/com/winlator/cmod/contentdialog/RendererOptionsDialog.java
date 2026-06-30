@@ -49,6 +49,9 @@ public class RendererOptionsDialog extends ContentDialog {
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
 
+        boolean getRendererLegacyScanout();
+        void setRendererLegacyScanout(boolean v);
+
         int getGraphicsFilterMode();
         void setGraphicsFilterMode(int v);
 
@@ -95,7 +98,7 @@ public class RendererOptionsDialog extends ContentDialog {
     };
     private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg"};
     private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG"};
-    private static final String[] UPSCALER_LABELS = {"SGSR", "FSR", "DLS", "NVScaler"};
+    private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
     private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
@@ -123,7 +126,9 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
+        CheckBox cbNativeRendering = findViewById(R.id.CBRendererNative);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
+        CheckBox cbLegacyScanout = findViewById(R.id.CBRendererLegacyScanout);
         CheckBox cbDefaultUpscaler = findViewById(R.id.CBDefaultUpscaler);
         CheckBox cbDefaultSupersampling = findViewById(R.id.CBDefaultSupersampling);
         Spinner spDefaultUpscaler = findViewById(R.id.SPDefaultUpscalerMode);
@@ -163,12 +168,16 @@ public class RendererOptionsDialog extends ContentDialog {
         spRenderer.setSelection(rendererSel);
 
         Runnable syncRendererUi = () -> {
-            boolean isVulkanRenderer = spRenderer.getSelectedItemPosition() == 1;
+            int rendererPosition = spRenderer.getSelectedItemPosition();
+            boolean isVulkanRenderer = rendererPosition == 1;
+            boolean isGlRenderer = rendererPosition == 0;
             setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
             setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
             if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
-            if (cbSwapRB != null) cbSwapRB.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+            if (cbNativeRendering != null) cbNativeRendering.setVisibility(isGlRenderer ? View.VISIBLE : View.GONE);
+            if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
+            if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
         };
         spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -210,7 +219,9 @@ public class RendererOptionsDialog extends ContentDialog {
         // Texture Filter
         setAmoledAdapter(ctx, spFilter, FILTER_LABELS);
         spFilter.setSelection(config.getRendererFilterMode());
+        cbNativeRendering.setChecked(isNativeMode);
         cbSwapRB.setChecked(config.getRendererSwapRB());
+        cbLegacyScanout.setChecked(config.getRendererLegacyScanout());
 
         setAmoledAdapter(ctx, spDefaultUpscaler, UPSCALER_LABELS);
         setAmoledAdapter(ctx, spDefaultPostFX, POSTFX_LABELS);
@@ -354,7 +365,9 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
                 config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
                 config.setRendererFilterMode(spFilter.getSelectedItemPosition());
+                config.setRendererNative(cbNativeRendering.isChecked());
                 config.setRendererSwapRB(cbSwapRB.isChecked());
+                config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
 
                 String backend = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()];
                 config.setFrameGenBackend(backend);
@@ -380,7 +393,9 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
             config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
+            config.setRendererNative(cbNativeRendering.isChecked());
             config.setRendererSwapRB(cbSwapRB.isChecked());
+            config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
         });
     }
 

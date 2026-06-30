@@ -88,11 +88,23 @@
             </LinearLayout>
 
             <CheckBox
-                android:id="@+id/CBRendererSwapRB"
+                android:id="@+id/CBRendererNative"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:text="Enable Native Rendering+ (Low-Latency Mode)" />
+
+            <CheckBox
+                android:id="@+id/CBRendererSwapRB"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="Swap red/blue channels" />
+
+            <CheckBox
+                android:id="@+id/CBRendererLegacyScanout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Use legacy 3.0 scanout behavior" />
 
             <LinearLayout
                 android:id="@+id/GroupGraphicsDefaults"

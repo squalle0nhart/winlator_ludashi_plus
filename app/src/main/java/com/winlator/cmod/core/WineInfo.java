@@ -12,6 +12,8 @@ import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.xenvironment.ImageFs;
 
+import java.util.Locale;
+
 public class WineInfo implements Parcelable {
     public static final WineInfo MAIN_WINE_VERSION = new WineInfo("proton", "9.0", "arm64ec");
     public final String version;
@@ -117,11 +119,7 @@ public class WineInfo implements Parcelable {
         if (identifier.equals(MAIN_WINE_VERSION.identifier())) return new WineInfo(MAIN_WINE_VERSION.type, MAIN_WINE_VERSION.version, MAIN_WINE_VERSION.arch, imageFs.getRootDir().getPath() + "/opt/" + MAIN_WINE_VERSION.identifier());
 
         ContentProfile wineProfile = contentsManager.getProfileByEntryName(identifier);
-        String normalizedIdentifier = identifier;
-
-        if (wineProfile != null && (wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE || wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON)) {
-            normalizedIdentifier = buildIdentifier(wineProfile.type, wineProfile.verName).toLowerCase();
-        }
+        String normalizedIdentifier = normalizeIdentifier(identifier, wineProfile);
 
         WineDescriptor descriptor = parseIdentifier(normalizedIdentifier.toLowerCase());
         if (descriptor == null) {
@@ -152,8 +150,51 @@ public class WineInfo implements Parcelable {
         return wineVersion == null ||wineVersion.equals(MAIN_WINE_VERSION.identifier());
     }
 
-    private static String buildIdentifier(ContentProfile.ContentType type, String versionName) {
-        return type.toString().toLowerCase() + "-" + versionName;
+    private static String normalizeIdentifier(String identifier, ContentProfile wineProfile) {
+        String normalizedFromProfile = normalizeProfileIdentifier(wineProfile);
+        if (normalizedFromProfile != null) return normalizedFromProfile;
+
+        String normalized = extractIdentifier(identifier);
+        if (normalized != null) return normalized;
+
+        return identifier == null ? "" : identifier.toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeProfileIdentifier(ContentProfile wineProfile) {
+        if (wineProfile == null) return null;
+        if (wineProfile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE
+                && wineProfile.type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
+            return null;
+        }
+
+        String normalized = extractIdentifier(wineProfile.verName);
+        if (normalized != null) return normalized;
+
+        String prefix = wineProfile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON ? "proton-" : "wine-";
+        return extractIdentifier(prefix + wineProfile.verName);
+    }
+
+    private static String extractIdentifier(String rawIdentifier) {
+        if (rawIdentifier == null || rawIdentifier.isEmpty()) return null;
+
+        String candidate = rawIdentifier.trim().toLowerCase(Locale.ROOT).replace(' ', '-');
+        int typeIndex = candidate.indexOf("proton-");
+        if (typeIndex < 0) typeIndex = candidate.indexOf("wine-");
+        if (typeIndex > 0) candidate = candidate.substring(typeIndex);
+
+        for (String arch : new String[] {"arm64ec", "x86_64", "x86"}) {
+            int archIndex = candidate.indexOf("-" + arch);
+            if (archIndex < 0) continue;
+
+            String normalized = candidate.substring(0, archIndex + arch.length() + 1);
+            if (normalized.startsWith("proton-proton-")) {
+                normalized = normalized.substring("proton-".length());
+            } else if (normalized.startsWith("wine-wine-")) {
+                normalized = normalized.substring("wine-".length());
+            }
+            return normalized;
+        }
+        return null;
     }
 
     private static WineDescriptor parseIdentifier(String identifier) {

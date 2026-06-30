@@ -10,6 +10,7 @@ import android.util.Log;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.XrActivity;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.renderer.material.CursorMaterial;
@@ -54,6 +55,13 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private boolean cursorVisible = true;
     private boolean screenOffsetYRelativeToCursor = false;
     private String[] unviewableWMClasses = null;
+    private DirectScanout scanout;
+    private boolean nativeMode = false;
+    private boolean xRenderingPausedForScanout = false;
+    private boolean swapRB = false;
+    private Cursor lastScanoutCursor = null;
+    private volatile int windowTexFilter = GLES20.GL_LINEAR;
+    private int fpsLimit = 0;
 
     @Override
     public void setUnviewableWMClasses(String classes) {
@@ -203,6 +211,11 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        if (nativeMode) {
+            xServer.setRenderingEnabled(true);
+            xRenderingPausedForScanout = false;
+            enableScanout();
+        }
     }
 
     @Override
@@ -220,6 +233,10 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         surfaceHeight = height;
         viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
         viewportNeedsUpdate = true;
+        if (nativeMode && scanout != null) {
+            scanout.setSurfaceSize(surfaceWidth, surfaceHeight);
+            updateScanoutDst();
+        }
     }
 
     @Override
@@ -228,6 +245,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             fullscreen = !fullscreen;
             toggleFullscreen = false;
             viewportNeedsUpdate = true;
+            if (nativeMode) updateScanoutDst();
         }
 
         if (effectComposer != null && effectComposer.hasEffects() && surfaceWidth > 0 && surfaceHeight > 0) {
@@ -296,7 +314,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
         renderWindows();
 
-        if (cursorVisible) renderCursor();
+        if (cursorVisible && !nativeMode) renderCursor();
 
         if (!magnifierEnabled && !fullscreen) {
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
@@ -320,8 +338,36 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         xServerView.requestRender();
     }
     @Override public void onUpdateWindowGeometry(final Window window, boolean resized) { if (resized) xServerView.queueEvent(this::updateScene); else xServerView.queueEvent(() -> updateWindowPosition(window)); xServerView.requestRender(); }
-    @Override public void onUpdateWindowAttributes(Window window, Bitmask mask) { if (mask.isSet(WindowAttributes.FLAG_CURSOR)) xServerView.requestRender(); }
-    @Override public void onPointerMove(short x, short y) { xServerView.requestRender(); }
+    @Override public void onUpdateWindowAttributes(Window window, Bitmask mask) {
+        if (mask.isSet(WindowAttributes.FLAG_CURSOR)) {
+            if (nativeMode && scanout != null) {
+                Window pointWindow = xServer.inputDeviceManager.getPointWindow();
+                if (pointWindow == window) {
+                    lastScanoutCursor = window.attributes.getCursor();
+                    sendCursorToScanout(lastScanoutCursor);
+                }
+            }
+            xServerView.requestRender();
+        }
+    }
+    @Override public void onPointerMove(short x, short y) {
+        if (nativeMode && scanout != null) {
+            Window pointWindow = xServer.inputDeviceManager.getPointWindow();
+            Cursor cursor = pointWindow != null ? pointWindow.attributes.getCursor() : null;
+            if (cursor != lastScanoutCursor) {
+                lastScanoutCursor = cursor;
+                sendCursorToScanout(cursor);
+            }
+            short hotX = 0;
+            short hotY = 0;
+            if (cursor != null) {
+                hotX = (short) cursor.hotSpotX;
+                hotY = (short) cursor.hotSpotY;
+            }
+            scanout.setCursorPos(x, y, hotX, hotY);
+        }
+        xServerView.requestRender();
+    }
 
     private void renderDrawable(Drawable drawable, int x, int y, ShaderMaterial material) {
         if (drawable == null) return;
@@ -334,6 +380,10 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texture.getTextureId());
+            if (material == windowMaterial) {
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, windowTexFilter);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, windowTexFilter);
+            }
             GLES20.glUniform1i(material.getUniformLocation("texture"), 0);
             GLES20.glUniform1fv(material.getUniformLocation("xform"), tmpXForm1.length, tmpXForm1, 0);
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, quadVertices.count());
@@ -461,17 +511,149 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     // HostRenderer implementation
     @Override public XServerView getXServerView() { return xServerView; }
-    @Override public void setRenderingEnabled(boolean enabled) {}
+    @Override public void setRenderingEnabled(boolean enabled) { xServer.setRenderingEnabled(enabled); }
     @Override public void requestRender() { xServerView.requestRender(); }
-    @Override public void forceCleanup() {}
-    @Override public void setFilterMode(int mode) {}
+    @Override public void forceCleanup() {
+        if (scanout != null) scanout.disable();
+        xServer.setRenderingEnabled(true);
+        xRenderingPausedForScanout = false;
+    }
+    @Override public void setFilterMode(int mode) {
+        windowTexFilter = (mode == 2) ? GLES20.GL_NEAREST : GLES20.GL_LINEAR;
+        xServerView.requestRender();
+    }
     @Override public void setFpsWindowId(int id) { fpsWindowId = id; }
     @Override public void setFrameRating(Object fr) {
         if (fr instanceof WinlatorHUD) hudRef = (WinlatorHUD) fr;
         else if (fr instanceof FrameRating) classicHudRef = (FrameRating) fr;
     }
-    @Override public int getFpsLimit() { return 0; }
-    @Override public void setFpsLimit(int limit) {}
+    @Override public int getFpsLimit() { return fpsLimit; }
+    @Override public void setFpsLimit(int limit) { fpsLimit = limit; }
+
+    public void setSwapRB(boolean enabled) {
+        swapRB = enabled;
+    }
+
+    public boolean isNativeMode() {
+        return nativeMode;
+    }
+
+    public void setInitialNativeMode(boolean enabled) {
+        nativeMode = enabled;
+    }
+
+    public void setNativeMode(boolean enabled) {
+        if (nativeMode == enabled) return;
+        nativeMode = enabled;
+        xRenderingPausedForScanout = false;
+        if (enabled) {
+            xServer.setRenderingEnabled(true);
+            enableScanout();
+        } else {
+            disableScanout();
+            xServerView.post(() -> {
+                xServer.setRenderingEnabled(true);
+                xServerView.requestRender();
+            });
+        }
+        xServerView.queueEvent(this::updateScene);
+        xServerView.post(() ->
+                AppUtils.showToast(xServerView.getContext(),
+                        enabled ? "Native Rendering+ Enabled" : "Native Rendering+ Disabled"));
+    }
+
+    public void onSurfaceDestroyed() {
+        disableScanout();
+        xServer.setRenderingEnabled(true);
+        xRenderingPausedForScanout = false;
+    }
+
+    public void presentScanout(Window window, Drawable content) {
+        if (scanout == null || !nativeMode || content == null) return;
+        if (!window.attributes.isMapped()) return;
+        int rx = window.getRootX();
+        int ry = window.getRootY();
+        synchronized (content.renderLock) {
+            if (!(content.getTexture() instanceof GPUImage)) return;
+            GPUImage image = (GPUImage) content.getTexture();
+            long ahbPtr = image.getHardwareBufferPtr();
+            if (ahbPtr == 0) return;
+
+            boolean wasDelivered = scanout.isGameFrameDelivered();
+            int fence = image.unlock();
+            scanout.present(ahbPtr, rx, ry, content.width, content.height, fence);
+            image.lock();
+            content.refreshDataFromTexture();
+            boolean delivered = scanout.isGameFrameDelivered();
+
+            if (!xRenderingPausedForScanout && !wasDelivered && delivered) {
+                xServer.setRenderingEnabled(false);
+                xRenderingPausedForScanout = true;
+            }
+
+            if (window.id == fpsWindowId) {
+                if (hudRef != null) hudRef.onFrame();
+                if (classicHudRef != null) classicHudRef.update();
+            }
+        }
+    }
+
+    private void enableScanout() {
+        if (android.os.Build.VERSION.SDK_INT < 29) return;
+        xServerView.post(() -> {
+            try {
+                android.view.SurfaceControl parent =
+                        (android.view.SurfaceControl) xServerView.getSurfaceControl();
+                if (parent == null) {
+                    Log.w("GLRenderer", "Native Rendering: GL SurfaceControl is null; cannot enable scanout");
+                    return;
+                }
+                if (scanout == null) scanout = new DirectScanout();
+                float targetFps = xServerView.getDisplay() != null
+                        ? xServerView.getDisplay().getRefreshRate() : 60f;
+                scanout.enable(parent, xServer.screenInfo.width, xServer.screenInfo.height, targetFps, swapRB);
+                scanout.setSurfaceSize(surfaceWidth, surfaceHeight);
+                updateScanoutDst();
+                sendCursorToScanout(lastScanoutCursor);
+            } catch (Exception e) {
+                Log.w("GLRenderer", "GL scanout enable failed: " + e);
+            }
+        });
+    }
+
+    private void disableScanout() {
+        if (scanout == null) return;
+        DirectScanout currentScanout = scanout;
+        xServerView.post(currentScanout::disable);
+    }
+
+    private void updateScanoutDst() {
+        if (scanout == null || !nativeMode) return;
+        if (fullscreen) {
+            scanout.setDst(0, 0, surfaceWidth, surfaceHeight);
+        } else {
+            scanout.setDst(viewTransformation.viewOffsetX, viewTransformation.viewOffsetY,
+                    viewTransformation.viewWidth, viewTransformation.viewHeight);
+        }
+    }
+
+    private void sendCursorToScanout(Cursor cursor) {
+        if (scanout == null || !nativeMode) return;
+        Drawable cursorDrawable;
+        if (cursor != null) {
+            if (!cursor.isVisible()) return;
+            cursorDrawable = cursor.cursorImage;
+        } else {
+            cursorDrawable = rootCursorDrawable;
+        }
+        if (cursorDrawable != null && cursorDrawable.getBuffer() != null) {
+            synchronized (cursorDrawable.renderLock) {
+                ByteBuffer buffer = cursorDrawable.getBuffer();
+                short stride = (short) (buffer.capacity() / (cursorDrawable.height * 4));
+                scanout.setCursorImage(buffer, cursorDrawable.width, cursorDrawable.height, stride);
+            }
+        }
+    }
 
     private static class RenderableWindow {
         public final Drawable content;

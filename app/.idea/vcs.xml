@@ -2,6 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/.." vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../Winlator-Ludashi-ludashi-3.0/app/src/main/cpp/adrenotools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../Winlator-Ludashi-ludashi-3.0/app/src/main/cpp/adrenotools/lib/linkernsbypass" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/main/cpp/adrenotools" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/main/cpp/adrenotools/lib/linkernsbypass" vcs="Git" />
   </component>

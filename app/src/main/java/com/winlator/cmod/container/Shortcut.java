@@ -315,6 +315,12 @@ public class Shortcut {
     }
     public void setRendererSwapRB(boolean v) { putExtra("rendererSwapRB", v ? "1" : "0"); }
 
+    public boolean getRendererLegacyScanout() {
+        String v = getExtra("rendererLegacyScanout", null);
+        return v != null ? v.equals("1") : container.getRendererLegacyScanout();
+    }
+    public void setRendererLegacyScanout(boolean v) { putExtra("rendererLegacyScanout", v ? "1" : "0"); }
+
     public boolean isLsfgEnabled() {
         String value = getExtra("lsfgEnabled", null);
         if (value == null || value.isEmpty()) return container.isLsfgEnabled();

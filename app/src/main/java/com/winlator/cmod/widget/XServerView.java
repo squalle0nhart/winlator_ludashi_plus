@@ -100,6 +100,18 @@ public class XServerView extends FrameLayout {
             renderer = glRenderer;
             glSurfaceView.setRenderer(glRenderer);
             glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+            glSurfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+                @Override
+                public void surfaceCreated(SurfaceHolder holder) {}
+
+                @Override
+                public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
+
+                @Override
+                public void surfaceDestroyed(SurfaceHolder holder) {
+                    glRenderer.onSurfaceDestroyed();
+                }
+            });
             addView(glSurfaceView);
         }
     }
@@ -131,8 +143,13 @@ public class XServerView extends FrameLayout {
     }
 
     public Object getSurfaceControl() {
-        if (android.os.Build.VERSION.SDK_INT >= 29 && vulkanSurfaceView != null) {
-            return vulkanSurfaceView.getSurfaceControl();
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            if (vulkanSurfaceView != null) {
+                return vulkanSurfaceView.getSurfaceControl();
+            }
+            if (glSurfaceView != null) {
+                return glSurfaceView.getSurfaceControl();
+            }
         }
         return null;
     }

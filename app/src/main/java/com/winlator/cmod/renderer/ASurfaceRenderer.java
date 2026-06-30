@@ -17,6 +17,7 @@ import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
@@ -87,9 +88,11 @@ public class ASurfaceRenderer implements HostRenderer,
         boolean visible = false;
         final Rect lastSrc = new Rect();
         final Rect lastDst = new Rect();
+        GPUImage swapBuffer = null;
     }
     private final ConcurrentHashMap<Integer, WindowSurface> windowSurfaces = new ConcurrentHashMap<>();
     private final Object sceneLock = new Object();
+    private boolean swapRB = false;
 
     // Desktop (explorer.exe) geometry cache for placing desktop child windows.
     private Window desktopWindow = null;
@@ -159,6 +162,7 @@ public class ASurfaceRenderer implements HostRenderer,
             nativeDestroy();
             surfaceInitialized = false;
         }
+        releaseAllSwapBuffers();
         windowSurfaces.clear();
         cachedDesktopDst = null;
     }
@@ -250,6 +254,7 @@ public class ASurfaceRenderer implements HostRenderer,
     private WindowSurface getOrCreateWindowSurface(int contentId, int w, int h, String debugName) {
         WindowSurface ws = windowSurfaces.get(contentId);
         if (ws != null && (ws.width != w || ws.height != h)) {
+            releaseSwapBuffer(ws);
             windowSurfaces.remove(contentId);
             nativeUnregisterWindowSC(contentId);
             ws = null;
@@ -356,13 +361,75 @@ public class ASurfaceRenderer implements HostRenderer,
         if (!windowSurfaces.containsKey(windowId)) return; // SC not created yet; updateScene will
         synchronized (drawable.renderLock) {
             if (drawable.getTexture() instanceof GPUImage) {
-                long ahbPtr = ((GPUImage) drawable.getTexture()).getHardwareBufferPtr();
+                GPUImage sourceImage = (GPUImage) drawable.getTexture();
+                long ahbPtr = sourceImage.getHardwareBufferPtr();
                 if (ahbPtr != 0) {
-                    nativeSetWindowBuffer(windowId, ahbPtr, -1, windowId, 0);
+                    long targetAhbPtr = ahbPtr;
+                    int fenceFd = -1;
+                    if (swapRB) {
+                        GPUImage swapBuffer = getOrCreateSwapBuffer(windowId, drawable.width, drawable.height);
+                        if (swapBuffer != null && copySwappedBuffer(sourceImage, swapBuffer, drawable.width, drawable.height)) {
+                            targetAhbPtr = swapBuffer.getHardwareBufferPtr();
+                            fenceFd = swapBuffer.unlock();
+                            swapBuffer.lock();
+                        }
+                    }
+                    nativeSetWindowBuffer(windowId, targetAhbPtr, fenceFd, windowId, 0);
                     if (hudFrameTick != null) hudFrameTick.accept(windowId);
                 }
             }
         }
+    }
+
+    private GPUImage getOrCreateSwapBuffer(int windowId, int width, int height) {
+        WindowSurface ws = windowSurfaces.get(windowId);
+        if (ws == null || width <= 0 || height <= 0) return null;
+        if (ws.swapBuffer == null) {
+            GPUImage swapBuffer = new GPUImage((short) width, (short) height);
+            if (swapBuffer.getHardwareBufferPtr() == 0 || swapBuffer.getVirtualData() == null) {
+                swapBuffer.destroy();
+                return null;
+            }
+            ws.swapBuffer = swapBuffer;
+        }
+        return ws.swapBuffer;
+    }
+
+    private boolean copySwappedBuffer(GPUImage sourceImage, GPUImage swapBuffer, int width, int height) {
+        ByteBuffer sourceData = sourceImage.getVirtualData();
+        ByteBuffer targetData = swapBuffer.getVirtualData();
+        if (sourceData == null || targetData == null || width <= 0 || height <= 0) return false;
+
+        int sourceStride = sourceImage.getStride() > 0 ? sourceImage.getStride() : width;
+        int targetStride = swapBuffer.getStride() > 0 ? swapBuffer.getStride() : width;
+        int copyWidth = Math.min(width, Math.min(sourceStride, targetStride));
+        if (copyWidth <= 0) return false;
+
+        ByteBuffer sourceView = sourceData.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer targetView = targetData.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+        for (int row = 0; row < height; row++) {
+            int sourceBase = row * sourceStride * 4;
+            int targetBase = row * targetStride * 4;
+            for (int col = 0; col < copyWidth; col++) {
+                int pixel = sourceView.getInt(sourceBase + col * 4);
+                int swappedPixel = (pixel & 0xFF00FF00)
+                        | ((pixel & 0x00FF0000) >> 16)
+                        | ((pixel & 0x000000FF) << 16);
+                targetView.putInt(targetBase + col * 4, swappedPixel);
+            }
+        }
+        return true;
+    }
+
+    private void releaseSwapBuffer(WindowSurface ws) {
+        if (ws != null && ws.swapBuffer != null) {
+            ws.swapBuffer.destroy();
+            ws.swapBuffer = null;
+        }
+    }
+
+    private void releaseAllSwapBuffers() {
+        for (WindowSurface ws : windowSurfaces.values()) releaseSwapBuffer(ws);
     }
 
     // -------------------------------------------------------------------------
@@ -404,7 +471,7 @@ public class ASurfaceRenderer implements HostRenderer,
 
     @Override
     public void onUnmapWindow(Window window) {
-        windowSurfaces.remove(window.id);
+        releaseSwapBuffer(windowSurfaces.remove(window.id));
         if (surfaceInitialized) nativeUnregisterWindowSC(window.id);
         updateScene();
     }
@@ -412,7 +479,7 @@ public class ASurfaceRenderer implements HostRenderer,
     @Override
     public void onDestroyWindow(Window window) {
         if (window == desktopWindow) desktopWindow = null;
-        windowSurfaces.remove(window.id);
+        releaseSwapBuffer(windowSurfaces.remove(window.id));
         if (surfaceInitialized) nativeUnregisterWindowSC(window.id);
         updateScene();
     }
@@ -422,7 +489,7 @@ public class ASurfaceRenderer implements HostRenderer,
     @Override
     public void onUpdateWindowGeometry(Window window, boolean resized) {
         if (resized) {
-            windowSurfaces.remove(window.id);
+            releaseSwapBuffer(windowSurfaces.remove(window.id));
             if (surfaceInitialized) nativeUnregisterWindowSC(window.id);
         }
         updateScene();
@@ -455,6 +522,12 @@ public class ASurfaceRenderer implements HostRenderer,
     @Override public void setRenderingEnabled(boolean enabled) { xServer.setRenderingEnabled(enabled); }
     @Override public void requestRender() { /* ASR presents via SurfaceFlinger transactions */ }
     @Override public void forceCleanup() { onSurfaceDestroyed(); }
+
+    public void setSwapRB(boolean enabled) {
+        if (swapRB == enabled) return;
+        swapRB = enabled;
+        if (!enabled) releaseAllSwapBuffers();
+    }
 
     @Override
     public void setCursorVisible(boolean visible) {

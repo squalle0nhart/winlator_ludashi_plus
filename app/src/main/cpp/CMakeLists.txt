@@ -167,3 +167,38 @@ target_link_libraries(vulkan_renderer
         dl
         atomic
 )
+
+# SurfaceFlinger (ASurfaceRenderer / ASR) host renderer — ported from
+# Bannerlator's native target. This repo already has the Java side; wire the
+# missing JNI/C++ library back into the build so ASurfaceRenderer can load.
+add_library(asurface_renderer SHARED
+        asurfacerenderer/asurface_jni.cpp
+        asurfacerenderer/ASurfaceRendererContext.cpp
+)
+
+target_compile_options(asurface_renderer PRIVATE
+        -Wall -Wextra -fvisibility=hidden -std=c++17
+)
+
+target_link_libraries(asurface_renderer
+        log
+        android
+        dl
+        atomic
+)
+
+add_library(direct_scanout SHARED
+        scanout/directscanout_jni.cpp
+        scanout/ScanoutContext.cpp
+)
+
+target_compile_options(direct_scanout PRIVATE
+        -Wall -Wextra -fvisibility=hidden -std=c++17
+)
+
+target_link_libraries(direct_scanout
+        log
+        android
+        dl
+        atomic
+)

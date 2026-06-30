@@ -143,6 +143,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
         final boolean[] rendererSwapRBHolder = new boolean[] { shortcut.getRendererSwapRB() };
+        final boolean[] rendererLegacyScanoutHolder = new boolean[] { shortcut.getRendererLegacyScanout() };
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererTypeHolder[0]) ? "OpenGL"
@@ -169,6 +170,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
+                public boolean getRendererLegacyScanout() { return rendererLegacyScanoutHolder[0]; }
+                public void setRendererLegacyScanout(boolean val) { rendererLegacyScanoutHolder[0] = val; }
                 public int getGraphicsFilterMode() {
                     String v = shortcut.getExtra("graphicsFilterMode", shortcut.container.getExtra("graphicsFilterMode", "0"));
                     try { return Integer.parseInt(v); } catch (NumberFormatException e) { return 0; }
@@ -515,6 +518,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);
                 shortcut.setRendererFilterMode(rendererFilterHolder[0]);
                 shortcut.setRendererSwapRB(rendererSwapRBHolder[0]);
+                shortcut.setRendererLegacyScanout(rendererLegacyScanoutHolder[0]);
                 shortcut.putExtra("emulator", emulator);
                 shortcut.putExtra("midiSoundFont", midiSoundFont);
                 shortcut.putExtra("lc_all", lc_all);

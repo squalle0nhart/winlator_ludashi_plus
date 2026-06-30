@@ -506,6 +506,16 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
+                            public boolean getRendererLegacyScanout() {
+                                return rendererCfgHolder.getRendererLegacyScanout();
+                            }
+
+                            public void setRendererLegacyScanout(boolean val) {
+                                rendererCfgHolder.setRendererLegacyScanout(val);
+                                if (isEditMode())
+                                    rendererCfgHolder.saveData();
+                            }
+
                             public int getGraphicsFilterMode() {
                                 try {
                                     return Integer.parseInt(rendererCfgHolder.getExtra("graphicsFilterMode", "0"));
@@ -923,6 +933,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setRendererDriverId(rendererCfgHolder.getRendererDriverId());
                     container.setRendererFilterMode(rendererCfgHolder.getRendererFilterMode());
                     container.setRendererSwapRB(rendererCfgHolder.getRendererSwapRB());
+                    container.setRendererLegacyScanout(rendererCfgHolder.getRendererLegacyScanout());
                     container.setDXWrapperConfig(dxwrapperConfig);
                     container.setAudioDriver(audioDriver);
                     container.setEmulator(emulator);
@@ -967,6 +978,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                         data.put("rendererFilterMode", rendererCfgHolder.getRendererFilterMode());
                     if (rendererCfgHolder.getRendererSwapRB())
                         data.put("rendererSwapRB", true);
+                    if (rendererCfgHolder.getRendererLegacyScanout())
+                        data.put("rendererLegacyScanout", true);
                     data.put("dxwrapperConfig", dxwrapperConfig);
                     data.put("audioDriver", audioDriver);
                     data.put("emulator", emulator);

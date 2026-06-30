@@ -44,6 +44,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.xenvironment.ImageFs;
+import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -107,13 +108,16 @@ public class ContainersFragment extends Fragment {
     public boolean onOptionsItemSelected(MenuItem menuItem) {
         switch (menuItem.getItemId()) {
             case R.id.containers_menu_add:
-                if (!ImageFs.find(getContext()).isValid()) return false;
-                FragmentManager fragmentManager = getParentFragmentManager();
-                fragmentManager.beginTransaction()
-                        .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
-                        .addToBackStack(null)
-                        .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
-                        .commit();
+                if (getActivity() instanceof MainActivity) {
+                    MainActivity activity = (MainActivity) getActivity();
+                    if (ImageFsInstaller.installIfNeeded(activity, this::openCreateContainerFragment)) {
+                        return true;
+                    }
+                } else if (!ImageFs.find(getContext()).isValid()) {
+                    showToast(getContext(), R.string.unable_to_install_system_files);
+                    return true;
+                }
+                openCreateContainerFragment();
                 return true;
 
             case R.id.action_big_picture_mode:
@@ -130,6 +134,16 @@ public class ContainersFragment extends Fragment {
         Intent intent = new Intent(getContext(), BigPictureActivity.class);
         startActivity(intent);
         getActivity().overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+    }
+
+    private void openCreateContainerFragment() {
+        if (!isAdded()) return;
+        FragmentManager fragmentManager = getParentFragmentManager();
+        fragmentManager.beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_up, R.anim.slide_out_down, R.anim.slide_in_down, R.anim.slide_out_up)
+                .addToBackStack(null)
+                .replace(R.id.FLFragmentContainer, new ContainerDetailFragment())
+                .commit();
     }
 
 
