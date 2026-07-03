@@ -2,6 +2,7 @@ package com.winlator.cmod.container;
 
 import android.os.Environment;
 
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.box64.Box64Preset;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
@@ -26,6 +27,7 @@ public class Container {
         BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_GRIP, BUTTON_TRIGGER,
         THUMBSTICK_UP, THUMBSTICK_DOWN, THUMBSTICK_LEFT, THUMBSTICK_RIGHT
     }
+    private static final int ENV_VARS_BACKFILL_VERSION = 16;
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 VKD3D_SHADER_MODEL=6_6 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,sysmem DXVK_HUD=devinfo,version,gpuload,fps DXVK_DISABLE_TIMELINE_SEMAPHORES=1";
     public static final String DEFAULT_SCREEN_SIZE = "1280x720";
     public static final String DEFAULT_GRAPHICS_DRIVER = "wrapper";
@@ -533,6 +535,11 @@ public class Container {
 
     public void saveData() {
         try {
+            if (extraData == null) extraData = new JSONObject();
+            if (containerManager != null) {
+                extraData.put("appVersion", AppUtils.getVersionCode(containerManager.getContext()));
+            }
+
             JSONObject data = new JSONObject();
             data.put("id", id);
             data.put("name", name);
@@ -731,8 +738,8 @@ public class Container {
 
             if (data.has("envVars") && data.has("extraData")) {
                 JSONObject extraData = data.getJSONObject("extraData");
-                int appVersion = Integer.parseInt(extraData.optString("appVersion", "0"));
-                if (appVersion < 16) {
+                int appVersion = extraData.optInt("appVersion", 0);
+                if (appVersion < ENV_VARS_BACKFILL_VERSION) {
                     EnvVars defaultEnvVars = new EnvVars(DEFAULT_ENV_VARS);
                     EnvVars envVars = new EnvVars(data.getString("envVars"));
                     for (String name : defaultEnvVars) {

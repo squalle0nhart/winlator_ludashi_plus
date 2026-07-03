@@ -24,22 +24,35 @@ public abstract class ProtonPackageManager {
         public final String fileName;
         public final long[] partSizes;
         public final String directUrl;
+        public final boolean contentPackage;
 
         public PackageInfo(String identifier, String title, String fileName, long[] partSizes) {
-            this(identifier, title, fileName, partSizes, null);
+            this(identifier, title, fileName, partSizes, null, false);
         }
 
         public PackageInfo(String identifier, String title, String fileName, long[] partSizes, String directUrl) {
+            this(identifier, title, fileName, partSizes, directUrl, false);
+        }
+
+        public PackageInfo(String identifier, String title, String fileName, long[] partSizes, String directUrl, boolean contentPackage) {
             this.identifier = identifier;
             this.title = title;
             this.fileName = fileName;
             this.partSizes = partSizes;
             this.directUrl = directUrl;
+            this.contentPackage = contentPackage;
         }
     }
 
     private static final List<PackageInfo> PACKAGES = Arrays.asList(
-            new PackageInfo("proton-9.0-arm64ec", "Proton 9 arm64ec", "proton-9.0-arm64ec.tar.zst", new long[]{52428800L, 14659103L}),
+            new PackageInfo(
+                    "Proton-Proton-11.1-ge-arm64ec-steam-0",
+                    "Proton 11.1 GE arm64ec steam",
+                    null,
+                    new long[]{1L},
+                    "https://github.com/nicholasx417/WinNative-Components/releases/download/Proton/Proton-11.1-ge-arm64ec-steam.wcp",
+                    true
+            ),
             new PackageInfo("proton-10-arm64ec", "Proton 10 arm64ec", "proton-10-arm64ec.tar.zst", new long[]{52428800L, 52428800L, 52428800L, 52428800L, 7195940L})
     );
 

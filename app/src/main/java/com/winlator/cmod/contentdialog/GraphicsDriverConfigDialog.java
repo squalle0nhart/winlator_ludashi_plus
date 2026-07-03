@@ -38,6 +38,7 @@ import java.util.Map;
 public class GraphicsDriverConfigDialog extends ContentDialog {
 
     private static final String TAG = "GraphicsDriverConfigDialog"; // Tag for logging
+    private static final String PRE_REGRESS_DRIVER_LABEL = "2.7.1 pre-regress";
     private Spinner sVersion;
     private Spinner sVulkanVersion;
     private MultiSelectionComboBox mscAvailableExtensions;
@@ -161,6 +162,18 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private String[] queryAvailableExtensions(String driver, Context context) {
         return GPUInformation.enumerateExtensions(driver, context);
     }
+
+    private boolean shouldForceTimelineSemaphores(String version) {
+        return version != null && version.trim().equalsIgnoreCase(PRE_REGRESS_DRIVER_LABEL);
+    }
+
+    private void applyVersionSpecificDefaults(String version) {
+        if (!shouldForceTimelineSemaphores(version)) return;
+        isTimelineSemaphoresEnabled = "1";
+        if (cbTimelineSemaphores != null && !cbTimelineSemaphores.isChecked()) {
+            cbTimelineSemaphores.setChecked(true);
+        }
+    }
   
     public GraphicsDriverConfigDialog(View anchor, String graphicsDriver, TextView graphicsDriverVersionView) {
         super(anchor.getContext(), R.layout.graphics_driver_config_dialog);
@@ -175,11 +188,9 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         if (scrollView != null) {
             int screenHeight = AppUtils.getScreenHeight();
             int screenWidth  = AppUtils.getScreenWidth();
-            if (screenWidth > screenHeight) {
-                ViewGroup.LayoutParams params = scrollView.getLayoutParams();
-                params.height = (int)(screenHeight * 0.45f);
-                scrollView.setLayoutParams(params);
-            }
+            ViewGroup.LayoutParams params = scrollView.getLayoutParams();
+            params.height = (int)(screenHeight * (screenWidth > screenHeight ? 0.45f : 0.55f));
+            scrollView.setLayoutParams(params);
         }
 
         String graphicsDriverConfig = anchor.getTag().toString();
@@ -223,6 +234,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedVersion = sVersion.getSelectedItem().toString();
+                applyVersionSpecificDefaults(selectedVersion);
                 String[] availableExtensions = queryAvailableExtensions(selectedVersion, anchor.getContext());
                 String blacklistedExtensions = "";
 
@@ -242,6 +254,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 selectedVersion = sVersion.getSelectedItem().toString();
+                applyVersionSpecificDefaults(selectedVersion);
                 Log.d(TAG, "User selected version: " + selectedVersion);
             }
         });
@@ -359,6 +372,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         cbTimelineSemaphores.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isTimelineSemaphoresEnabled = isChecked ? "1" : "0";
         });
+        applyVersionSpecificDefaults(initialVersion);
 
         isTuDebugSysmemEnabled = tuDebugSysmem;
         cbTuDebugSysmem.setChecked(isTuDebugSysmemEnabled.equals("1"));

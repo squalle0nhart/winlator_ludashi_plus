@@ -1609,7 +1609,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         titleView.setPadding(dp(2), 0, 0, dp(4));
         list.addView(titleView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         for (ProtonPackageManager.PackageInfo packageInfo : ProtonPackageManager.getPackages()) {
-            boolean installed = ProtonPackageManager.isInstalled(context, packageInfo.identifier);
+            boolean installed = isReleaseProtonInstalled(packageInfo);
             addReleaseProtonRow(list, sWineVersion, packageInfo, installed, () -> {
                 if (installed && isEditMode()) {
                     AppUtils.showToast(getContext(), R.string.wine_version_locked_for_existing_container);
@@ -1656,6 +1656,14 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 : null;
         addInlineWineRow(list, displayWineVersionTitle(packageInfo.title), getString(installed ? R.string.proton_package_installed : R.string.proton_package_not_installed),
                 installed ? R.drawable.icon_confirm : R.drawable.icon_popup_menu_download, installed ? R.string.select : R.string.install, action, deleteAction);
+    }
+
+    private boolean isReleaseProtonInstalled(ProtonPackageManager.PackageInfo packageInfo) {
+        if (packageInfo.contentPackage) {
+            ContentProfile profile = contentsManager.getProfileByEntryName(packageInfo.identifier);
+            return profile != null && profile.remoteUrl == null;
+        }
+        return ProtonPackageManager.isInstalled(context, packageInfo.identifier);
     }
 
     private void addInlineWineRow(LinearLayout list, String title, String subtitle, int iconResId, int actionTextResId, Runnable action, Runnable deleteAction) {
@@ -1721,7 +1729,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
     }
 
     private void downloadReleaseProton(ProtonPackageManager.PackageInfo packageInfo, Spinner sWineVersion, Runnable onFinished) {
-        if (ProtonPackageManager.isInstalled(context, packageInfo.identifier)) {
+        if (isReleaseProtonInstalled(packageInfo)) {
             if (!isEditMode()) refreshWineVersionSpinner(sWineVersion, packageInfo.identifier);
             onFinished.run();
             return;
@@ -1729,9 +1737,30 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         DownloadProgressDialog dialog = new DownloadProgressDialog(getActivity());
         dialog.show(R.string.downloading_proton);
         CONTENT_IO_EXECUTOR.execute(() -> {
-            File output = new File(getContext().getCacheDir(), packageInfo.identifier + ".tar.zst");
+            String fileName = packageInfo.fileName != null
+                    ? packageInfo.fileName
+                    : packageInfo.identifier.replace('/', '_') + ".wcp";
+            File output = new File(getContext().getCacheDir(), fileName);
             boolean downloaded = ProtonPackageManager.downloadPackage(packageInfo, output, progress -> requireActivity().runOnUiThread(() -> dialog.setProgress(progress)));
-            boolean installed = downloaded && ProtonPackageManager.installPackage(getContext(), packageInfo.identifier, output);
+            if (!downloaded) {
+                requireActivity().runOnUiThread(() -> {
+                    dialog.closeOnUiThread();
+                    AppUtils.showToast(getContext(), R.string.unable_to_install_proton);
+                });
+                return;
+            }
+
+            if (packageInfo.contentPackage) {
+                requireActivity().runOnUiThread(() -> {
+                    dialog.closeOnUiThread();
+                    installImportedContent(Uri.fromFile(output),
+                            Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_PROTON),
+                            onFinished);
+                });
+                return;
+            }
+
+            boolean installed = ProtonPackageManager.installPackage(getContext(), packageInfo.identifier, output);
             requireActivity().runOnUiThread(() -> {
                 dialog.closeOnUiThread();
                 if (installed) {
