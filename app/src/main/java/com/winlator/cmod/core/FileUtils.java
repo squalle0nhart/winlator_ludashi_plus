@@ -364,9 +364,19 @@ public abstract class FileUtils {
         }
 
         if ("primary".equalsIgnoreCase(type)) {
-            return Environment.getExternalStorageDirectory() + "/" + path;
+            return joinPath(Environment.getExternalStorageDirectory().getAbsolutePath(), path);
         } else {
-            return "/mnt/media_rw/" + type + "/" + path;
+            String preferredPath = joinPath("/storage/" + type, path);
+            if (new File(preferredPath).exists()) {
+                return preferredPath;
+            }
+
+            String fallbackPath = joinPath("/mnt/media_rw/" + type, path);
+            if (new File(fallbackPath).exists()) {
+                return fallbackPath;
+            }
+
+            return preferredPath;
         }
     }
 
@@ -376,6 +386,11 @@ public abstract class FileUtils {
         String filePath = getFilePathFromUriUsingSAF(context, uri);
         Log.d(TAG, "File path obtained: " + filePath);
         return filePath;
+    }
+
+    private static String joinPath(String basePath, String relativePath) {
+        if (relativePath == null || relativePath.isEmpty()) return basePath;
+        return basePath + "/" + relativePath;
     }
 
 
