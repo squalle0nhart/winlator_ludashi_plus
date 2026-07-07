@@ -32,6 +32,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -149,6 +150,15 @@ import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
+    private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
+    private static final int GRAPHICS_SCALING_NONE = 0;
+    private static final int GRAPHICS_SCALING_LINEAR = 1;
+    private static final int GRAPHICS_SCALING_NEAREST = 2;
+    private static final int GRAPHICS_SCALING_SGSR = 3;
+    private static final int GRAPHICS_SCALING_FSR = 4;
+    private static final int GRAPHICS_SCALING_FSR_FIT = 5;
+    private static final int GRAPHICS_SCALING_DLS = 6;
+    private static final int GRAPHICS_SCALING_NIS = 7;
 
     private static final boolean DISABLE_TOUCHSCREEN_AUTO_HIDE = true;
 
@@ -262,6 +272,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         TextView valueView = findViewById(R.id.TVToggleFullscreenValue);
         if (titleView != null) titleView.setText(R.string.fullscreen_mode);
         if (valueView != null) valueView.setText(getFullscreenModeLabelRes(fullscreenMode));
+        setSelectedModeButton(R.id.BTFullscreenOff, fullscreenMode == Container.FULLSCREEN_OFF);
+        setSelectedModeButton(R.id.BTFullscreenFit, fullscreenMode == Container.FULLSCREEN_FIT);
+        setSelectedModeButton(R.id.BTFullscreenStretch, fullscreenMode == Container.FULLSCREEN_STRETCH);
+        setSelectedModeButton(R.id.BTFullscreenFill, fullscreenMode == Container.FULLSCREEN_FILL);
+        setSelectedModeButton(R.id.BTFullscreenInteger, fullscreenMode == Container.FULLSCREEN_INTEGER);
     }
 
     private void persistFullscreenModeSelection(int fullscreenMode) {
@@ -304,6 +319,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
         int index = spinner != null ? spinner.getSelectedItemPosition() : 0;
         if (index < 0 || index >= VULKAN_UPSCALER_FILTER_VALUES.length) index = 0;
         return VULKAN_UPSCALER_FILTER_VALUES[index];
+    }
+
+    private void setSelectedModeButton(int viewId, boolean selected) {
+        View view = findViewById(viewId);
+        if (view != null) view.setSelected(selected);
+    }
+
+    private void setOnClickListenerIfPresent(int viewId, View.OnClickListener listener) {
+        View view = findViewById(viewId);
+        if (view != null) view.setOnClickListener(listener);
+    }
+
+    private int getPersistentRendererFilterMode() {
+        if (shortcut != null) return shortcut.getRendererFilterMode();
+        if (container != null) return container.getRendererFilterMode();
+        return 0;
+    }
+
+    private void setPersistentRendererFilterMode(int mode) {
+        if (shortcut != null) {
+            shortcut.setRendererFilterMode(mode);
+        } else if (container != null) {
+            container.setRendererFilterMode(mode);
+        }
     }
 
     private void saveLaunchGraphicsExtra(String key, String value) {
@@ -1932,11 +1971,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner spUpscalerMode     = findViewById(R.id.SPUpscalerMode);
         View    lblSharpnessHeader = findViewById(R.id.LBLSharpnessHeader);
         SeekBar sbSharpness        = findViewById(R.id.SBSharpness);
+        TextView tvSharpnessValue  = findViewById(R.id.TVSharpnessValue);
         Spinner spPostFXMode       = findViewById(R.id.SPPostFXMode);
         Spinner spColorMode        = findViewById(R.id.SPColorMode);
         View    btSaveGraphicsPreset = findViewById(R.id.BTSaveGraphicsPreset);
         View    llFrameGenOptions  = findViewById(R.id.LLFrameGenOptions);
         Spinner spFrameGenFPS      = findViewById(R.id.SPFrameGenFPS);
+        View    btScalingNone      = findViewById(R.id.BTScalingNone);
+        View    btScalingLinear    = findViewById(R.id.BTScalingLinear);
+        View    btScalingNearest   = findViewById(R.id.BTScalingNearest);
+        View    btScalingSgsr      = findViewById(R.id.BTScalingSgsr);
+        View    btScalingFsr       = findViewById(R.id.BTScalingFsr);
+        View    btScalingFsrFit    = findViewById(R.id.BTScalingFsrFit);
+        View    btScalingDls       = findViewById(R.id.BTScalingDls);
+        View    btScalingNis       = findViewById(R.id.BTScalingNis);
 
         if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
         if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
@@ -1966,65 +2014,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         final String[] upscalerLabels = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
         final Runnable[] applyGlEffectsRef = new Runnable[1];
+        final int[] selectedBaseFilterMode = {getPersistentRendererFilterMode()};
+        final int[] selectedScalingMode = {GRAPHICS_SCALING_NONE};
+
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spUpscalerMode.setAdapter(a);
-            spUpscalerMode.setSelection(getSavedUpscalerSelection(
-                getLaunchGraphicsExtra("graphicsFilterMode", "")));
-            spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (swEnableFSR != null && swEnableFSR.isChecked()) {
-                        if (vkRenderer != null) renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
-                        else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
-                    }
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
-        }
-
-        float initSharp = getLaunchGraphicsSharpnessPercent();
-        if (sbSharpness != null) {
-            sbSharpness.setValue(initSharp);
-            if (vkRenderer != null) {
-                vkRenderer.setSharpness(initSharp / 100f);
-                sbSharpness.setOnValueChangeListener((sb, v) -> vkRenderer.setSharpness(v / 100f));
-            } else if (glRenderer != null) {
-                sbSharpness.setOnValueChangeListener((sb, v) -> {
-                    if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
-                });
-            }
-        }
-
-        Runnable updateSharpnessVis = () -> {
-            boolean fsrOn = swEnableFSR  != null && swEnableFSR.isChecked();
-            boolean dlsOn = spPostFXMode != null && spPostFXMode.getSelectedItemPosition() == 1;
-            int vis = (fsrOn || dlsOn) ? View.VISIBLE : View.GONE;
-            if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(vis);
-            if (sbSharpness        != null) sbSharpness.setVisibility(vis);
-        };
-
-        String savedFilter = getLaunchGraphicsExtra("graphicsFilterMode", "");
-        boolean fsrOn = !savedFilter.isEmpty() && Integer.parseInt(savedFilter) > 0;
-        if (swEnableFSR != null) {
-            swEnableFSR.setChecked(fsrOn);
-            if (spUpscalerMode != null)
-                spUpscalerMode.setVisibility(fsrOn ? View.VISIBLE : View.GONE);
-            if (fsrOn)
-                if (vkRenderer != null) renderer.setFilterMode(spUpscalerMode != null
-                    ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0]);
-            swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
-                if (spUpscalerMode != null)
-                    spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
-                if (vkRenderer != null) {
-                    renderer.setFilterMode(checked
-                        ? (spUpscalerMode != null ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0])
-                        : (container != null ? container.getRendererFilterMode() : 0));
-                } else if (applyGlEffectsRef[0] != null) {
-                    applyGlEffectsRef[0].run();
-                }
-                updateSharpnessVis.run();
-            });
+            spUpscalerMode.setSelection(getSavedUpscalerSelection(getLaunchGraphicsExtra("graphicsFilterMode", "")));
         }
 
         final String[] pfxLabels = {"None", "DLS", "CRT", "HDR", "Natural"};
@@ -2039,16 +2036,30 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             spPostFXMode.setSelection(initPFX, false);
             if (initPFX > 0 && vkRenderer != null) vkRenderer.setPostFXMode(initPFX);
-
-            spPostFXMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (vkRenderer != null) vkRenderer.setPostFXMode(pos);
-                    else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
-                    updateSharpnessVis.run();
-                }
-                @Override public void onNothingSelected(AdapterView<?> p) {}
-            });
         }
+
+        float initSharp = getLaunchGraphicsSharpnessPercent();
+        if (sbSharpness != null) {
+            sbSharpness.setValue(initSharp);
+            if (tvSharpnessValue != null) tvSharpnessValue.setText(String.valueOf(Math.round(initSharp)));
+            if (vkRenderer != null) {
+                vkRenderer.setSharpness(initSharp / 100f);
+                sbSharpness.setOnValueChangeListener((sb, v) -> {
+                    if (tvSharpnessValue != null) tvSharpnessValue.setText(String.valueOf(Math.round(v)));
+                    vkRenderer.setSharpness(v / 100f);
+                });
+            } else if (glRenderer != null) {
+                sbSharpness.setOnValueChangeListener((sb, v) -> {
+                    if (tvSharpnessValue != null) tvSharpnessValue.setText(String.valueOf(Math.round(v)));
+                    if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                });
+            }
+        }
+
+        Runnable updateSharpnessVis = () -> {
+            if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(View.VISIBLE);
+            if (sbSharpness != null) sbSharpness.setVisibility(View.VISIBLE);
+        };
 
         if (glRenderer != null) {
             applyGlEffectsRef[0] = () -> {
@@ -2086,14 +2097,200 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 }
                 glRenderer.getXServerView().requestRender();
             };
-            applyGlEffectsRef[0].run();
         }
 
-        String savedPFXInit = getLaunchGraphicsExtra("graphicsPostFXMode", "");
-        boolean dlsRestored = !savedPFXInit.isEmpty() && Integer.parseInt(savedPFXInit) == 1;
-        int sharpVis = (fsrOn || dlsRestored) ? View.VISIBLE : View.GONE;
-        if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
-        if (sbSharpness        != null) sbSharpness.setVisibility(sharpVis);
+        final Runnable updateScalingButtons = () -> {
+            setSelectedModeButton(R.id.BTScalingNone, selectedScalingMode[0] == GRAPHICS_SCALING_NONE);
+            setSelectedModeButton(R.id.BTScalingLinear, selectedScalingMode[0] == GRAPHICS_SCALING_LINEAR);
+            setSelectedModeButton(R.id.BTScalingNearest, selectedScalingMode[0] == GRAPHICS_SCALING_NEAREST);
+            setSelectedModeButton(R.id.BTScalingSgsr, selectedScalingMode[0] == GRAPHICS_SCALING_SGSR);
+            setSelectedModeButton(R.id.BTScalingFsr, selectedScalingMode[0] == GRAPHICS_SCALING_FSR);
+            setSelectedModeButton(R.id.BTScalingFsrFit, selectedScalingMode[0] == GRAPHICS_SCALING_FSR_FIT);
+            setSelectedModeButton(R.id.BTScalingDls, selectedScalingMode[0] == GRAPHICS_SCALING_DLS);
+            setSelectedModeButton(R.id.BTScalingNis, selectedScalingMode[0] == GRAPHICS_SCALING_NIS);
+        };
+
+        final Runnable applyScalingSelection = () -> {
+            int upscalerSelection = spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() : 0;
+            int postFxSelection = spPostFXMode != null ? spPostFXMode.getSelectedItemPosition() : 0;
+            boolean enableUpscaler = false;
+            boolean enableSoftStretch = false;
+
+            switch (selectedScalingMode[0]) {
+                case GRAPHICS_SCALING_LINEAR:
+                    selectedBaseFilterMode[0] = 0;
+                    postFxSelection = 0;
+                    break;
+                case GRAPHICS_SCALING_NEAREST:
+                    selectedBaseFilterMode[0] = 1;
+                    postFxSelection = 0;
+                    break;
+                case GRAPHICS_SCALING_SGSR:
+                    enableUpscaler = true;
+                    upscalerSelection = 0;
+                    postFxSelection = 0;
+                    break;
+                case GRAPHICS_SCALING_FSR:
+                    enableUpscaler = true;
+                    upscalerSelection = 1;
+                    postFxSelection = 0;
+                    break;
+                case GRAPHICS_SCALING_FSR_FIT:
+                    enableUpscaler = true;
+                    upscalerSelection = 1;
+                    postFxSelection = 0;
+                    enableSoftStretch = true;
+                    break;
+                case GRAPHICS_SCALING_DLS:
+                    enableUpscaler = true;
+                    upscalerSelection = 2;
+                    postFxSelection = glRenderer != null ? 1 : 0;
+                    break;
+                case GRAPHICS_SCALING_NIS:
+                    enableUpscaler = true;
+                    upscalerSelection = 3;
+                    postFxSelection = 0;
+                    break;
+                case GRAPHICS_SCALING_NONE:
+                default:
+                    selectedBaseFilterMode[0] = 0;
+                    postFxSelection = 0;
+                    break;
+            }
+
+            softStretchEnabled = enableSoftStretch;
+            View btItemSoftStretch = findViewById(R.id.BTItemSoftStretch);
+            if (btItemSoftStretch != null) btItemSoftStretch.setSelected(softStretchEnabled);
+            if (vkRenderer != null) vkRenderer.setStretchMode(softStretchEnabled ? 1 : 0);
+
+            if (spUpscalerMode != null && spUpscalerMode.getSelectedItemPosition() != upscalerSelection) {
+                spUpscalerMode.setSelection(upscalerSelection);
+            }
+            if (spPostFXMode != null && spPostFXMode.getSelectedItemPosition() != postFxSelection) {
+                spPostFXMode.setSelection(postFxSelection, false);
+            }
+            if (swEnableFSR != null && swEnableFSR.isChecked() != enableUpscaler) {
+                swEnableFSR.setChecked(enableUpscaler);
+            }
+
+            if (!enableUpscaler) {
+                int runtimeFilter = glRenderer != null && selectedBaseFilterMode[0] == 1 ? 2 : selectedBaseFilterMode[0];
+                renderer.setFilterMode(runtimeFilter);
+                if (glRenderer != null && applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+            } else if (vkRenderer != null) {
+                renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
+            }
+
+            updateScalingButtons.run();
+            updateSharpnessVis.run();
+        };
+
+        String savedFilter = getLaunchGraphicsExtra("graphicsFilterMode", "");
+        int savedFilterMode = 0;
+        try {
+            savedFilterMode = savedFilter == null || savedFilter.isEmpty() ? 0 : Integer.parseInt(savedFilter);
+        } catch (NumberFormatException ignored) {}
+        String savedScalingModeValue = getLaunchGraphicsExtra(GRAPHICS_SIDEBAR_SCALING_MODE_KEY, "");
+        try {
+            if (!savedScalingModeValue.isEmpty()) {
+                selectedScalingMode[0] = Integer.parseInt(savedScalingModeValue);
+            } else if (savedFilterMode == 2) {
+                selectedScalingMode[0] = GRAPHICS_SCALING_SGSR;
+            } else if (savedFilterMode == 4) {
+                selectedScalingMode[0] = softStretchEnabled ? GRAPHICS_SCALING_FSR_FIT : GRAPHICS_SCALING_FSR;
+            } else if (savedFilterMode == 5) {
+                selectedScalingMode[0] = GRAPHICS_SCALING_DLS;
+            } else if (savedFilterMode == 3) {
+                selectedScalingMode[0] = GRAPHICS_SCALING_NIS;
+            } else if (selectedBaseFilterMode[0] == 1) {
+                selectedScalingMode[0] = GRAPHICS_SCALING_NEAREST;
+            } else {
+                selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
+            }
+        } catch (NumberFormatException ignored) {
+            selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
+        }
+
+        if (spUpscalerMode != null) {
+            spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                    if (swEnableFSR != null && swEnableFSR.isChecked()) {
+                        if (vkRenderer != null) renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
+                        else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                    }
+                }
+                @Override public void onNothingSelected(AdapterView<?> p) {}
+            });
+        }
+
+        if (swEnableFSR != null) {
+            swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
+                if (vkRenderer != null) {
+                    renderer.setFilterMode(checked
+                            ? (spUpscalerMode != null ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0])
+                            : selectedBaseFilterMode[0]);
+                } else if (glRenderer != null) {
+                    renderer.setFilterMode(checked ? 2 : (selectedBaseFilterMode[0] == 1 ? 2 : 0));
+                    if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                }
+                updateSharpnessVis.run();
+            });
+        }
+
+        if (spPostFXMode != null) {
+            spPostFXMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                    if (vkRenderer != null) vkRenderer.setPostFXMode(pos);
+                    else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
+                    updateSharpnessVis.run();
+                }
+                @Override public void onNothingSelected(AdapterView<?> p) {}
+            });
+        }
+
+        View.OnClickListener scalingClickListener = v -> {
+            int viewId = v.getId();
+            if (viewId == R.id.BTScalingNone) selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
+            else if (viewId == R.id.BTScalingLinear) selectedScalingMode[0] = GRAPHICS_SCALING_LINEAR;
+            else if (viewId == R.id.BTScalingNearest) selectedScalingMode[0] = GRAPHICS_SCALING_NEAREST;
+            else if (viewId == R.id.BTScalingSgsr) selectedScalingMode[0] = GRAPHICS_SCALING_SGSR;
+            else if (viewId == R.id.BTScalingFsr) selectedScalingMode[0] = GRAPHICS_SCALING_FSR;
+            else if (viewId == R.id.BTScalingFsrFit) selectedScalingMode[0] = GRAPHICS_SCALING_FSR_FIT;
+            else if (viewId == R.id.BTScalingDls) selectedScalingMode[0] = GRAPHICS_SCALING_DLS;
+            else if (viewId == R.id.BTScalingNis) selectedScalingMode[0] = GRAPHICS_SCALING_NIS;
+            applyScalingSelection.run();
+        };
+        if (btScalingNone != null) btScalingNone.setOnClickListener(scalingClickListener);
+        if (btScalingLinear != null) btScalingLinear.setOnClickListener(scalingClickListener);
+        if (btScalingNearest != null) btScalingNearest.setOnClickListener(scalingClickListener);
+        if (btScalingSgsr != null) btScalingSgsr.setOnClickListener(scalingClickListener);
+        if (btScalingFsr != null) btScalingFsr.setOnClickListener(scalingClickListener);
+        if (btScalingFsrFit != null) btScalingFsrFit.setOnClickListener(scalingClickListener);
+        if (btScalingDls != null) btScalingDls.setOnClickListener(scalingClickListener);
+        if (btScalingNis != null) btScalingNis.setOnClickListener(scalingClickListener);
+
+        View.OnClickListener fullscreenClickListener = v -> {
+            int viewId = v.getId();
+            int fullscreenMode = Container.FULLSCREEN_OFF;
+            if (viewId == R.id.BTFullscreenFit) fullscreenMode = Container.FULLSCREEN_FIT;
+            else if (viewId == R.id.BTFullscreenStretch) fullscreenMode = Container.FULLSCREEN_STRETCH;
+            else if (viewId == R.id.BTFullscreenFill) fullscreenMode = Container.FULLSCREEN_FILL;
+            else if (viewId == R.id.BTFullscreenInteger) fullscreenMode = Container.FULLSCREEN_INTEGER;
+            setRendererFullscreenMode(fullscreenMode, true);
+        };
+        setOnClickListenerIfPresent(R.id.BTFullscreenOff, fullscreenClickListener);
+        setOnClickListenerIfPresent(R.id.BTFullscreenFit, fullscreenClickListener);
+        setOnClickListenerIfPresent(R.id.BTFullscreenStretch, fullscreenClickListener);
+        setOnClickListenerIfPresent(R.id.BTFullscreenFill, fullscreenClickListener);
+        setOnClickListenerIfPresent(R.id.BTFullscreenInteger, fullscreenClickListener);
+
+        applyScalingSelection.run();
+        updateFullscreenModeUi(renderer.getFullscreenMode());
+
+        if (glRenderer != null) {
+            applyGlEffectsRef[0].run();
+        }
+        updateSharpnessVis.run();
 
         if (btSaveGraphicsPreset != null) {
             btSaveGraphicsPreset.setOnClickListener(v -> {
@@ -2108,7 +2305,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     String.valueOf(sbSharpness != null ? sbSharpness.getValue() : 50f));
                 saveLaunchGraphicsExtra("graphicsPostFXMode",
                     String.valueOf(spPostFXMode != null ? spPostFXMode.getSelectedItemPosition() : 0));
+                saveLaunchGraphicsExtra(GRAPHICS_SIDEBAR_SCALING_MODE_KEY, String.valueOf(selectedScalingMode[0]));
                 saveLaunchGraphicsExtra("graphicsColorMode", "0");
+                setPersistentRendererFilterMode(selectedBaseFilterMode[0]);
                 persistLaunchGraphicsPreset();
                 Toast.makeText(this, "Preset saved", Toast.LENGTH_SHORT).show();
             });

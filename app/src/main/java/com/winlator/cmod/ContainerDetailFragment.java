@@ -2011,9 +2011,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
     }
 
     private void downloadContentForTypes(List<ContentProfile.ContentType> types, Runnable refreshAction) {
-        DownloadProgressDialog dialog = new DownloadProgressDialog(getActivity());
-        dialog.show(R.string.loading);
-        dialog.setProgress(10);
+        PreloaderDialog dialog = new PreloaderDialog(getActivity());
+        dialog.showOnUiThread(R.string.loading);
         CONTENT_IO_EXECUTOR.execute(() -> {
             String contentsURL = PreferenceManager.getDefaultSharedPreferences(getContext())
                     .getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
@@ -2027,7 +2026,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     : null;
             boolean includeVegasDxvk = types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
             String vegasJson = includeVegasDxvk ? Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API) : null;
-            requireActivity().runOnUiThread(() -> dialog.setProgress(65));
             contentsManager.clearRemoteProfiles();
             if (json != null) contentsManager.appendRemoteProfiles(json);
             if (bannerlatorJson != null) contentsManager.appendBannerlatorRemoteProfiles(bannerlatorJson);
@@ -2040,7 +2038,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 }
             }
             requireActivity().runOnUiThread(() -> {
-                dialog.setProgress(100);
                 dialog.closeOnUiThread();
                 if (candidates.isEmpty()) {
                     AppUtils.showToast(getContext(), R.string.no_items_to_display);
@@ -2057,6 +2054,16 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
     }
 
     private void downloadAndInstallProfile(ContentProfile profile, Runnable refreshAction) {
+        contentsManager.syncContents();
+        ContentProfile installedProfile = contentsManager.getProfileByEntryName(ContentsManager.getEntryName(profile));
+        if (installedProfile != null && installedProfile.remoteUrl == null) {
+            requireActivity().runOnUiThread(() -> {
+                refreshAction.run();
+                selectInstalledWineContent(installedProfile);
+            });
+            return;
+        }
+
         DownloadProgressDialog dialog = new DownloadProgressDialog(getActivity());
         dialog.show(R.string.downloading_file);
         CONTENT_IO_EXECUTOR.execute(() -> {
@@ -2068,6 +2075,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 });
                 return;
             }
+            requireActivity().runOnUiThread(() -> dialog.setMessage(R.string.installing_content));
             installImportedContent(Uri.fromFile(output), Collections.singletonList(profile.type), refreshAction, dialog);
         });
     }

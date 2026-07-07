@@ -32,6 +32,11 @@
     <string name="fullscreen_mode_fill">Fill (Crop)</string>
     <string name="fullscreen_mode_integer">Integer (Pixel-Perfect)</string>
     <string name="fullscreen_mode_default">Use container default</string>
+    <string name="fullscreen_mode_short_off">Off</string>
+    <string name="fullscreen_mode_short_fit">Fit</string>
+    <string name="fullscreen_mode_short_stretch">Stretch</string>
+    <string name="fullscreen_mode_short_fill">Fill</string>
+    <string name="fullscreen_mode_short_integer">Integer</string>
     <string name="exit">Exit</string>
     <string name="no_control_element_selected">No control element selected</string>
     <string name="scale">Scale</string>
@@ -88,6 +93,15 @@
     <string name="video_memory_size">Video Memory Size</string>
     <string name="show_fps">Show FPS</string>
     <string name="none">None</string>
+    <string name="linear">Linear</string>
+    <string name="nearest">Nearest</string>
+    <string name="scaling_mode">Scaling mode</string>
+    <string name="sgsr">SGSR</string>
+    <string name="fsr">FSR</string>
+    <string name="fsr_fit">FSR (Fit)</string>
+    <string name="dls">DLS</string>
+    <string name="nis">NIS</string>
+    <string name="sharpness">Sharpness</string>
     <string name="auto">Auto</string>
     <string name="custom_text">Custom Text</string>
     <string name="icon">Icon</string>

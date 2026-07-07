@@ -211,40 +211,241 @@
                     android:orientation="vertical"
                     android:background="@drawable/sidebar_card"
                     android:padding="12dp">
-                    <Switch
-                        android:id="@+id/SWEnableFSR"
+                    <TextView
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:text="Super Resolution"
+                        android:layout_height="wrap_content"
+                        android:text="@string/fullscreen_mode"
                         android:textColor="#FFFFFF"
-                        android:textSize="15sp" />
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="42dp"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/BTFullscreenOff"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fullscreen_mode_short_off"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTFullscreenFit"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fullscreen_mode_short_fit"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTFullscreenStretch"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fullscreen_mode_short_stretch"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/BTFullscreenFill"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fullscreen_mode_short_fill"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTFullscreenInteger"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fullscreen_mode_short_integer"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp" />
+                    </LinearLayout>
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:background="#33FFFFFF" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/scaling_mode"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/BTScalingNone"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/none"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTScalingLinear"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/linear"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTScalingNearest"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/nearest"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/BTScalingSgsr"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/sgsr"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTScalingFsr"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fsr"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTScalingFsrFit"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/fsr_fit"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/BTScalingDls"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/dls"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="13sp" />
+                        <Button
+                            android:id="@+id/BTScalingNis"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:text="@string/nis"
+                            android:textAllCaps="false"
+                            android:textColor="@color/sidebar_mode_button_text"
+                            android:maxLines="1"
+                            android:textSize="13sp" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:id="@+id/LBLSharpnessHeader"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Upscaler Mode"
-                            android:textColor="#0055ff"
+                            android:text="@string/sharpness"
+                            android:textColor="#FFFFFF"
                             android:textSize="13sp" />
-                        <Spinner
-                            android:id="@+id/SPUpscalerMode"
-                            android:layout_width="120dp"
-                            android:layout_height="36dp"
-                            android:background="@android:color/transparent" />
+                        <TextView
+                            android:id="@+id/TVSharpnessValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp" />
                     </LinearLayout>
-                    <TextView
-                        android:id="@+id/LBLSharpnessHeader"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="Sharpness"
-                        android:textColor="#0055ff"
-                        android:textSize="13sp" />
                     <com.winlator.cmod.widget.SeekBar
                         android:id="@+id/SBSharpness"
                         android:layout_width="match_parent"
@@ -253,12 +454,21 @@
                         app:minValue="0"
                         app:step="1" />
 
-                    <!-- ── Post Effect ─────────────────────────────────────── -->
+                    <Switch
+                        android:id="@+id/SWEnableFSR"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                    <Spinner
+                        android:id="@+id/SPUpscalerMode"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginTop="12dp"
-                        android:layout_marginBottom="2dp"
                         android:background="#33FFFFFF" />
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -270,7 +480,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="Post Effect"
-                            android:textColor="#0055ff"
+                            android:textColor="#B3FFFFFF"
                             android:textSize="13sp" />
                         <Spinner
                             android:id="@+id/SPPostFXMode"
@@ -419,7 +629,8 @@
                     android:paddingStart="14dp"
                     android:paddingEnd="14dp"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:visibility="gone">
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

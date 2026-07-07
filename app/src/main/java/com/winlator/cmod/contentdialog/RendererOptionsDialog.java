@@ -171,12 +171,15 @@ public class RendererOptionsDialog extends ContentDialog {
             int rendererPosition = spRenderer.getSelectedItemPosition();
             boolean isVulkanRenderer = rendererPosition == 1;
             boolean isGlRenderer = rendererPosition == 0;
+            boolean isSurfaceFlingerRenderer = rendererPosition >= 0
+                    && rendererPosition < rendererIds.size()
+                    && "surfaceflinger".equalsIgnoreCase(rendererIds.get(rendererPosition));
             setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
             setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
             if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
             if (cbNativeRendering != null) cbNativeRendering.setVisibility(isGlRenderer ? View.VISIBLE : View.GONE);
-            if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
+            if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer || isSurfaceFlingerRenderer) ? View.VISIBLE : View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
         };
         spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
