@@ -221,6 +221,10 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         sFEXCorePreset.setPopupBackgroundResource(
                 isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
 
+        Spinner sFullscreenMode = view.findViewById(R.id.SFullscreenMode);
+        sFullscreenMode.setPopupBackgroundResource(
+                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+
         Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
         sStartupSelection.setPopupBackgroundResource(
                 isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
@@ -684,8 +688,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         }
         sHudMode.setSelection(savedHudMode);
 
-        final CheckBox cbFullscreenStretched = view.findViewById(R.id.CBFullscreenStretched);
-        cbFullscreenStretched.setChecked(isEditMode() && container.isFullscreenStretched());
+        final Spinner sFullscreenMode = view.findViewById(R.id.SFullscreenMode);
+        loadFullscreenModeSpinner(context, sFullscreenMode,
+                isEditMode() ? container.getFullscreenMode() : Container.FULLSCREEN_OFF, false);
 
         // Existing declarations of UI components and variables
         final Runnable showInputWarning = () -> ContentDialog.alert(context,
@@ -894,7 +899,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 String drives = getDrives(view);
                 int hudMode = sHudMode.getSelectedItemPosition(); // 0=Off 1=Classic 2=Modern
                 boolean showFPS = hudMode != 0;
-                boolean fullscreenStretched = cbFullscreenStretched.isChecked();
+                int fullscreenMode = getFullscreenModeFromSpinner(sFullscreenMode, false);
                 boolean exclusiveXInput = cbExclusiveXInput.isChecked();
                 String cpuList = cpuListView.getCheckedCPUListAsString();
                 String cpuListWoW64 = cpuListViewWoW64.getCheckedCPUListAsString();
@@ -941,7 +946,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setDrives(drives);
                     container.setShowFPS(showFPS);
                     container.putExtra("hudMode", String.valueOf(hudMode));
-                    container.setFullscreenStretched(fullscreenStretched);
+                    container.setFullscreenMode(fullscreenMode);
                     container.setExclusiveXInput(exclusiveXInput);
                     container.setInputType(finalInputType);
                     container.setStartupSelection(startupSelection);
@@ -987,7 +992,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("drives", drives);
                     data.put("showFPS", showFPS);
                     data.put("hudMode", hudMode);
-                    data.put("fullscreenStretched", fullscreenStretched);
+                    data.put("fullscreenMode", fullscreenMode);
                     data.put("exclusiveXInput", exclusiveXInput);
                     data.put("inputType", finalInputType);
                     data.put("startupSelection", startupSelection);
@@ -1839,6 +1844,33 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
         // Set the adapter with the combined list
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+    }
+
+    public static void loadFullscreenModeSpinner(Context context, Spinner spinner, int selectedMode,
+            boolean includeDefaultOption) {
+        ArrayList<String> options = new ArrayList<>();
+        if (includeDefaultOption) options.add(context.getString(R.string.fullscreen_mode_default));
+        options.add(context.getString(R.string.fullscreen_mode_off));
+        options.add(context.getString(R.string.fullscreen_mode_fit));
+        options.add(context.getString(R.string.fullscreen_mode_stretch));
+        options.add(context.getString(R.string.fullscreen_mode_fill));
+        options.add(context.getString(R.string.fullscreen_mode_integer));
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, options);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        spinner.setAdapter(adapter);
+
+        int clampedMode = Math.max(includeDefaultOption ? -1 : Container.FULLSCREEN_OFF,
+                Math.min(selectedMode, Container.FULLSCREEN_INTEGER));
+        spinner.setSelection(includeDefaultOption ? clampedMode + 1 : clampedMode);
+    }
+
+    public static int getFullscreenModeFromSpinner(Spinner spinner, boolean includeDefaultOption) {
+        int position = spinner.getSelectedItemPosition();
+        if (includeDefaultOption) {
+            return Math.max(-1, Math.min(position - 1, Container.FULLSCREEN_INTEGER));
+        }
+        return Math.max(Container.FULLSCREEN_OFF, Math.min(position, Container.FULLSCREEN_INTEGER));
     }
 
     public static void loadBox64VersionSpinner(Context context, Container container, ContentsManager manager,

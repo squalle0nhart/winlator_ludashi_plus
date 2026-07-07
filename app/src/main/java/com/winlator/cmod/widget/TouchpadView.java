@@ -18,6 +18,7 @@ import android.widget.FrameLayout;
 import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
@@ -105,11 +106,12 @@ public class TouchpadView extends View {
     }
 
     private void updateXform(int outerWidth, int outerHeight, int innerWidth, int innerHeight) {
+        int fullscreenMode = xServer.getRenderer().getFullscreenMode();
         ViewTransformation viewTransformation = new ViewTransformation();
-        viewTransformation.update(outerWidth, outerHeight, innerWidth, innerHeight);
+        viewTransformation.update(outerWidth, outerHeight, innerWidth, innerHeight, fullscreenMode);
 
         float invAspect = 1.0f / viewTransformation.aspect;
-        if (!xServer.getRenderer().isFullscreen()) {
+        if (fullscreenMode != Container.FULLSCREEN_STRETCH) {
             XForm.makeTranslation(xform, -viewTransformation.viewOffsetX, -viewTransformation.viewOffsetY);
             XForm.scale(xform, invAspect, invAspect);
         } else

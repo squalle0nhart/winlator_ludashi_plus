@@ -674,11 +674,16 @@
                             android:src="@drawable/icon_menu" />
                     </LinearLayout>
 
-                    <CheckBox
-                        android:id="@+id/CBFullscreenStretched"
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/fullscreen_stretched" />
+                        android:text="@string/fullscreen_mode" />
+
+                    <Spinner
+                        style="@style/ComboBox"
+                        android:id="@+id/SFullscreenModeOverride"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
                 </LinearLayout>
 

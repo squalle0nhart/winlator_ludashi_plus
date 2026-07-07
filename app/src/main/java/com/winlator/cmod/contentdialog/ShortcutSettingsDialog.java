@@ -35,6 +35,7 @@ import com.winlator.cmod.ContainerDetailFragment;
 import com.winlator.cmod.R;
 import com.winlator.cmod.ShortcutsFragment;
 import com.winlator.cmod.box64.Box64PresetManager;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.contents.ContentProfile;
@@ -281,9 +282,19 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             }
         });
 
-        final CheckBox cbFullscreenStretched =  findViewById(R.id.CBFullscreenStretched);
-        boolean fullscreenStretched = shortcut.getExtra("fullscreenStretched", "0").equals("1");
-        cbFullscreenStretched.setChecked(fullscreenStretched);
+        final Spinner sFullscreenModeOverride = findViewById(R.id.SFullscreenModeOverride);
+        int fullscreenModeOverride = -1;
+        String fullscreenModeExtra = shortcut.getExtra("fullscreenMode");
+        if (!fullscreenModeExtra.isEmpty()) {
+            try {
+                fullscreenModeOverride = Integer.parseInt(fullscreenModeExtra);
+            } catch (NumberFormatException ignored) {
+                fullscreenModeOverride = -1;
+            }
+        } else if ("1".equals(shortcut.getExtra("fullscreenStretched", ""))) {
+            fullscreenModeOverride = Container.FULLSCREEN_STRETCH;
+        }
+        ContainerDetailFragment.loadFullscreenModeSpinner(context, sFullscreenModeOverride, fullscreenModeOverride, true);
 
         final Runnable showInputWarning = () -> ContentDialog.alert(context, R.string.enable_xinput_and_dinput_same_time, null);
         final CheckBox cbEnableXInput = findViewById(R.id.CBEnableXInput);
@@ -523,7 +534,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("midiSoundFont", midiSoundFont);
                 shortcut.putExtra("lc_all", lc_all);
 
-                shortcut.putExtra("fullscreenStretched", cbFullscreenStretched.isChecked() ? "1" : null);
+                int selectedFullscreenModeOverride =
+                        ContainerDetailFragment.getFullscreenModeFromSpinner(sFullscreenModeOverride, true);
+                shortcut.putExtra("fullscreenMode",
+                        selectedFullscreenModeOverride >= 0 ? String.valueOf(selectedFullscreenModeOverride) : null);
+                shortcut.putExtra("fullscreenStretched", null);
 
                 String wincomponents = containerDetailFragment.getWinComponents(getContentView());
                 shortcut.putExtra("wincomponents", wincomponents);
@@ -639,6 +654,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
+        Spinner sFullscreenModeOverride = view.findViewById(R.id.SFullscreenModeOverride);
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
         sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
@@ -650,6 +666,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFullscreenModeOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
         applyDarkThemeToFormFields(view, isDarkMode);
 

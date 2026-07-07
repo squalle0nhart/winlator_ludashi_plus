@@ -64,7 +64,12 @@ public class Container {
     private int rendererFilterMode = 0;
     private boolean rendererSwapRB = false;
     private boolean rendererLegacyScanout = false;
-    private boolean fullscreenStretched;
+    public static final int FULLSCREEN_OFF = 0;
+    public static final int FULLSCREEN_FIT = 1;
+    public static final int FULLSCREEN_STRETCH = 2;
+    public static final int FULLSCREEN_FILL = 3;
+    public static final int FULLSCREEN_INTEGER = 4;
+    private int fullscreenMode = FULLSCREEN_OFF;
     private byte startupSelection = STARTUP_SELECTION_ESSENTIAL;
     private String cpuList;
     private String cpuListWoW64;
@@ -315,13 +320,35 @@ public class Container {
         this.controllerMapping = controllerMapping;
     }
 
-    public boolean isFullscreenStretched() { return fullscreenStretched; }
+    public int getFullscreenMode() { return fullscreenMode; }
+
+    public void setFullscreenMode(int fullscreenMode) { this.fullscreenMode = fullscreenMode; }
+
+    public boolean isFullscreenStretched() { return fullscreenMode == FULLSCREEN_STRETCH; }
 
     public boolean isShowFPS() {
         return showFPS;
     }
 
-    public void setFullscreenStretched(boolean fullscreenStretched) { this.fullscreenStretched = fullscreenStretched; }
+    public void setFullscreenStretched(boolean fullscreenStretched) {
+        fullscreenMode = fullscreenStretched ? FULLSCREEN_STRETCH : FULLSCREEN_OFF;
+    }
+
+    public static int nextFullscreenMode(int fullscreenMode) {
+        switch (fullscreenMode) {
+            case FULLSCREEN_OFF:
+                return FULLSCREEN_FIT;
+            case FULLSCREEN_FIT:
+                return FULLSCREEN_STRETCH;
+            case FULLSCREEN_STRETCH:
+                return FULLSCREEN_FILL;
+            case FULLSCREEN_FILL:
+                return FULLSCREEN_INTEGER;
+            case FULLSCREEN_INTEGER:
+            default:
+                return FULLSCREEN_OFF;
+        }
+    }
 
     public void setShowFPS(boolean showFPS) {
         this.showFPS = showFPS;
@@ -563,7 +590,7 @@ public class Container {
             data.put("wincomponents", wincomponents);
             data.put("drives", drives);
             data.put("showFPS", showFPS);
-            data.put("fullscreenStretched", fullscreenStretched);
+            data.put("fullscreenMode", fullscreenMode);
             data.put("inputType", inputType);
             data.put("startupSelection", startupSelection);
             data.put("box64Version", box64Version);
@@ -653,8 +680,11 @@ public class Container {
                 case "showFPS" :
                     setShowFPS(data.getBoolean(key));
                     break;
+                case "fullscreenMode" :
+                    setFullscreenMode(data.getInt(key));
+                    break;
                 case "fullscreenStretched" :
-                    setFullscreenStretched(data.getBoolean(key));
+                    if (!data.has("fullscreenMode")) setFullscreenStretched(data.getBoolean(key));
                     break;
                 case "inputType" :
                     setInputType(data.getInt(key));

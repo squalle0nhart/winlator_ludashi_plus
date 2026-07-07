@@ -226,6 +226,67 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return container != null ? container.getExtra(key, fallback) : fallback;
     }
 
+    private int resolveLaunchFullscreenMode() {
+        String shortcutMode = shortcut != null ? shortcut.getExtra("fullscreenMode") : "";
+        String legacyShortcutStretch = shortcut != null ? shortcut.getExtra("fullscreenStretched") : "";
+        if (shortcut != null && shortcutMode != null && !shortcutMode.isEmpty()) {
+            try {
+                return Integer.parseInt(shortcutMode);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (shortcut != null && legacyShortcutStretch != null && !legacyShortcutStretch.isEmpty()) {
+            return "1".equals(legacyShortcutStretch) ? Container.FULLSCREEN_STRETCH : Container.FULLSCREEN_OFF;
+        }
+        return container != null ? container.getFullscreenMode() : Container.FULLSCREEN_OFF;
+    }
+
+    private int getFullscreenModeLabelRes(int fullscreenMode) {
+        switch (fullscreenMode) {
+            case Container.FULLSCREEN_FIT:
+                return R.string.fullscreen_mode_fit;
+            case Container.FULLSCREEN_STRETCH:
+                return R.string.fullscreen_mode_stretch;
+            case Container.FULLSCREEN_FILL:
+                return R.string.fullscreen_mode_fill;
+            case Container.FULLSCREEN_INTEGER:
+                return R.string.fullscreen_mode_integer;
+            case Container.FULLSCREEN_OFF:
+            default:
+                return R.string.fullscreen_mode_off;
+        }
+    }
+
+    private void updateFullscreenModeUi(int fullscreenMode) {
+        TextView titleView = findViewById(R.id.TVToggleFullscreenTitle);
+        TextView valueView = findViewById(R.id.TVToggleFullscreenValue);
+        if (titleView != null) titleView.setText(R.string.fullscreen_mode);
+        if (valueView != null) valueView.setText(getFullscreenModeLabelRes(fullscreenMode));
+    }
+
+    private void persistFullscreenModeSelection(int fullscreenMode) {
+        if (shortcut != null) {
+            shortcut.putExtra("fullscreenMode", String.valueOf(fullscreenMode));
+            shortcut.putExtra("fullscreenStretched", null);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.setFullscreenMode(fullscreenMode);
+            container.saveData();
+        }
+    }
+
+    private void setRendererFullscreenMode(int fullscreenMode, boolean persist) {
+        if (xServerView == null) return;
+        HostRenderer rendererRef = xServerView.getRenderer();
+        int previousMode = rendererRef.getFullscreenMode();
+        rendererRef.setFullscreenMode(fullscreenMode);
+        if (touchpadView != null && previousMode != fullscreenMode) {
+            touchpadView.toggleFullscreen();
+        }
+        updateFullscreenModeUi(fullscreenMode);
+        if (persist) persistFullscreenModeSelection(fullscreenMode);
+    }
+
     private int getSavedUpscalerSelection(String savedFilter) {
         if (savedFilter == null || savedFilter.isEmpty()) return 0;
         try {
@@ -1303,23 +1364,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
 
-        String shortcutFullscreenStretched = shortcut != null ? shortcut.getExtra("fullscreenStretched") : null;
-
-        boolean shouldStretch = false;
-
-        if (shortcut != null && shortcutFullscreenStretched != null) {
-
-            shouldStretch = shortcutFullscreenStretched.equals("1");
-        } else if (container != null && container.isFullscreenStretched()) {
-
-            shouldStretch = true;
-        }
-
-        if (shouldStretch) {
-
-            renderer.toggleFullscreen();
-            touchpadView.toggleFullscreen();
-        }
+        setRendererFullscreenMode(resolveLaunchFullscreenMode(), false);
 
         if (shortcut != null) {
             String controlsProfile = shortcut.getExtra("controlsProfile");
@@ -1535,9 +1580,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (btItemToggleFullscreen != null) {
             btItemToggleFullscreen.setOnClickListener(v -> {
                 if (xServerView != null) {
-                    xServerView.getRenderer().toggleFullscreen();
-                    if (touchpadView != null)
-                        touchpadView.toggleFullscreen();
+                    HostRenderer rendererRef = xServerView.getRenderer();
+                    int nextFullscreenMode = Container.nextFullscreenMode(rendererRef.getFullscreenMode());
+                    setRendererFullscreenMode(nextFullscreenMode, true);
                 }
                 drawerLayout.closeDrawers();
             });
@@ -1574,11 +1619,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (xServerView != null) {
                     softStretchEnabled = !softStretchEnabled;
                     HostRenderer rendererRef = xServerView.getRenderer();
-
-                    if (softStretchEnabled && !rendererRef.isFullscreen()) {
-                        rendererRef.toggleFullscreen();
-                        if (touchpadView != null) touchpadView.toggleFullscreen();
-                    }
                     if (rendererRef instanceof VulkanRenderer) {
                         ((VulkanRenderer) rendererRef).setStretchMode(softStretchEnabled ? 1 : 0);
                     }

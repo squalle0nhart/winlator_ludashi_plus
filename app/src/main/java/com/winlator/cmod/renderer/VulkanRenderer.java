@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory;
 import android.view.Surface;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.widget.FrameRating;
 import com.winlator.cmod.widget.WinlatorHUD;
 import com.winlator.cmod.widget.XServerView;
@@ -33,7 +34,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private final Object lock = new Object();
 
     public final ViewTransformation viewTransformation = new ViewTransformation();
-    private boolean fullscreen = false;
+    private int fullscreenMode = Container.FULLSCREEN_OFF;
+    private boolean isStretch() { return fullscreenMode == Container.FULLSCREEN_STRETCH; }
     private float magnifierZoom = 1.0f;
     private boolean screenOffsetYRelativeToCursor = false;
     public int surfaceWidth;
@@ -152,7 +154,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                             surfaceWidth = sc[0];
                             surfaceHeight = sc[1];
                             viewTransformation.update(surfaceWidth, surfaceHeight,
-                                xServer.screenInfo.width, xServer.screenInfo.height);
+                                xServer.screenInfo.width, xServer.screenInfo.height, fullscreenMode);
                         }
                         
                         
@@ -231,7 +233,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     public void onSurfaceChanged(int width, int height) {
         if (inPipMode) return;
         surfaceWidth = width; surfaceHeight = height;
-        viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
+        viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height, fullscreenMode);
         synchronized (lock) {
             if (nativeHandle != 0) { nativeResize(nativeHandle, width, height); updateTransform(); }
         }
@@ -319,12 +321,16 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     private void updateTransform() {
         if (nativeHandle == 0) return;
+        if (surfaceWidth > 0 && surfaceHeight > 0) {
+            viewTransformation.update(surfaceWidth, surfaceHeight,
+                xServer.screenInfo.width, xServer.screenInfo.height, fullscreenMode);
+        }
         float zoom = magnifierZoom;
         
         
         float ptrX = xServer.pointer.getX();
         float ptrY = xServer.pointer.getY();
-        if (fullscreen) {
+        if (isStretch()) {
             
             
             viewTransformation.update(surfaceWidth, surfaceHeight,
@@ -449,7 +455,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             nativeSetRenderList(nativeHandle, ids, xs, ys, n);
             return;
         }
-        if (fullscreen) {
+        if (isStretch()) {
             int n = list.size() - start;
             if (n <= 0) { nativeSetRenderList(nativeHandle, new long[0], new int[0], new int[0], 0); return; }
             long[] ids = new long[n]; int[] xs = new int[n]; int[] ys = new int[n];
@@ -750,8 +756,14 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         else if (fr instanceof FrameRating) classicHudRef = (FrameRating) fr;
     }
 
-    public boolean isFullscreen() { return fullscreen; }
-    public void toggleFullscreen() { fullscreen = !fullscreen; synchronized (lock) { updateTransform(); } xServerView.queueEvent(this::updateScene); }
+    public boolean isFullscreen() { return fullscreenMode != Container.FULLSCREEN_OFF; }
+    public int getFullscreenMode() { return fullscreenMode; }
+    public void setFullscreenMode(int mode) {
+        fullscreenMode = mode;
+        synchronized (lock) { updateTransform(); }
+        xServerView.queueEvent(this::updateScene);
+    }
+    public void toggleFullscreen() { setFullscreenMode(Container.nextFullscreenMode(fullscreenMode)); }
     public void setScreenOffsetYRelativeToCursor(boolean b) { screenOffsetYRelativeToCursor = b; synchronized (lock) { updateTransform(); } }
     public boolean isScreenOffsetYRelativeToCursor() { return screenOffsetYRelativeToCursor; }
     public void setMagnifierZoom(float zoom) {

@@ -10,6 +10,7 @@ import android.util.Log;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.XrActivity;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
@@ -49,8 +50,9 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private final Drawable rootCursorDrawable;
     private final ArrayList<RenderableWindow> renderableWindows = new ArrayList<>();
     
-    private boolean fullscreen = false;
+    private volatile int fullscreenMode = Container.FULLSCREEN_OFF;
     private boolean toggleFullscreen = false;
+    private boolean isStretch() { return fullscreenMode == Container.FULLSCREEN_STRETCH; }
     public boolean viewportNeedsUpdate = true;
     private boolean cursorVisible = true;
     private boolean screenOffsetYRelativeToCursor = false;
@@ -231,7 +233,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
         surfaceWidth = width;
         surfaceHeight = height;
-        viewTransformation.update(width, height, xServer.screenInfo.width, xServer.screenInfo.height);
+        recomputeViewTransformation();
         viewportNeedsUpdate = true;
         if (nativeMode && scanout != null) {
             scanout.setSurfaceSize(surfaceWidth, surfaceHeight);
@@ -242,8 +244,9 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     @Override
     public void onDrawFrame(GL10 gl) {
         if (toggleFullscreen) {
-            fullscreen = !fullscreen;
+            fullscreenMode = Container.nextFullscreenMode(fullscreenMode);
             toggleFullscreen = false;
+            recomputeViewTransformation();
             viewportNeedsUpdate = true;
             if (nativeMode) updateScanoutDst();
         }
@@ -268,7 +271,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         }
 
         if (viewportNeedsUpdate && magnifierEnabled) {
-            if (fullscreen) {
+            if (isStretch()) {
                 GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight);
             }
             else {
@@ -296,7 +299,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
             XForm.makeTransform(tmpXForm2, -pointerX, -pointerY, magnifierZoom, magnifierZoom, 0);
         } else {
-            if (!fullscreen) {
+            if (!isStretch()) {
                 int pointerY = 0;
                 if (screenOffsetYRelativeToCursor) {
                     short halfScreenHeight = (short)(xServer.screenInfo.height / 2);
@@ -316,7 +319,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
         if (cursorVisible && !nativeMode) renderCursor();
 
-        if (!magnifierEnabled && !fullscreen) {
+        if (!magnifierEnabled && !isStretch()) {
             GLES20.glDisable(GLES20.GL_SCISSOR_TEST);
         }
 
@@ -498,9 +501,23 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     public boolean isCursorVisible() { return cursorVisible; }
     public boolean isScreenOffsetYRelativeToCursor() { return screenOffsetYRelativeToCursor; }
     public void setScreenOffsetYRelativeToCursor(boolean screenOffsetYRelativeToCursor) { this.screenOffsetYRelativeToCursor = screenOffsetYRelativeToCursor; xServerView.requestRender(); }
-    public boolean isFullscreen() { return fullscreen; }
+    public boolean isFullscreen() { return fullscreenMode != Container.FULLSCREEN_OFF; }
+    @Override public int getFullscreenMode() { return fullscreenMode; }
+    @Override public void setFullscreenMode(int mode) {
+        fullscreenMode = mode;
+        viewportNeedsUpdate = true;
+        xServerView.queueEvent(this::recomputeViewTransformation);
+        if (nativeMode) xServerView.queueEvent(this::updateScanoutDst);
+        xServerView.requestRender();
+    }
     public float getMagnifierZoom() { return magnifierZoom; }
     public void setMagnifierZoom(float magnifierZoom) { this.magnifierZoom = magnifierZoom; xServerView.requestRender(); }
+    private void recomputeViewTransformation() {
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return;
+        viewTransformation.update(surfaceWidth, surfaceHeight,
+                xServer.screenInfo.width, xServer.screenInfo.height, fullscreenMode);
+    }
+
     public int getSurfaceWidth() { return surfaceWidth; }
     public int getSurfaceHeight() { return surfaceHeight; }
     public boolean isViewportNeedsUpdate() { return viewportNeedsUpdate; }
@@ -629,7 +646,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
 
     private void updateScanoutDst() {
         if (scanout == null || !nativeMode) return;
-        if (fullscreen) {
+        if (isStretch()) {
             scanout.setDst(0, 0, surfaceWidth, surfaceHeight);
         } else {
             scanout.setDst(viewTransformation.viewOffsetX, viewTransformation.viewOffsetY,

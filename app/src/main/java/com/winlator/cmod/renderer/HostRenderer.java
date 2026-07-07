@@ -15,6 +15,8 @@ public interface HostRenderer {
     float getMagnifierZoom();
     void toggleFullscreen();
     boolean isFullscreen();
+    void setFullscreenMode(int mode);
+    int getFullscreenMode();
     void setScreenOffsetYRelativeToCursor(boolean b);
     boolean isScreenOffsetYRelativeToCursor();
     void setFpsWindowId(int id);
