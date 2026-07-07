@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal"
-    android:background="#000000">
+    android:background="?attr/colorToolbarSurface">
 
     <LinearLayout
         android:layout_width="64dp"
@@ -15,7 +15,7 @@
         android:paddingEnd="10dp"
         android:paddingTop="18dp"
         android:paddingBottom="18dp"
-        android:background="#000000">
+        android:background="?attr/colorToolbarSurface">
 
         <LinearLayout
             android:id="@+id/BTItemGraphics"
@@ -160,7 +160,7 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:background="#000000"
+        android:background="?attr/colorToolbarSurface"
         android:paddingStart="18dp"
         android:paddingEnd="20dp"
         android:paddingTop="18dp"

@@ -64,6 +64,7 @@ import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProtonPackageManager;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineThemeManager;
@@ -138,67 +139,46 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
     }
 
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-        // Context context = textView.getContext();
-
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#0055ff"));
-            textView.setBackgroundResource(R.color.window_background_color_dark);
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#0055ff"));
-            textView.setBackgroundResource(R.color.window_background_color);
-        }
+        ThemeUtils.applyFieldSetLabelStyle(textView);
     }
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
 
         // Update Spinners
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
-        sScreenSize.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sScreenSize.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sWineVersion = view.findViewById(R.id.SWineVersion);
-        sWineVersion.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sWineVersion.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
-        sGraphicsDriver.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sGraphicsDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
-        sDXWrapper.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sDXWrapper.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
-        sAudioDriver.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sAudioDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sEmulator64 = view.findViewById(R.id.SEmulator64);
-        sEmulator64.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sEmulator64.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sEmulator = view.findViewById(R.id.SEmulator);
-        sEmulator.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sEmulator.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
-        sMIDISoundFont.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         // Update Wine Configuration Tab Spinner styles
         // Desktop
         Spinner sDesktopTheme = view.findViewById(R.id.SDesktopTheme);
-        sDesktopTheme.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sDesktopTheme.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sDesktopBackgroundType = view.findViewById(R.id.SDesktopBackgroundType);
-        sDesktopBackgroundType.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sDesktopBackgroundType.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-        sMouseWarpOverride.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sMouseWarpOverride.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         // Win Components
         // Handled in createWinComponentsTab
@@ -206,28 +186,22 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         // Update Advanced Tab Spinner styles
 
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sBox64Version = view.findViewById(R.id.SBox64Version);
-        sBox64Version.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sBox64Version.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
-        sFEXCoreVersion.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sFEXCoreVersion.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sFullscreenMode = view.findViewById(R.id.SFullscreenMode);
-        sFullscreenMode.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sFullscreenMode.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sStartupSelection = view.findViewById(R.id.SStartupSelection);
-        sStartupSelection.setPopupBackgroundResource(
-                isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        sStartupSelection.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
     }
 
     private void applyDynamicStylesRecursively(View view, boolean isDarkMode) {
@@ -261,23 +235,26 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         if (drawable != null) {
             int size = Math.round(16 * textView.getResources().getDisplayMetrics().density);
             drawable.setBounds(0, 0, size, size);
-            drawable.setTint(Color.parseColor("#0055ff"));
+            drawable.setTint(ThemeUtils.getColorAttr(textView.getContext(), R.attr.themeAccentColor));
             textView.setCompoundDrawables(drawable, null, null, null);
             textView.setCompoundDrawablePadding(Math.round(6 * textView.getResources().getDisplayMetrics().density));
         }
-        textView.setTextColor(Color.WHITE);
+        textView.setTextColor(ThemeUtils.getColorAttr(textView.getContext(), R.attr.colorOnSurface));
     }
 
     private void styleContainerTabs(TabLayout tabLayout) {
         int[][] states = new int[][]{new int[]{android.R.attr.state_selected}, new int[]{}};
-        int[] colors = new int[]{Color.parseColor("#0055ff"), Color.parseColor("#9CA8B8")};
+        int[] colors = new int[]{
+                ThemeUtils.getColorAttr(tabLayout.getContext(), R.attr.themeAccentColor),
+                ThemeUtils.getColorAttr(tabLayout.getContext(), R.attr.colorOnSurfaceVariant)
+        };
         android.content.res.ColorStateList stateList = new android.content.res.ColorStateList(states, colors);
         for (int i = 0; i < tabLayout.getTabCount(); i++) {
             TabLayout.Tab tab = tabLayout.getTabAt(i);
             if (tab != null) tab.setIcon(null);
         }
         tabLayout.setTabTextColors(stateList);
-        tabLayout.setSelectedTabIndicatorColor(Color.parseColor("#0055ff"));
+        tabLayout.setSelectedTabIndicatorColor(ThemeUtils.getColorAttr(tabLayout.getContext(), R.attr.themeAccentColor));
     }
 
     @Override
@@ -671,10 +648,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         AppUtils.setSpinnerSelectionFromValue(sMIDISoundFont, isEditMode() ? container.getMIDISoundFont() : "");
 
         Spinner sHudMode = view.findViewById(R.id.SHudMode);
-        ArrayAdapter<String> hudAdapter = new ArrayAdapter<>(context,
-                android.R.layout.simple_spinner_item,
+        ArrayAdapter<String> hudAdapter = ThemeUtils.createSpinnerAdapter(context,
                 new String[]{"Off", "Classic", "Modern"});
-        hudAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         sHudMode.setAdapter(hudAdapter);
         // Carrega modo: tenta extra "hudMode", senão converte showFPS antigo
         int savedHudMode = 0;
@@ -1081,8 +1056,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             List<String> mouseWarpOverrideList = Arrays.asList(context.getString(R.string.disable),
                     context.getString(R.string.enable), context.getString(R.string.force));
             Spinner sMouseWarpOverride = view.findViewById(R.id.SMouseWarpOverride);
-            sMouseWarpOverride.setAdapter(
-                    new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, mouseWarpOverrideList));
+            sMouseWarpOverride.setAdapter(ThemeUtils.createSpinnerAdapter(context, mouseWarpOverrideList));
             AppUtils.setSpinnerSelectionFromValue(sMouseWarpOverride,
                     registryEditor.getStringValue("Software\\Wine\\DirectInput", "MouseWarpOverride", "disable"));
         }
@@ -1102,7 +1076,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         } catch (JSONException e) {
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(requireContext(), values));
         spinner.setSelection(selectedPosition);
     }
 
@@ -1310,8 +1284,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
             // Set the background color of the spinners dynamically based on the current
             // theme
-            spinner.setPopupBackgroundResource(
-                    isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
             parent.addView(itemView);
 
@@ -1337,8 +1310,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
             // Set the background color of the spinners dynamically based on the current
             // theme
-            spinner.setPopupBackgroundResource(
-                    isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
             parent.addView(itemView);
         }
@@ -1352,7 +1324,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 context, R.array.wincomponent_entries, R.layout.spinner_item_amoled);
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);
         spinner.setAdapter(adapter);
-        spinner.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+        spinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
     }
 
     private EnvVarsView createEnvVarsTab(final View view) {
@@ -1397,13 +1369,11 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         Callback<String[]> addItem = (drive) -> {
             final View itemView = inflater.inflate(R.layout.drive_list_item, parent, false);
             Spinner spinner = itemView.findViewById(R.id.Spinner);
-            spinner.setAdapter(
-                    new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, driveLetters));
+            spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, driveLetters));
             AppUtils.setSpinnerSelectionFromValue(spinner, drive[0] + ":");
 
             // Apply dark theme to the spinner popup background
-            spinner.setPopupBackgroundResource(
-                    isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+            spinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
             final EditText editText = itemView.findViewById(R.id.EditText);
             editText.setText(drive[1]);
@@ -1452,15 +1422,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
     // Helper method to apply dark theme to EditText
     private static void applyDarkThemeToEditText(EditText editText) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
+        ThemeUtils.applyEditTextTheme(editText);
     }
 
     // Helper method to apply dark theme to buttons or other clickable views
@@ -1517,7 +1479,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         ArrayAdapter<String> wineVersionAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, wineVersions);
         wineVersionAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
         sWineVersion.setAdapter(wineVersionAdapter);
-        sWineVersion.setPopupBackgroundResource(R.drawable.dialog_background_dark_blue);
+        sWineVersion.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         if (isEditMode())
             AppUtils.setSpinnerSelectionFromValue(sWineVersion, container.getWineVersion());
     }
@@ -1536,7 +1498,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
     private ContentDialog createProtonDialog(int titleResId) {
         ContentDialog dialog = new ContentDialog(context, R.layout.proton_options_dialog);
-        dialog.getContentView().setBackgroundResource(R.drawable.dialog_background_dark_blue);
+        dialog.getContentView().setBackgroundResource(ThemeUtils.getDialogBackgroundRes());
         dialog.setTitle(titleResId);
         dialog.findViewById(R.id.BTConfirm).setVisibility(View.GONE);
         View frameLayout = dialog.findViewById(R.id.FrameLayout);
@@ -1561,7 +1523,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
     }
 
     private void addProtonDialogRow(ContentDialog dialog, LinearLayout content, int iconResId, String title, String subtitle, Runnable action) {
-        int accentColor = Color.parseColor("#0055ff");
+        int accentColor = ThemeUtils.getColorAttr(context, R.attr.themeAccentColor);
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
@@ -1581,14 +1543,14 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         row.addView(textPanel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         TextView titleView = new TextView(context);
         titleView.setText(title);
-        titleView.setTextColor(Color.WHITE);
+        titleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.colorOnSurface));
         titleView.setTextSize(15);
         titleView.setSingleLine(true);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         textPanel.addView(titleView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         TextView subtitleView = new TextView(context);
         subtitleView.setText(subtitle);
-        subtitleView.setTextColor(Color.parseColor("#b0b0b0"));
+        subtitleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.colorOnSurfaceVariant));
         subtitleView.setTextSize(12);
         subtitleView.setSingleLine(true);
         subtitleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1608,7 +1570,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         list.removeAllViews();
         TextView titleView = new TextView(context);
         titleView.setText(R.string.available_protons);
-        titleView.setTextColor(Color.parseColor("#0055FF"));
+        titleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.themeAccentColor));
         titleView.setTextSize(13);
         titleView.setTypeface(null, android.graphics.Typeface.BOLD);
         titleView.setPadding(dp(2), 0, 0, dp(4));
@@ -1683,7 +1645,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         ImageView icon = new ImageView(context);
         icon.setImageResource(iconResId);
-        icon.setColorFilter(Color.parseColor("#0055FF"), PorterDuff.Mode.SRC_IN);
+        icon.setColorFilter(ThemeUtils.getColorAttr(context, R.attr.themeAccentColor), PorterDuff.Mode.SRC_IN);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
         iconParams.setMargins(0, 0, dp(10), 0);
         row.addView(icon, iconParams);
@@ -1694,7 +1656,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         TextView packageTitleView = new TextView(context);
         packageTitleView.setText(title);
-        packageTitleView.setTextColor(Color.WHITE);
+        packageTitleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.colorOnSurface));
         packageTitleView.setTextSize(14);
         packageTitleView.setSingleLine(true);
         packageTitleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1702,7 +1664,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         TextView subtitleView = new TextView(context);
         subtitleView.setText(subtitle);
-        subtitleView.setTextColor(Color.parseColor("#9CA8B8"));
+        subtitleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.colorOnSurfaceVariant));
         subtitleView.setTextSize(12);
         subtitleView.setSingleLine(true);
         subtitleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1710,7 +1672,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         TextView actionView = new TextView(context);
         actionView.setText(actionTextResId);
-        actionView.setTextColor(Color.parseColor("#0055FF"));
+        actionView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.themeAccentColor));
         actionView.setTextSize(13);
         actionView.setTypeface(null, android.graphics.Typeface.BOLD);
         actionView.setPadding(dp(10), dp(6), dp(2), dp(6));
@@ -1719,7 +1681,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         if (deleteAction != null) {
             ImageView deleteView = new ImageView(context);
             deleteView.setImageResource(R.drawable.icon_popup_menu_remove);
-            deleteView.setColorFilter(Color.parseColor("#0055FF"), PorterDuff.Mode.SRC_IN);
+            deleteView.setColorFilter(ThemeUtils.getColorAttr(context, R.attr.themeAccentColor), PorterDuff.Mode.SRC_IN);
             deleteView.setPadding(dp(6), dp(6), dp(6), dp(6));
             LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(dp(32), dp(32));
             deleteParams.setMargins(dp(6), 0, 0, 0);
@@ -1824,8 +1786,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             array.add(value.name());
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(spinner.getContext(),
-                android.R.layout.simple_spinner_dropdown_item, array);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                R.layout.spinner_item_amoled, array);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
         spinner.setAdapter(adapter);
 
         byte keycode = isEditMode() ? container.getControllerMapping(mapping) : (byte) defaultValue;
@@ -1851,7 +1813,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             itemList.add("Wrapper-legacy");
         }
         // Set the adapter with the combined list
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, itemList));
     }
 
     public static void loadFullscreenModeSpinner(Context context, Spinner spinner, int selectedMode,
@@ -1902,7 +1864,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             }
         }
         List<String> itemList = new ArrayList<>(versions);
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, itemList));
         if (container != null)
             AppUtils.setSpinnerSelectionFromValue(spinner, container.getBox64Version());
         else
@@ -1944,13 +1906,13 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         row.setPadding(dp(12), 0, dp(12), 0);
         ImageView icon = new ImageView(context);
         icon.setImageResource(iconResId);
-        icon.setColorFilter(Color.parseColor("#0055ff"), PorterDuff.Mode.SRC_IN);
+        icon.setColorFilter(ThemeUtils.getColorAttr(context, R.attr.themeAccentColor), PorterDuff.Mode.SRC_IN);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(26), dp(26));
         iconParams.setMargins(0, 0, dp(12), 0);
         row.addView(icon, iconParams);
         TextView titleView = new TextView(context);
         titleView.setText(text);
-        titleView.setTextColor(Color.WHITE);
+        titleView.setTextColor(ThemeUtils.getColorAttr(context, R.attr.colorOnSurface));
         titleView.setTextSize(16);
         titleView.setSingleLine(true);
         row.addView(titleView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));

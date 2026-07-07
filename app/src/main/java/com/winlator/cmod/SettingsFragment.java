@@ -30,6 +30,7 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.ArrayAdapter;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -52,6 +53,7 @@ import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
 import com.winlator.cmod.fexcore.FEXCorePreset;
 import com.winlator.cmod.fexcore.FEXCorePresetManager;
@@ -93,6 +95,7 @@ public class SettingsFragment extends Fragment {
     private EditText etCustomApiKey;
 
     private CheckBox cbDarkMode;
+    private Spinner sColorTheme;
     boolean isDarkMode;
 
     private static final int REQUEST_CODE_WINLATOR_PATH = 1002;
@@ -127,24 +130,30 @@ public class SettingsFragment extends Fragment {
         preferences = PreferenceManager.getDefaultSharedPreferences(context);
 
         // Check for Dark Mode preference
-        isDarkMode = preferences.getBoolean("dark_mode", true);
+        isDarkMode = ThemeUtils.isDarkMode(context);
         // Apply dynamic styles
         applyDynamicStyles(view, isDarkMode);
 
         // Initialize the Dark Mode checkbox
         cbDarkMode = view.findViewById(R.id.CBDarkMode);
-        cbDarkMode.setChecked(preferences.getBoolean("dark_mode", true));
-        cbDarkMode.setVisibility(View.GONE);
+        cbDarkMode.setChecked(isDarkMode);
+        cbDarkMode.setVisibility(View.VISIBLE);
+        cbDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> isDarkMode = isChecked);
 
-        cbDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            // Save dark mode preference
-            SharedPreferences.Editor editor = preferences.edit();
-            editor.putBoolean("dark_mode", isChecked);
-            editor.apply();
-
-            // Update the UI or activity theme if necessary
-            updateTheme(isChecked);
-        });
+        sColorTheme = view.findViewById(R.id.SColorTheme);
+        String[] colorThemeEntries = getResources().getStringArray(R.array.app_color_theme_entries);
+        String[] colorThemeValues = getResources().getStringArray(R.array.app_color_theme_values);
+        ArrayAdapter<String> colorThemeAdapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, colorThemeEntries);
+        colorThemeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled);
+        sColorTheme.setAdapter(colorThemeAdapter);
+        sColorTheme.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        String savedColorTheme = ThemeUtils.getColorTheme(context);
+        for (int i = 0; i < colorThemeValues.length; i++) {
+            if (savedColorTheme.equals(colorThemeValues[i])) {
+                sColorTheme.setSelection(i, false);
+                break;
+            }
+        }
 
         // Initialize Big Picture Mode Checkbox
         cbEnableBigPictureMode = view.findViewById(R.id.CBEnableBigPictureMode);
@@ -206,7 +215,7 @@ public class SettingsFragment extends Fragment {
 
         final Spinner sMIDISoundFont = view.findViewById(R.id.SMIDISoundFont);
 
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sMIDISoundFont.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         final View btInstallSF = view.findViewById(R.id.BTInstallSF);
         final View btRemoveSF = view.findViewById(R.id.BTRemoveSF);
@@ -321,9 +330,13 @@ public class SettingsFragment extends Fragment {
 
         view.findViewById(R.id.BTConfirm).setOnClickListener((v) -> {
             SharedPreferences.Editor editor = preferences.edit();
+            boolean themeChanged = preferences.getBoolean(ThemeUtils.PREF_DARK_MODE, true) != cbDarkMode.isChecked();
+            String newColorTheme = colorThemeValues[Math.max(0, sColorTheme.getSelectedItemPosition())];
+            themeChanged = themeChanged || !newColorTheme.equals(ThemeUtils.getColorTheme(context));
 
             // Save Dark Mode setting
-            editor.putBoolean("dark_mode", cbDarkMode.isChecked());
+            editor.putBoolean(ThemeUtils.PREF_DARK_MODE, cbDarkMode.isChecked());
+            editor.putString(ThemeUtils.PREF_COLOR_THEME, newColorTheme);
             editor.putString("box64_preset", Box64PresetManager.getSpinnerSelectedId(sBox64Preset));
             editor.putString("fexcore_preset", FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset));
             editor.putBoolean("use_dri3", cbUseDRI3.isChecked());
@@ -354,6 +367,10 @@ public class SettingsFragment extends Fragment {
             saveCustomApiKeySettings(editor);
 
             if (editor.commit()) {
+                if (themeChanged) {
+                    requireActivity().recreate();
+                    return;
+                }
                 NavigationView navigationView = getActivity().findViewById(R.id.NavigationView);
                 navigationView.setCheckedItem(R.id.main_menu_containers);
                 FragmentManager fragmentManager = getParentFragmentManager();
@@ -367,25 +384,13 @@ public class SettingsFragment extends Fragment {
         return view;
     }
 
-    private void updateTheme(boolean isDarkMode) {
-        if (isDarkMode) {
-            getActivity().setTheme(R.style.AppTheme_Dark);
-        } else {
-            getActivity().setTheme(R.style.AppTheme);
-        }
-
-        // Recreate the activity to apply the new theme
-        getActivity().recreate();
-    }
-
-
     private void applyDynamicStyles(View view, boolean isDarkMode) {
 
         Spinner sBox64Preset = view.findViewById(R.id.SBox64Preset);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sBox64Preset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sFEXCorePreset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
     }
 
     private void applyDynamicStylesRecursively(View view) {
@@ -400,10 +405,6 @@ public class SettingsFragment extends Fragment {
 
         TextView themeLabel = view.findViewById(R.id.TVTheme);
         applyFieldSetLabelStyle(themeLabel, isDarkMode);
-        themeLabel.setVisibility(View.GONE);
-        if (themeLabel.getParent() instanceof View) {
-            ((View) themeLabel.getParent()).setVisibility(View.GONE);
-        }
 
         TextView shortcutSettingsLabel = view.findViewById(R.id.TVShortcutSettings);
         applyFieldSetLabelStyle(shortcutSettingsLabel, isDarkMode);
@@ -461,17 +462,7 @@ public class SettingsFragment extends Fragment {
     }
 
     private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-//        Context context = textView.getContext();
-
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundResource(R.color.window_background_color_dark); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
-        }
+        ThemeUtils.applyFieldSetLabelStyle(textView);
     }
 
     private void initCustomApiKeySettings(View view) {

@@ -16,17 +16,17 @@
             android:layout_width="match_parent"
             android:layout_height="?actionBarSize"
             android:id="@+id/Toolbar"
-            android:background="#000000"
+            android:background="?attr/colorToolbarSurface"
             app:layout_scrollFlags="enterAlways|scroll"
             app:title="@string/app_name"
-            app:titleTextColor="#ffffff"
+            app:titleTextColor="?attr/colorOnSurface"
             app:titleTextAppearance="@style/TextAppearance.AppCompat.Medium" />
 
         <FrameLayout
             android:id="@+id/FLFragmentContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#000000"
+            android:background="?attr/colorWindowBackground"
             app:layout_behavior="@string/appbar_scrolling_view_behavior"/>
     </LinearLayout>
 
@@ -35,7 +35,7 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:orientation="vertical"
-        android:background="#000000">
+        android:background="?attr/colorDrawerBackground">
 
         <com.google.android.material.navigation.NavigationView
             android:layout_width="match_parent"
@@ -43,9 +43,9 @@
             android:layout_weight="1"
             android:id="@+id/NavigationView"
             android:fitsSystemWindows="false"
-            android:background="#000000"
-            app:itemIconTint="@color/colorAccent"
-            app:itemTextColor="@color/white"
+            android:background="?attr/colorDrawerBackground"
+            app:itemIconTint="?attr/colorAccent"
+            app:itemTextColor="?attr/colorOnSurface"
             app:itemBackground="@drawable/ui_nav_item_bg"
             app:itemHorizontalPadding="20dp"
             app:itemIconPadding="18dp"

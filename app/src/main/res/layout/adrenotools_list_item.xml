@@ -20,7 +20,7 @@
         android:gravity="start|top"
         android:maxLines="1"
         android:paddingLeft="14dp"
-        android:textColor="@android:color/white"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="15sp"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -34,7 +34,7 @@
         android:gravity="start|bottom"
         android:maxLines="1"
         android:paddingLeft="14dp"
-        android:textColor="#9e9e9e"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="12sp"
         app:layout_constraintTop_toBottomOf="@+id/TVName" />
 

@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:background="#000000"
+    android:background="@drawable/dialog_background_dark_blue"
     android:padding="12dp">
 
     <View

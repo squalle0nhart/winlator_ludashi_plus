@@ -32,6 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.inputcontrols.Binding;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
@@ -73,7 +74,8 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
 
         ActionBar actionBar = getSupportActionBar();
         actionBar.setDisplayHomeAsUpEnabled(true);
-        actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+        actionBar.setHomeAsUpIndicator(ThemeUtils.getTintedDrawable(this, R.drawable.icon_action_bar_back, R.attr.colorOnSurface));
+        ThemeUtils.applyWindowChrome(this);
 
         emptyTextView = findViewById(R.id.TVEmptyText);
         recyclerView = findViewById(R.id.RecyclerView);
@@ -380,7 +382,7 @@ public class ExternalControllerBindingsActivity extends AppCompatActivity {
         final ControllerBindingsAdapter.ViewHolder holder = (ControllerBindingsAdapter.ViewHolder) recyclerView
                 .findViewHolderForAdapterPosition(position);
         if (holder != null) {
-            final int color = ContextCompat.getColor(this, R.color.colorAccent);
+            final int color = ThemeUtils.getColorAttr(this, R.attr.themeAccentColor);
             final ValueAnimator animator = ValueAnimator.ofFloat(0.4f, 0.0f);
             animator.setDuration(200);
             animator.setInterpolator(new AccelerateDecelerateInterpolator());

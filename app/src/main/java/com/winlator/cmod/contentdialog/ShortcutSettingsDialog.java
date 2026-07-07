@@ -47,6 +47,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.fexcore.FEXCoreManager;
 import com.winlator.cmod.fexcore.FEXCorePreset;
@@ -422,7 +423,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         String selectedDriver = sGraphicsDriver.getSelectedItem().toString();
         List<String> sGraphicsItemsList = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.graphics_driver_entries)));
-        sGraphicsDriver.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, sGraphicsItemsList));
+        sGraphicsDriver.setAdapter(ThemeUtils.createSpinnerAdapter(context, sGraphicsItemsList));
         AppUtils.setSpinnerSelectionFromValue(sGraphicsDriver, selectedDriver);
 
         final Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
@@ -619,7 +620,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         applyDarkThemeToEditText(view.findViewById(R.id.ETScreenHeight), isDarkMode);
 
         ArrayList<String> items = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.screen_size_entries)));
-        sScreenSize.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items));
+        sScreenSize.setAdapter(ThemeUtils.createSpinnerAdapter(context, items));
 
         sScreenSize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -644,6 +645,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
     private void applyDynamicStyles(View view, boolean isDarkMode) {
         applyDarkThemeToFormFields(view, isDarkMode);
+        Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
@@ -656,18 +658,19 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         Spinner sFEXCorePreset = view.findViewById(R.id.SFEXCorePreset);
         Spinner sFullscreenModeOverride = view.findViewById(R.id.SFullscreenModeOverride);
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
-        sGraphicsDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sDXWrapper.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sAudioDriver.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sEmulatorSpinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sBox64Preset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sControlsProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sMIDISoundFont.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sBox64Version.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sFEXCorePreset.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sFEXCoreVersion.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sFullscreenModeOverride.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
-        sStartupSelection.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        sScreenSize.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sGraphicsDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sDXWrapper.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sAudioDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sEmulatorSpinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sBox64Preset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sControlsProfile.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sMIDISoundFont.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sBox64Version.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sFEXCorePreset.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sFEXCoreVersion.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sFullscreenModeOverride.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sStartupSelection.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         applyDarkThemeToFormFields(view, isDarkMode);
 
     }
@@ -691,25 +694,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
     }
 
     private void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
-        if (isDarkMode) {
-            textView.setTextColor(Color.WHITE);
-            textView.setBackgroundColor(Color.BLACK);
-        } else {
-            textView.setTextColor(Color.parseColor("#0055ff"));
-            textView.setBackgroundResource(R.color.window_background_color);
-        }
+        ThemeUtils.applyFieldSetLabelStyle(textView);
     }
 
     private static void applyDarkThemeToEditText(EditText editText, boolean isDarkMode) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE);
-            editText.setHintTextColor(Color.GRAY);
-            editText.setBackgroundResource(R.drawable.edit_text_dark);
-        } else {
-            editText.setTextColor(Color.BLACK);
-            editText.setHintTextColor(Color.GRAY);
-            editText.setBackgroundResource(R.drawable.edit_text);
-        }
+        ThemeUtils.applyEditTextTheme(editText);
     }
 
     private void updateExtra(String extraName, String containerValue, String newValue) {
@@ -784,7 +773,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             values.add(profile.getName());
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, values));
         spinner.setSelection(selectedPosition, false);
     }
 
@@ -812,7 +801,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 itemList.add(entryName.substring(firstDashIndex + 1));
             }
         }
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, itemList));
     }
 
 
@@ -850,13 +839,13 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         row.setPadding(dp(12), 0, dp(12), 0);
         ImageView icon = new ImageView(getContext());
         icon.setImageResource(iconResId);
-        icon.setColorFilter(Color.parseColor("#0055ff"));
+        icon.setColorFilter(ThemeUtils.getColorAttr(getContext(), R.attr.themeAccentColor));
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(26), dp(26));
         iconParams.setMargins(0, 0, dp(12), 0);
         row.addView(icon, iconParams);
         TextView titleView = new TextView(getContext());
         titleView.setText(text);
-        titleView.setTextColor(Color.WHITE);
+        titleView.setTextColor(ThemeUtils.getColorAttr(getContext(), R.attr.colorOnSurface));
         titleView.setTextSize(16);
         titleView.setSingleLine(true);
         row.addView(titleView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
@@ -1065,7 +1054,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             for (String value : dxwrapperEntries) {
                     items.add(value);
             }
-            sDXWrapper.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, items.toArray(new String[0])));
+            sDXWrapper.setAdapter(ThemeUtils.createSpinnerAdapter(context, items));
             AppUtils.setSpinnerSelectionFromIdentifier(sDXWrapper, selectedDXWrapper);
         };
 

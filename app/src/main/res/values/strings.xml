@@ -292,6 +292,8 @@
     <string name="directinput_mapper_type">DirectInput Mapper Type</string>
     <string name="desktop">Desktop</string>
     <string name="theme">Theme</string>
+    <string name="use_dark_mode">Use dark mode</string>
+    <string name="accent_palette">Accent palette</string>
     <string name="background">Background</string>
     <string name="max_device_memory">Max Device Memory</string>
     <string name="frame_rate">Frame Rate</string>

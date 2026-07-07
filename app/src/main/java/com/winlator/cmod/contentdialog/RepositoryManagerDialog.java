@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.ThemeUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -48,7 +49,6 @@ public class RepositoryManagerDialog {
         builder.setTitle("Driver Sources"); // English
 
         recyclerView = new RecyclerView(context);
-        recyclerView.setBackgroundColor(Color.BLACK);
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
         recyclerView.setPadding(0, 10, 0, 10);
 
@@ -62,7 +62,9 @@ public class RepositoryManagerDialog {
 
         dialog = builder.create();
         dialog.show();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(ThemeUtils.getColorAttr(context, R.attr.colorWindowBackground)));
+        }
     }
 
     
@@ -73,14 +75,17 @@ public class RepositoryManagerDialog {
         final EditText inputName = new EditText(context);
         inputName.setHint("Name (e.g. Turnip Drivers)");
         if (repoToEdit != null) inputName.setText(repoToEdit.name);
+        ThemeUtils.applyEditTextTheme(inputName);
         
         final EditText inputUrl = new EditText(context);
         inputUrl.setHint("GitHub API URL");
         if (repoToEdit != null) inputUrl.setText(repoToEdit.apiUrl);
+        ThemeUtils.applyEditTextTheme(inputUrl);
 
         android.widget.LinearLayout layout = new android.widget.LinearLayout(context);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         layout.setPadding(50, 30, 50, 30); 
+        layout.setBackgroundColor(ThemeUtils.getColorAttr(context, R.attr.colorWindowBackground));
         layout.addView(inputName);
         layout.addView(inputUrl);
         builder.setView(layout);

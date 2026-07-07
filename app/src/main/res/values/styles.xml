@@ -1,16 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Light Theme -->
-    <style name="AppTheme" parent="@style/Theme.AppCompat.NoActionBar">
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="android:windowBackground">@color/window_background_color</item>
-        <item name="android:colorBackground">@color/window_background_color</item>
+    <style name="AppTheme.Base" parent="@style/Theme.AppCompat.NoActionBar">
+        <item name="colorWindowBackground">@color/theme_light_window</item>
+        <item name="colorSurface">@color/theme_light_surface</item>
+        <item name="colorSurfaceElevated">@color/theme_light_surface_elevated</item>
+        <item name="colorSurfacePressed">@color/theme_light_surface_pressed</item>
+        <item name="colorOutline">@color/theme_light_outline</item>
+        <item name="colorOnSurface">@color/theme_light_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/theme_light_on_surface_variant</item>
+        <item name="colorToolbarSurface">@color/theme_light_toolbar_surface</item>
+        <item name="colorDrawerBackground">@color/theme_light_drawer</item>
+        <item name="colorDrawerItemSelected">@color/theme_light_drawer_item_selected</item>
+        <item name="colorDrawerItemPressed">@color/theme_light_drawer_item_pressed</item>
+        <item name="colorProgressTrack">@color/theme_light_progress_track</item>
+        <item name="android:windowBackground">@color/theme_light_window</item>
+        <item name="android:colorBackground">@color/theme_light_window</item>
         <item name="android:windowDisablePreview">true</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:statusBarColor">@color/theme_light_toolbar_surface</item>
+        <item name="android:navigationBarColor">@color/theme_light_toolbar_surface</item>
         <item name="android:textViewStyle">@style/TextView</item>
+        <item name="android:textColorPrimary">@color/theme_light_on_surface</item>
+        <item name="android:textColorSecondary">@color/theme_light_on_surface_variant</item>
+        <item name="colorControlNormal">@color/theme_light_on_surface</item>
         <item name="android:checkboxStyle">@style/CheckBox</item>
         <item name="android:listPopupWindowStyle">@style/ListPopupWindow</item>
         <item name="listPopupWindowStyle">@style/ListPopupWindow</item>
@@ -20,36 +31,160 @@
         <item name="popupMenuStyle">@style/PopupMenu</item>
     </style>
 
-    <!-- Dark Theme -->
-    <style name="AppTheme.Dark" parent="@style/Theme.AppCompat.NoActionBar">
-        <item name="colorAccent">@color/colorAccentDark</item>
-        <item name="colorPrimary">@color/colorPrimaryDarkMode</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDarkModeDark</item>
-        <item name="android:windowBackground">@color/window_background_color_dark</item>
-        <item name="android:colorBackground">@color/window_background_color_dark</item>
+    <style name="AppTheme.Base.Dark" parent="@style/Theme.AppCompat.NoActionBar">
+        <item name="colorWindowBackground">@color/theme_dark_window</item>
+        <item name="colorSurface">@color/theme_dark_surface</item>
+        <item name="colorSurfaceElevated">@color/theme_dark_surface_elevated</item>
+        <item name="colorSurfacePressed">@color/theme_dark_surface_pressed</item>
+        <item name="colorOutline">@color/theme_dark_outline</item>
+        <item name="colorOnSurface">@color/theme_dark_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/theme_dark_on_surface_variant</item>
+        <item name="colorToolbarSurface">@color/theme_dark_toolbar_surface</item>
+        <item name="colorDrawerBackground">@color/theme_dark_drawer</item>
+        <item name="colorDrawerItemSelected">@color/theme_dark_drawer_item_selected</item>
+        <item name="colorDrawerItemPressed">@color/theme_dark_drawer_item_pressed</item>
+        <item name="colorProgressTrack">@color/theme_dark_progress_track</item>
+        <item name="android:windowBackground">@color/theme_dark_window</item>
+        <item name="android:colorBackground">@color/theme_dark_window</item>
         <item name="android:windowDisablePreview">true</item>
-        <item name="android:statusBarColor">#000000</item>
-        <item name="android:navigationBarColor">#000000</item>
-        <item name="android:textViewStyle">@style/TextView.Dark</item>
-        <item name="android:checkboxStyle">@style/CheckBox.Dark</item>
-        <item name="android:listPopupWindowStyle">@style/ListPopupWindow.Dark</item>
-        <item name="listPopupWindowStyle">@style/ListPopupWindow.Dark</item>
-        <item name="android:popupWindowStyle">@style/PopupWindow.Dark</item>
-        <item name="popupWindowStyle">@style/PopupWindow.Dark</item>
-        <item name="android:popupMenuStyle">@style/PopupMenu.Dark</item>
-        <item name="popupMenuStyle">@style/PopupMenu.Dark</item>
+        <item name="android:statusBarColor">@color/theme_dark_toolbar_surface</item>
+        <item name="android:navigationBarColor">@color/theme_dark_toolbar_surface</item>
+        <item name="android:textViewStyle">@style/TextView</item>
+        <item name="android:textColorPrimary">@color/theme_dark_on_surface</item>
+        <item name="android:textColorSecondary">@color/theme_dark_on_surface_variant</item>
+        <item name="colorControlNormal">@color/theme_dark_on_surface</item>
+        <item name="android:checkboxStyle">@style/CheckBox</item>
+        <item name="android:listPopupWindowStyle">@style/ListPopupWindow</item>
+        <item name="listPopupWindowStyle">@style/ListPopupWindow</item>
+        <item name="android:popupWindowStyle">@style/PopupWindow</item>
+        <item name="popupWindowStyle">@style/PopupWindow</item>
+        <item name="android:popupMenuStyle">@style/PopupMenu</item>
+        <item name="popupMenuStyle">@style/PopupMenu</item>
     </style>
 
-    <!-- Light Theme Fullscreen -->
-    <style name="AppThemeFullscreen" parent="@style/AppTheme">
+    <style name="AppTheme.Blue" parent="@style/AppTheme.Base">
+        <item name="colorAccent">@color/theme_blue_500</item>
+        <item name="colorPrimary">@color/theme_blue_500</item>
+        <item name="colorPrimaryDark">@color/theme_blue_700</item>
+        <item name="themeAccentColor">@color/theme_blue_500</item>
+    </style>
+
+    <style name="AppTheme.Blue.Dark" parent="@style/AppTheme.Base.Dark">
+        <item name="colorAccent">@color/theme_blue_500</item>
+        <item name="colorPrimary">@color/theme_blue_500</item>
+        <item name="colorPrimaryDark">@color/theme_blue_700</item>
+        <item name="themeAccentColor">@color/theme_blue_500</item>
+    </style>
+
+    <style name="AppTheme.Emerald" parent="@style/AppTheme.Base">
+        <item name="colorAccent">@color/theme_emerald_500</item>
+        <item name="colorPrimary">@color/theme_emerald_500</item>
+        <item name="colorPrimaryDark">@color/theme_emerald_700</item>
+        <item name="themeAccentColor">@color/theme_emerald_500</item>
+    </style>
+
+    <style name="AppTheme.Emerald.Dark" parent="@style/AppTheme.Base.Dark">
+        <item name="colorAccent">@color/theme_emerald_500</item>
+        <item name="colorPrimary">@color/theme_emerald_500</item>
+        <item name="colorPrimaryDark">@color/theme_emerald_700</item>
+        <item name="themeAccentColor">@color/theme_emerald_500</item>
+    </style>
+
+    <style name="AppTheme.Sunset" parent="@style/AppTheme.Base">
+        <item name="colorAccent">@color/theme_sunset_500</item>
+        <item name="colorPrimary">@color/theme_sunset_500</item>
+        <item name="colorPrimaryDark">@color/theme_sunset_700</item>
+        <item name="themeAccentColor">@color/theme_sunset_500</item>
+    </style>
+
+    <style name="AppTheme.Sunset.Dark" parent="@style/AppTheme.Base.Dark">
+        <item name="colorAccent">@color/theme_sunset_500</item>
+        <item name="colorPrimary">@color/theme_sunset_500</item>
+        <item name="colorPrimaryDark">@color/theme_sunset_700</item>
+        <item name="themeAccentColor">@color/theme_sunset_500</item>
+    </style>
+
+    <style name="AppTheme.Rose" parent="@style/AppTheme.Base">
+        <item name="colorAccent">@color/theme_rose_500</item>
+        <item name="colorPrimary">@color/theme_rose_500</item>
+        <item name="colorPrimaryDark">@color/theme_rose_700</item>
+        <item name="themeAccentColor">@color/theme_rose_500</item>
+    </style>
+
+    <style name="AppTheme.Rose.Dark" parent="@style/AppTheme.Base.Dark">
+        <item name="colorAccent">@color/theme_rose_500</item>
+        <item name="colorPrimary">@color/theme_rose_500</item>
+        <item name="colorPrimaryDark">@color/theme_rose_700</item>
+        <item name="themeAccentColor">@color/theme_rose_500</item>
+    </style>
+
+    <style name="AppTheme" parent="@style/AppTheme.Blue" />
+    <style name="AppTheme.Dark" parent="@style/AppTheme.Blue.Dark" />
+
+    <style name="AppThemeFullscreen.Blue" parent="@style/AppTheme.Blue">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
-    <!-- Dark Theme Fullscreen -->
-    <style name="AppThemeFullscreen.Dark" parent="@style/AppTheme.Dark">
+    <style name="AppThemeFullscreen.Blue.Dark" parent="@style/AppTheme.Blue.Dark">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Emerald" parent="@style/AppTheme.Emerald">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Emerald.Dark" parent="@style/AppTheme.Emerald.Dark">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Sunset" parent="@style/AppTheme.Sunset">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Sunset.Dark" parent="@style/AppTheme.Sunset.Dark">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Rose" parent="@style/AppTheme.Rose">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Rose.Dark" parent="@style/AppTheme.Rose.Dark">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen" parent="@style/AppThemeFullscreen.Blue">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+
+    <style name="AppThemeFullscreen.Dark" parent="@style/AppThemeFullscreen.Blue.Dark">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowTranslucentStatus">true</item>
@@ -71,14 +206,15 @@
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
         <item name="android:spinnerMode">dropdown</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:background">@drawable/combo_box</item>
         <item name="android:popupBackground">@drawable/dialog_background_dark_blue</item>
     </style>
 
     <!-- Dark ComboBox Styles -->
     <style name="ComboBox.Dark" parent="ComboBox">
-        <item name="android:textColor">#ffffff</item>
-        <item name="android:background">@drawable/combo_box_dark</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:background">@drawable/combo_box</item>
         <item name="android:popupBackground">@drawable/dialog_background_dark_blue</item>
     </style>
 
@@ -90,8 +226,8 @@
     </style>
 
     <style name="ComboBoxCompact.Dark" parent="ComboBoxCompact">
-        <item name="android:textColor">#ffffff</item>
-        <item name="android:background">@drawable/combo_box_no_arrow_dark</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:background">@drawable/combo_box</item>
         <item name="android:popupBackground">@drawable/dialog_background_dark_blue</item>
     </style>
 
@@ -150,27 +286,30 @@
         <item name="android:paddingBottom">0dp</item>
         <item name="android:maxLines">1</item>
         <item name="android:inputType">text</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
         <item name="android:background">@drawable/edit_text</item>
     </style>
 
     <style name="EditText.Dark" parent="EditText">
-        <item name="android:textColor">#ffffff</item>
-        <item name="android:background">@drawable/edit_text_dark</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+        <item name="android:background">@drawable/edit_text</item>
     </style>
 
     <!-- TextView Styles -->
     <style name="TextView" parent="@android:style/Widget.TextView">
         <item name="android:textSize">16sp</item>
-        <item name="android:textColor">#ffffff</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
     <style name="TextView.Dark" parent="TextView">
-        <item name="android:textColor">#ffffff</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
     <style name="ContainerDetailLabel" parent="TextView">
         <item name="android:textSize">13sp</item>
-        <item name="android:textColor">#EAF1FF</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
 
     <style name="ContainerDetailSectionTitle" parent="TextView">
@@ -181,16 +320,16 @@
 
     <!-- CheckBox Styles -->
     <style name="CheckBox" parent="@android:style/Widget.CompoundButton.CheckBox">
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:textColorSecondary">@color/colorPrimary</item>
-        <item name="android:textColor">#ffffff</item>
+        <item name="colorAccent">?attr/colorAccent</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textSize">16sp</item>
     </style>
 
     <style name="CheckBox.Dark" parent="CheckBox">
-        <item name="colorAccent">@color/colorAccentDark</item>
-        <item name="android:textColorSecondary">@color/colorPrimaryDark</item>
-        <item name="android:textColor">#ffffff</item>
+        <item name="colorAccent">?attr/colorAccent</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textSize">16sp</item>
     </style>
 
@@ -209,7 +348,7 @@
     </style>
 
     <style name="BaseButton.Dark" parent="BaseButton">
-        <item name="android:textColor">#ffffff</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
     <style name="ButtonNeutral" parent="BaseButton">
@@ -228,7 +367,7 @@
     </style>
 
     <style name="ButtonPositive.Dark" parent="BaseButton.Dark">
-        <item name="android:background">@drawable/proton_icon_button_background</item>
+        <item name="android:background">@drawable/button_positive</item>
         <item name="android:textColor">#ffffff</item>
     </style>
 
@@ -247,23 +386,23 @@
     <style name="ToolButton" parent="BaseImageButton">
         <item name="android:layout_marginLeft">2dp</item>
         <item name="android:layout_marginRight">2dp</item>
-        <item name="android:tint">@color/colorPrimary</item>
+        <item name="android:tint">?attr/colorAccent</item>
     </style>
 
     <style name="ToolButton.Dark" parent="BaseImageButton">
-        <item name="android:tint">@color/colorAccent</item>
+        <item name="android:tint">?attr/colorAccent</item>
     </style>
 
     <style name="ListMenuButton" parent="BaseImageButton">
         <item name="android:layout_width">34dp</item>
         <item name="android:layout_height">34dp</item>
-        <item name="android:tint">@color/colorPrimaryDark</item>
+        <item name="android:tint">?attr/colorAccent</item>
         <item name="android:layout_marginLeft">2dp</item>
         <item name="android:layout_marginRight">2dp</item>
     </style>
 
     <style name="ListMenuButton.Dark" parent="ListMenuButton">
-        <item name="android:tint">@color/colorAccent</item>
+        <item name="android:tint">?attr/colorAccent</item>
     </style>
 
     <style name="FieldActionButton" parent="BaseImageButton">
@@ -272,11 +411,11 @@
         <item name="android:layout_marginStart">0dp</item>
         <item name="android:padding">6dp</item>
         <item name="android:background">@drawable/field_action_button</item>
-        <item name="android:tint">@color/colorPrimaryDark</item>
+        <item name="android:tint">?attr/colorAccent</item>
     </style>
 
     <style name="FieldActionButton.Dark" parent="FieldActionButton">
-        <item name="android:tint">@color/colorAccent</item>
+        <item name="android:tint">?attr/colorAccent</item>
     </style>
 
     <!-- Line Styles -->
@@ -297,25 +436,25 @@
     <style name="HorizontalLine">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1dp</item>
-        <item name="android:background">@color/colorAccent</item>
+        <item name="android:background">?attr/colorAccent</item>
         <item name="android:layout_marginTop">8dp</item>
         <item name="android:layout_marginBottom">8dp</item>
     </style>
 
     <style name="HorizontalLine.Dark" parent="HorizontalLine">
-        <item name="android:background">@color/colorAccent</item>
+        <item name="android:background">?attr/colorAccent</item>
     </style>
 
     <style name="FieldSeparator">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1dp</item>
-        <item name="android:background">#eeeeee</item>
+        <item name="android:background">?attr/colorOutline</item>
         <item name="android:layout_marginTop">8dp</item>
         <item name="android:layout_marginBottom">8dp</item>
     </style>
 
     <style name="FieldSeparator.Dark" parent="FieldSeparator">
-        <item name="android:background">#444444</item>
+        <item name="android:background">?attr/colorOutline</item>
     </style>
 
     <style name="FieldSet">
@@ -337,18 +476,18 @@
     <style name="FieldSetLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:background">@color/window_background_color</item>
+        <item name="android:background">?attr/colorWindowBackground</item>
         <item name="android:orientation">vertical</item>
         <item name="android:paddingLeft">6dp</item>
         <item name="android:paddingRight">6dp</item>
         <item name="android:layout_marginLeft">12dp</item>
-        <item name="android:textColor">@color/colorAccent</item>
+        <item name="android:textColor">?attr/colorAccent</item>
         <item name="android:textSize">14sp</item>
     </style>
 
     <style name="FieldSetLabel.Dark" parent="FieldSetLabel">
-        <item name="android:background">@color/window_background_color_dark</item>
-        <item name="android:textColor">@color/colorAccent</item>
+        <item name="android:background">?attr/colorWindowBackground</item>
+        <item name="android:textColor">?attr/colorAccent</item>
     </style>
 
 
@@ -389,11 +528,11 @@
         <item name="android:layout_height">22dp</item>
         <item name="android:layout_marginLeft">4dp</item>
         <item name="android:src">@drawable/icon_help</item>
-        <item name="tint">#e0e0e0</item>
+        <item name="tint">?attr/colorOnSurfaceVariant</item>
     </style>
 
     <style name="HelpButton.Dark" parent="HelpButton">
-        <item name="tint">#f0f0f0</item>
+        <item name="tint">?attr/colorOnSurfaceVariant</item>
     </style>
 
     <style name="TabLayoutBackground" >

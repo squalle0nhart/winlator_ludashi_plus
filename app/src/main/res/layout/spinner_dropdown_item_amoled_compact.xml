@@ -9,5 +9,5 @@
     android:paddingStart="14dp"
     android:paddingEnd="14dp"
     android:singleLine="true"
-    android:textColor="#FFFFFFFF"
+    android:textColor="?attr/colorOnSurface"
     android:textSize="16sp" />

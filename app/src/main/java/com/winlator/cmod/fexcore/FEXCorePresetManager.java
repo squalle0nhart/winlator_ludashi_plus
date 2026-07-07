@@ -14,6 +14,7 @@ import com.winlator.cmod.SettingsFragment;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ThemeUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -290,7 +291,7 @@ public class FEXCorePresetManager {
             }
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, presets));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, presets));
         spinner.setSelection(selectedPosition);
     }
 

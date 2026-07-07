@@ -46,6 +46,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.HttpUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.inputcontrols.ControlElement;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -354,7 +355,7 @@ public class InputControlsFragment extends Fragment {
                 ((TextView)itemView.findViewById(R.id.TVSubtitle)).setText(controllerBindingCount+" "+bindingsText);
 
                 ImageView imageView = itemView.findViewById(R.id.ImageView);
-                int tintColor = controller.isConnected() ? ContextCompat.getColor(context, R.color.colorAccent) : 0xffe57373;
+                int tintColor = controller.isConnected() ? ThemeUtils.getColorAttr(context, R.attr.themeAccentColor) : 0xffe57373;
                 ImageViewCompat.setImageTintList(imageView, ColorStateList.valueOf(tintColor));
 
                 if (controllerBindingCount > 0) {

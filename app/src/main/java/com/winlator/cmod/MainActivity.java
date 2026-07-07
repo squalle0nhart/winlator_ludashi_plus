@@ -7,7 +7,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -47,6 +46,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.ImageUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.WineThemeManager;
@@ -114,14 +114,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (!sharedPreferences.contains("dark_mode")) {
             sharedPreferences.edit().putBoolean("dark_mode", true).apply();
         }
+        if (!sharedPreferences.contains(ThemeUtils.PREF_COLOR_THEME)) {
+            sharedPreferences.edit().putString(ThemeUtils.PREF_COLOR_THEME, ThemeUtils.DEFAULT_COLOR_THEME).apply();
+        }
 
         isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
-
-        if (isDarkMode) {
-            setTheme(R.style.AppTheme_Dark);
-        } else {
-            setTheme(R.style.AppTheme);
-        }
+        setTheme(ThemeUtils.getThemeResId(this));
 
         notificationService = new Intent(this, NotificationService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED))
@@ -139,21 +137,18 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         drawerLayout = findViewById(R.id.DrawerLayout);
         NavigationView navigationView = findViewById(R.id.NavigationView);
         navigationView.setNavigationItemSelectedListener(this);
-        navigationView.setBackgroundColor(Color.BLACK);
+        navigationView.setBackgroundColor(ThemeUtils.getColorAttr(this, R.attr.colorDrawerBackground));
         updateStorageFooter();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(Color.BLACK);
-            getWindow().setNavigationBarColor(Color.BLACK);
-        }
+        ThemeUtils.applyWindowChrome(this);
 
         setSupportActionBar(findViewById(R.id.Toolbar));
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_menu);
+            setActionBarNavigationIcon(R.drawable.icon_action_bar_menu);
         }
 
-        setNavigationViewItemTextColor(navigationView, Color.WHITE);
+        setNavigationViewItemTextColor(navigationView, ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
 
         File winlatorDir = new File(SettingsFragment.DEFAULT_WINLATOR_PATH);
         if (!winlatorDir.exists())
@@ -165,7 +160,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         editInputControls = intent.getBooleanExtra("edit_input_controls", false);
         if (editInputControls) {
             selectedProfileId = intent.getIntExtra("selected_profile_id", 0);
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_back);
+            setActionBarNavigationIcon(R.drawable.icon_action_bar_back);
             onNavigationItemSelected(navigationView.getMenu().findItem(R.id.main_menu_input_controls));
             navigationView.setCheckedItem(R.id.main_menu_input_controls);
         } else {
@@ -180,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         : R.id.main_menu_containers;
             }
 
-            actionBar.setHomeAsUpIndicator(R.drawable.icon_action_bar_menu);
+            setActionBarNavigationIcon(R.drawable.icon_action_bar_menu);
             onNavigationItemSelected(navigationView.getMenu().findItem(menuItemId));
             navigationView.setCheckedItem(menuItemId);
 
@@ -204,6 +199,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         storageView.setText(Formatter.formatShortFileSize(this, usedBytes) + " / " + Formatter.formatShortFileSize(this, totalBytes));
         storageProgress.setProgress(usedPercent);
+    }
+
+    private void setActionBarNavigationIcon(int drawableResId) {
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar == null) return;
+        actionBar.setHomeAsUpIndicator(ThemeUtils.getTintedDrawable(this, drawableResId, R.attr.colorOnSurface));
     }
 
     private void showAllFilesAccessDialog() {

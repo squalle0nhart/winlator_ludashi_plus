@@ -151,6 +151,18 @@
         <item>Light</item>
         <item>Dark</item>
     </string-array>
+    <string-array name="app_color_theme_entries">
+        <item>Blue</item>
+        <item>Emerald</item>
+        <item>Sunset</item>
+        <item>Rose</item>
+    </string-array>
+    <string-array name="app_color_theme_values">
+        <item>blue</item>
+        <item>emerald</item>
+        <item>sunset</item>
+        <item>rose</item>
+    </string-array>
     <string-array name="desktop_background_type_entries">
         <item>Image</item>
         <item>Solid Color</item>

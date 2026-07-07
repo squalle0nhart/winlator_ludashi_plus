@@ -15,6 +15,7 @@ import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.math.Mathf;
 
@@ -53,8 +54,8 @@ public class SeekBar extends AppCompatImageView {
         textSize = UnitUtils.dpToPx(16.0f);
         textColor = -0x8c8c8d; // Dark gray color
 
-        colorPrimary = -0x282829; // Primary color
-        colorSecondary = ContextCompat.getColor(context, R.color.colorPrimary); // Color secondary
+        colorPrimary = ThemeUtils.getColorAttr(context, R.attr.colorProgressTrack);
+        colorSecondary = ThemeUtils.getColorAttr(context, R.attr.themeAccentColor);
 
         if (attrs != null) {
             TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.SeekBar, 0, 0);

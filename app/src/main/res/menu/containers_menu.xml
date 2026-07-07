@@ -7,7 +7,6 @@
         android:id="@+id/action_big_picture_mode"
         android:title="Big Picture Mode"
         android:icon="@drawable/ic_big_picture_mode"
-        android:color="#FFFFFF"
         app:showAsAction="ifRoom" />
 
     <item

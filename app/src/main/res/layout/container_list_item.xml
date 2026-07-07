@@ -15,7 +15,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:src="@drawable/icon_menu_container"
-        app:tint="@color/colorAccent" />
+        app:tint="?attr/colorAccent" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp" />
 
         <TextView
@@ -40,7 +40,7 @@
             android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#A8A8A8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
 
         <TextView
@@ -50,7 +50,7 @@
             android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#BDBDBD"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
     </LinearLayout>
 
@@ -61,12 +61,12 @@
         android:background="@drawable/ui_fab_blue"
         android:padding="10dp"
         android:src="@drawable/icon_run"
-        app:tint="#FFFFFF" />
+        app:tint="?attr/colorOnSurface" />
 
     <ImageView
         android:id="@id/BTMenu"
         style="@style/ListMenuButton"
         android:layout_marginStart="8dp"
         android:src="@drawable/icon_list_item_menu"
-        app:tint="#FFFFFF" />
+        app:tint="?attr/colorOnSurface" />
 </LinearLayout>

@@ -7,6 +7,7 @@ import android.widget.Spinner;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.ThemeUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -117,7 +118,7 @@ public class MidiManager {
         for (File file : sfFiles)
             filesName.add(file.getName());
 
-        spinner.setAdapter(new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, filesName));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(spinner.getContext(), filesName));
     }
 
     public static void loadSFSpinnerWithoutDisabled(Spinner spinner) {
@@ -129,7 +130,7 @@ public class MidiManager {
         for (File file : sfFiles)
             filesName.add(file.getName());
 
-        spinner.setAdapter(new ArrayAdapter<>(spinner.getContext(), android.R.layout.simple_spinner_dropdown_item, filesName));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(spinner.getContext(), filesName));
     }
 
 }

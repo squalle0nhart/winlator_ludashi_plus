@@ -22,4 +22,17 @@
     <attr name="extraKeysButtonActiveTextColor" format="reference" />
     <attr name="extraKeysButtonBackgroundColor" format="reference" />
     <attr name="extraKeysButtonActiveBackgroundColor" format="reference" />
+    <attr name="colorWindowBackground" format="color|reference" />
+    <attr name="colorSurface" format="color|reference" />
+    <attr name="colorSurfaceElevated" format="color|reference" />
+    <attr name="colorSurfacePressed" format="color|reference" />
+    <attr name="colorOutline" format="color|reference" />
+    <attr name="colorOnSurface" format="color|reference" />
+    <attr name="colorOnSurfaceVariant" format="color|reference" />
+    <attr name="colorToolbarSurface" format="color|reference" />
+    <attr name="colorDrawerBackground" format="color|reference" />
+    <attr name="colorDrawerItemSelected" format="color|reference" />
+    <attr name="colorDrawerItemPressed" format="color|reference" />
+    <attr name="colorProgressTrack" format="color|reference" />
+    <attr name="themeAccentColor" format="color|reference" />
 </resources>

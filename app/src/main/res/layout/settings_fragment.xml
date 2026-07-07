@@ -233,12 +233,25 @@
                         android:id="@+id/CBDarkMode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Enable Dark Mode" />
+                        android:text="@string/use_dark_mode" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/accent_palette" />
+
+                    <Spinner
+                        style="@style/ComboBox"
+                        android:id="@+id/SColorTheme"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp" />
                 </LinearLayout>
                 <TextView
                     android:id="@+id/TVTheme"
                     style="@style/FieldSetLabel"
-                    android:text="Theme" />
+                    android:text="@string/theme" />
             </FrameLayout>
 
             <!-- Shortcuts -->

@@ -22,6 +22,7 @@ import androidx.preference.PreferenceManager;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.Callback;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ public class ContentDialog extends Dialog {
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
         isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
 
-        contentView.setBackgroundResource(isDarkMode ? R.drawable.dialog_background_dark_blue : R.drawable.content_dialog_background);
+        contentView.setBackgroundResource(ThemeUtils.getDialogBackgroundRes());
 
         if (getWindow() != null) getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
 
@@ -186,7 +187,7 @@ public class ContentDialog extends Dialog {
 
         SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
         boolean isDarkMode = sharedPreferences.getBoolean("dark_mode", true);
-        applyDarkThemeToEditText(editText, isDarkMode);
+        ThemeUtils.applyEditTextTheme(editText);
 
         editText.setHint(R.string.untitled);
         if (defaultText != null) editText.setText(defaultText);
@@ -199,18 +200,6 @@ public class ContentDialog extends Dialog {
         });
 
         dialog.show();
-    }
-
-    private static void applyDarkThemeToEditText(EditText editText, boolean isDarkMode) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
     }
 
     public static void showMultipleChoiceList(Context context, int titleResId, final String[] items, Callback<ArrayList<Integer>> callback) {

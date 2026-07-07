@@ -43,6 +43,7 @@ import com.winlator.cmod.contentdialog.StorageInfoDialog;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.PreloaderDialog;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
@@ -97,10 +98,12 @@ public class ContainersFragment extends Fragment {
         menu.clear();
         menuInflater.inflate(R.menu.containers_menu, menu);
         MenuItem bigPictureItem = menu.findItem(R.id.action_big_picture_mode);
-        Drawable icon = bigPictureItem.getIcon();
-        if (icon != null) {
-            icon.mutate(); // Ensure we don't modify other instances of this drawable
-            icon.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
+        if (bigPictureItem != null) {
+            bigPictureItem.setIcon(ThemeUtils.getTintedDrawable(requireContext(), R.drawable.ic_big_picture_mode, R.attr.colorOnSurface));
+        }
+        MenuItem addItem = menu.findItem(R.id.containers_menu_add);
+        if (addItem != null) {
+            addItem.setIcon(ThemeUtils.getTintedDrawable(requireContext(), R.drawable.icon_action_bar_add, R.attr.colorOnSurface));
         }
     }
 

@@ -23,6 +23,7 @@ import com.winlator.cmod.core.ArrayUtils;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeUtils;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -63,7 +64,7 @@ public class Box64EditPresetDialog extends ContentDialog {
         }
         else etName.setText(context.getString(R.string.preset)+"-"+ Box64PresetManager.getNextPresetId(context, prefix));
 
-        applyDarkThemeToEditText(etName);
+        ThemeUtils.applyEditTextTheme(etName);
 
         loadEnvVarsList();
 
@@ -133,7 +134,7 @@ public class Box64EditPresetDialog extends ContentDialog {
                     if (readonly) toggleButton.setAlpha(0.5f);
                 }
                 else {
-                    spinner.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+                    spinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
                     spinner.setVisibility(View.VISIBLE);
                     spinner.setEnabled(!readonly);
                     spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, values));
@@ -149,26 +150,6 @@ public class Box64EditPresetDialog extends ContentDialog {
     private static void applyFieldSetLabelStyle(TextView textView, boolean isDarkMode) {
 //        Context context = textView.getContext();
 
-        if (isDarkMode) {
-            // Apply dark mode-specific attributes
-            textView.setTextColor(Color.parseColor("#cccccc")); // Set text color to #cccccc
-            textView.setBackgroundResource(R.color.content_dialog_background_dark); // Set dark background color
-        } else {
-            // Apply light mode-specific attributes (original FieldSetLabel)
-            textView.setTextColor(Color.parseColor("#bdbdbd")); // Set text color to #bdbdbd
-            textView.setBackgroundResource(R.color.window_background_color); // Set light background color
-        }
-    }
-
-    private void applyDarkThemeToEditText(EditText editText) {
-        if (isDarkMode) {
-            editText.setTextColor(Color.WHITE); // Set text color to white for dark theme
-            editText.setHintTextColor(Color.GRAY); // Set hint color to gray
-            editText.setBackgroundResource(R.drawable.edit_text_dark); // Custom dark background drawable
-        } else {
-            editText.setTextColor(Color.BLACK); // Default text color
-            editText.setHintTextColor(Color.GRAY); // Default hint color
-            editText.setBackgroundResource(R.drawable.edit_text); // Custom light background drawable
-        }
+        ThemeUtils.applyFieldSetLabelStyle(textView);
     }
 }

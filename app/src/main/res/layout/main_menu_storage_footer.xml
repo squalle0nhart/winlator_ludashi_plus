@@ -24,14 +24,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Storage"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="12sp" />
 
         <TextView
             android:id="@+id/TVStorageUsage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#D8D8D8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
     </LinearLayout>
 

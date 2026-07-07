@@ -22,6 +22,7 @@ import androidx.annotation.Nullable;
 import com.winlator.cmod.R;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.Arrays;
@@ -137,21 +138,12 @@ public class EnvVarsView extends FrameLayout {
 
     // Method to apply dark theme styles
     private void applyDarkTheme(View view) {
-        if (isDarkMode) {
-            if (view instanceof TextView) {
-                ((TextView) view).setTextColor(Color.WHITE);
-            } else if (view instanceof EditText) {
-                view.setBackgroundResource(R.drawable.edit_text_dark); // Assuming you have a dark background resource
-                ((EditText) view).setTextColor(Color.WHITE);
-                ((EditText) view).setHintTextColor(Color.GRAY);
-            } else if (view instanceof Spinner) {
-                ((Spinner) view).setPopupBackgroundResource(R.drawable.content_dialog_background_dark);
-            } else if (view instanceof ToggleButton) {
-                // Apply custom styles if needed for ToggleButton
-                // For example, you could change the background or text colors
-            }
-        } else {
-            // Apply light theme if needed
+        if (view instanceof TextView) {
+            ((TextView) view).setTextColor(ThemeUtils.getColorAttr(getContext(), R.attr.colorOnSurface));
+        } else if (view instanceof EditText) {
+            ThemeUtils.applyEditTextTheme((EditText) view);
+        } else if (view instanceof Spinner) {
+            ((Spinner) view).setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         }
     }
 
@@ -218,8 +210,7 @@ public class EnvVarsView extends FrameLayout {
                 EditText editText = itemView.findViewById(R.id.EditText);
                 editText.setVisibility(VISIBLE);
                 editText.setText(value);
-                // Apply specific styling for "TEXT" fields
-                editText.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text); // Apply dark background resource for "TEXT"
+                ThemeUtils.applyEditTextTheme(editText);
                 getValueCallback = () -> editText.getText().toString();
                 break;
             case "NUMBER":
@@ -228,7 +219,7 @@ public class EnvVarsView extends FrameLayout {
                 editTextNumber.setVisibility(VISIBLE);
                 editTextNumber.setText(value);
                 if (type.equals("NUMBER")) editTextNumber.setInputType(InputType.TYPE_CLASS_NUMBER);
-                editTextNumber.setBackgroundResource(isDarkMode ? R.drawable.edit_text_dark : R.drawable.edit_text);
+                ThemeUtils.applyEditTextTheme(editTextNumber);
                 getValueCallback = () -> editTextNumber.getText().toString();
                 break;
         }

@@ -1,21 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background_color">#000000</color>
-    <color name="colorPrimary">#0055ff</color>
-    <color name="colorPrimaryDark">#0055ff</color>
-    <color name="colorAccent">#0055ff</color>
+    <color name="window_background_color">#F4F7FC</color>
+    <color name="colorPrimary">#2F6BFF</color>
+    <color name="colorPrimaryDark">#164BCE</color>
+    <color name="colorAccent">#2F6BFF</color>
     <color name="black">#000000</color>
 
-    <color name="window_background_color_dark">#000000</color>
-    <color name="colorPrimaryDarkMode">#000000</color>
-    <color name="colorPrimaryDarkModeDark">#000000</color>
-    <color name="colorAccentDark">#0055ff</color>
+    <color name="window_background_color_dark">#04060A</color>
+    <color name="colorPrimaryDarkMode">#2F6BFF</color>
+    <color name="colorPrimaryDarkModeDark">#164BCE</color>
+    <color name="colorAccentDark">#2F6BFF</color>
     <color name="white">#ffffff</color>
 
-    <color name="combo_box_dark">#070707</color>
-    <color name="content_dialog_background_dark">#000000</color>
-    <color name="button_neutral_dark">#101010</color>
-    <color name="button_positive_dark">#0055ff</color>
+    <color name="combo_box_dark">#111827</color>
+    <color name="content_dialog_background_dark">#0B1018</color>
+    <color name="button_neutral_dark">#111827</color>
+    <color name="button_positive_dark">#2F6BFF</color>
+
+    <color name="theme_light_window">#F4F7FC</color>
+    <color name="theme_light_surface">#FFFFFF</color>
+    <color name="theme_light_surface_elevated">#FBFDFF</color>
+    <color name="theme_light_surface_pressed">#E8EEF8</color>
+    <color name="theme_light_outline">#D5DEEC</color>
+    <color name="theme_light_on_surface">#182334</color>
+    <color name="theme_light_on_surface_variant">#627086</color>
+    <color name="theme_light_toolbar_surface">#EEF3FB</color>
+    <color name="theme_light_drawer">#EEF3FB</color>
+    <color name="theme_light_drawer_item_selected">#DCE7FA</color>
+    <color name="theme_light_drawer_item_pressed">#E5ECF9</color>
+    <color name="theme_light_progress_track">#D9E0ED</color>
+
+    <color name="theme_dark_window">#04060A</color>
+    <color name="theme_dark_surface">#0B1018</color>
+    <color name="theme_dark_surface_elevated">#111827</color>
+    <color name="theme_dark_surface_pressed">#162238</color>
+    <color name="theme_dark_outline">#273446</color>
+    <color name="theme_dark_on_surface">#F4F7FF</color>
+    <color name="theme_dark_on_surface_variant">#9CA9BD</color>
+    <color name="theme_dark_toolbar_surface">#05070B</color>
+    <color name="theme_dark_drawer">#05070B</color>
+    <color name="theme_dark_drawer_item_selected">#151D2A</color>
+    <color name="theme_dark_drawer_item_pressed">#101925</color>
+    <color name="theme_dark_progress_track">#273243</color>
+
+    <color name="theme_blue_500">#2F6BFF</color>
+    <color name="theme_blue_700">#164BCE</color>
+    <color name="theme_emerald_500">#1FA971</color>
+    <color name="theme_emerald_700">#0E7A50</color>
+    <color name="theme_sunset_500">#F28C28</color>
+    <color name="theme_sunset_700">#C56612</color>
+    <color name="theme_rose_500">#D94F70</color>
+    <color name="theme_rose_700">#AC3553</color>
 
     <color name="abc_decor_view_status_guard">#ff000000</color>
     <color name="abc_decor_view_status_guard_light">#ff000000</color>
