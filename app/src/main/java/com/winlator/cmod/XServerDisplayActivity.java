@@ -2736,6 +2736,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
         envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
 
+        boolean isWrapperGamenative = "wrapper-gamenative".equalsIgnoreCase(graphicsDriver);
+        int vendorId = GPUInformation.getVendorID(null, null);
+        boolean isAdreno = vendorId == 0x5143;
+        boolean isXclipse = vendorId == 0x144D;
+        boolean excludeBcnCompute = isAdreno || (isWrapperGamenative && isXclipse);
         String timelineSemaphores = graphicsDriverConfig.get("timelineSemaphores");
         if ("1".equals(timelineSemaphores)) {
             envVars.remove("DXVK_DISABLE_TIMELINE_SEMAPHORES");
@@ -2754,14 +2759,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         switch (bcnEmulation) {
             case "auto" -> {
-                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
+                if (bcnEmulationType.equals("compute") && !excludeBcnCompute) {
                     envVars.put("ENABLE_BCN_COMPUTE", "1");
                     envVars.put("BCN_COMPUTE_AUTO", "1");
                 }
                 envVars.put("WRAPPER_EMULATE_BCN", "3");
             }
             case "full" -> {
-                if (bcnEmulationType.equals("compute") && GPUInformation.getVendorID(null, null) != 0x5143) {
+                if (bcnEmulationType.equals("compute") && !excludeBcnCompute) {
                     envVars.put("ENABLE_BCN_COMPUTE", "1");
                     envVars.put("BCN_COMPUTE_AUTO", "0");
                 }
@@ -2783,6 +2788,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String resolveGraphicsDriverArchiveName() {
         if (graphicsDriver == null || graphicsDriver.isEmpty() || graphicsDriver.equals("wrapper")) {
             return "wrapper";
+        }
+        if (graphicsDriver.startsWith("wrapper-v2")) {
+            return "wrapper-original";
         }
         if (graphicsDriver.startsWith("wrapper-original")) {
             return "wrapper-original";

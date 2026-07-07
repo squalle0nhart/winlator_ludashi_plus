@@ -1178,7 +1178,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         final Context context = sGraphicsDriver.getContext();
 
         // Update the spinner with the available graphics driver options
-        updateGraphicsDriverSpinner(context, sGraphicsDriver);
+        updateGraphicsDriverSpinner(context, sGraphicsDriver, selectedGraphicsDriver);
 
         Runnable update = () -> {
             String graphicsDriver = StringUtils.parseIdentifier(sGraphicsDriver.getSelectedItem());
@@ -1211,7 +1211,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         });
 
         // Set the spinner's initial selection
-        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, selectedGraphicsDriver);
+        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, normalizeGraphicsDriverIdentifier(selectedGraphicsDriver));
         update.run();
     }
 
@@ -1839,9 +1839,17 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         spinner.setSelection(isEditMode() && (index != 0) ? index : defaultValue);
     }
 
-    public static void updateGraphicsDriverSpinner(Context context, Spinner spinner) {
+    public static String normalizeGraphicsDriverIdentifier(String graphicsDriver) {
+        if ("wrapper-original".equals(graphicsDriver)) return "wrapper-v2";
+        return graphicsDriver;
+    }
+
+    public static void updateGraphicsDriverSpinner(Context context, Spinner spinner, String selectedGraphicsDriver) {
         String[] originalItems = context.getResources().getStringArray(R.array.graphics_driver_entries);
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
+        if ("wrapper-legacy".equals(selectedGraphicsDriver) && !itemList.contains("Wrapper-legacy")) {
+            itemList.add("Wrapper-legacy");
+        }
         // Set the adapter with the combined list
         spinner.setAdapter(new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, itemList));
     }

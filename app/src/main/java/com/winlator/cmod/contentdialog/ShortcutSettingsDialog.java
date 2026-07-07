@@ -1047,7 +1047,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
     public void loadGraphicsDriverSpinner(final Spinner sGraphicsDriver, final Spinner sDXWrapper, final View vGraphicsDriverConfig, String selectedGraphicsDriver, String selectedDXWrapper) {
         final Context context = sGraphicsDriver.getContext();
 
-        ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver);
+        ContainerDetailFragment.updateGraphicsDriverSpinner(context, sGraphicsDriver, selectedGraphicsDriver);
 
         final String[] dxwrapperEntries = context.getResources().getStringArray(R.array.dxwrapper_entries);
 
@@ -1079,7 +1079,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver, selectedGraphicsDriver);
+        AppUtils.setSpinnerSelectionFromIdentifier(sGraphicsDriver,
+                ContainerDetailFragment.normalizeGraphicsDriverIdentifier(selectedGraphicsDriver));
         update.run();
     }
 }
