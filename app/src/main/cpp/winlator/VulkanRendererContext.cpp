@@ -903,11 +903,15 @@ void VulkanRendererContext::setPostFXMode(int mode) {
             RLOG("setPostFXMode: postfxPipeline destruído");
         }
     }
+    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::setSharpness(float s) {
-    sharpness = std::clamp(s, 0.0f, 1.0f);
+    float clamped = std::clamp(s, 0.0f, 1.0f);
+    if (sharpness == clamped) return;
+    sharpness = clamped;
+    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -1187,6 +1191,7 @@ void VulkanRendererContext::ensureCursorTex(short w, short h) {
     vk_.UpdateDescriptorSets(device,1,&wr,0,nullptr);
 
     cursorTexW=w; cursorTexH=h;
+    cursorImageInitialized=false;
 }
 
 void VulkanRendererContext::cleanupCursorTex() {
@@ -1195,6 +1200,7 @@ void VulkanRendererContext::cleanupCursorTex() {
     if (cursorMem!=VK_NULL_HANDLE){vk_.FreeMemory(device,cursorMem,nullptr);cursorMem=VK_NULL_HANDLE;}
     if (cursorStg!=VK_NULL_HANDLE){vk_.DestroyBuffer(device,cursorStg,nullptr);vk_.FreeMemory(device,cursorStgM,nullptr);cursorStg=VK_NULL_HANDLE;cursorStgP=nullptr;cursorStgC=0;}
     cursorTexW=0; cursorTexH=0;
+    cursorImageInitialized=false;
 }
 
 void VulkanRendererContext::ensureCursorStaging(VkDeviceSize sz) {
@@ -1261,11 +1267,15 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, VkRenderPass target
     bool hasCursorCopy = hasCursorUpload && cursorImg!=VK_NULL_HANDLE && cursorUpload!=VK_NULL_HANDLE;
     if (hasCursorCopy) {
         VkImageMemoryBarrier b{}; b.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b.oldLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; b.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        b.oldLayout=cursorImageInitialized ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        b.newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         b.srcQueueFamilyIndex=b.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
         b.image=cursorImg; b.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
-        b.srcAccessMask=VK_ACCESS_SHADER_READ_BIT; b.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
-        vk_.CmdPipelineBarrier(cb, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        b.srcAccessMask=cursorImageInitialized ? VK_ACCESS_SHADER_READ_BIT : 0;
+        b.dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+        vk_.CmdPipelineBarrier(cb,
+            cursorImageInitialized ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &b);
         VkBufferImageCopy r{}; r.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
         r.imageExtent={(uint32_t)curW,(uint32_t)curH,1};
@@ -1273,6 +1283,7 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, VkRenderPass target
         b.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; b.newLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         b.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; b.dstAccessMask=VK_ACCESS_SHADER_READ_BIT;
         postUpload.push_back(b);
+        cursorImageInitialized=true;
     }
 
     if (!postUpload.empty())
@@ -1422,7 +1433,10 @@ void VulkanRendererContext::renderLoop() {
     while (isRunning) {
         { std::unique_lock<std::mutex> lk(dirtyMutex);
           dirtyCV.wait(lk,[this]{
-              return !isRunning||(!surfaceDetached.load()&&(needsRender.load()||fbResized.load()))||cursorMoved.load(); }); }
+              return !isRunning || cursorMoved.load() ||
+                  (!surfaceDetached.load() &&
+                   (needsRender.load() || fbResized.load() ||
+                    (frameGenMultiplier.load() >= 2 && frameGenContentDirty.load()))); }); }
         if (!isRunning) break;
 
         if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) continue;
@@ -1449,12 +1463,17 @@ void VulkanRendererContext::setFrameGenerationMultiplier(int multiplier) {
     int sanitized = multiplier < 2 ? 0 : std::min(4, multiplier);
     int previous = frameGenMultiplier.exchange(sanitized);
     if (previous != sanitized) {
-        frameGenResetRequested.store(true);
+        invalidateFrameGenHistory();
         needsRender.store(true, std::memory_order_relaxed);
         dirtyCV.notify_one();
         RLOG("Native Framegen multiplier: %s", sanitized == 0
             ? "Off" : (std::to_string(sanitized) + "x").c_str());
     }
+}
+
+void VulkanRendererContext::invalidateFrameGenHistory(bool contentDirty) {
+    frameGenResetRequested.store(true, std::memory_order_release);
+    if (contentDirty) frameGenContentDirty.store(true, std::memory_order_release);
 }
 
 bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& draws,
@@ -1528,7 +1547,11 @@ bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& d
     return true;
 }
 
-bool VulkanRendererContext::presentFrameGenPhase(float phase) {
+bool VulkanRendererContext::presentFrameGenPhase(float phase,
+    VkBuffer cursorUpload, bool hasCursorUpload,
+    float ox, float oy, float sx, float sy, float cw, float ch,
+    short ptrX, short ptrY, short curHotX, short curHotY,
+    short curW, short curH, bool curVis, VkRect2D scissorRect) {
     if (!frameGenResourcesBuilt || frameGenHistoryCount < 2 || surfaceDetached.load()) return false;
     if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return false;
 
@@ -1560,6 +1583,40 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase) {
     VkCommandBufferBeginInfo begin{};
     begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     if (vk_.BeginCommandBuffer(command, &begin) != VK_SUCCESS) return false;
+
+    bool hasCursorCopy = hasCursorUpload && cursorImg != VK_NULL_HANDLE &&
+                         cursorUpload != VK_NULL_HANDLE && curW > 0 && curH > 0;
+    if (hasCursorCopy) {
+        VkImageMemoryBarrier cursorToCopy{};
+        cursorToCopy.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        cursorToCopy.oldLayout = cursorImageInitialized
+            ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+        cursorToCopy.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        cursorToCopy.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        cursorToCopy.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        cursorToCopy.image = cursorImg;
+        cursorToCopy.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        cursorToCopy.srcAccessMask = cursorImageInitialized ? VK_ACCESS_SHADER_READ_BIT : 0;
+        cursorToCopy.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        vk_.CmdPipelineBarrier(command,
+            cursorImageInitialized ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+            0, nullptr, 0, nullptr, 1, &cursorToCopy);
+        VkBufferImageCopy copy{};
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        copy.imageExtent = {(uint32_t)curW, (uint32_t)curH, 1};
+        vk_.CmdCopyBufferToImage(command, cursorUpload, cursorImg,
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        VkImageMemoryBarrier cursorReady = cursorToCopy;
+        cursorReady.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        cursorReady.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        cursorReady.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        cursorReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                               0, nullptr, 0, nullptr, 1, &cursorReady);
+        cursorImageInitialized = true;
+    }
 
     uint32_t parity = frameGenHistoryCurrent;
     if (!frameGenMotionValid) {
@@ -1619,11 +1676,42 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase) {
                               &frameGenInterpSets[parity], 0, nullptr);
     FrameGenInterpPush interpPush{
         (float)swapchainExt.width, (float)swapchainExt.height,
-        std::clamp(phase, 0.0f, 1.0f), 0.06f, 0.25f, 0.0f
+        std::clamp(phase, 0.0f, 1.0f), 0.04f, 0.18f, 0.0f
     };
     vk_.CmdPushConstants(command, frameGenInterpPipeLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
                          0, sizeof(interpPush), &interpPush);
     vk_.CmdDraw(command, 3, 1, 0, 0);
+
+    // The hardware cursor is an overlay, not game content. Keeping it out of
+    // both history images prevents cursor motion/redraws from corrupting flow.
+    if (curVis && cursorImageInitialized && cursorImg != VK_NULL_HANDLE &&
+        cursorDS != VK_NULL_HANDLE && curW > 0 && curH > 0 && cw > 0.f && ch > 0.f) {
+        int32_t scissorX = std::max(0, scissorRect.offset.x);
+        int32_t scissorY = std::max(0, scissorRect.offset.y);
+        uint32_t maxW = swapchainExt.width > (uint32_t)scissorX
+            ? swapchainExt.width - (uint32_t)scissorX : 0u;
+        uint32_t maxH = swapchainExt.height > (uint32_t)scissorY
+            ? swapchainExt.height - (uint32_t)scissorY : 0u;
+        VkRect2D cursorScissor{{scissorX, scissorY},
+            {std::min(scissorRect.extent.width, maxW),
+             std::min(scissorRect.extent.height, maxH)}};
+        vk_.CmdSetScissor(command, 0, 1, &cursorScissor);
+        vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  pipeLayout, 0, 1, &cursorDS, 0, nullptr);
+        float cursorX = (float)std::max(0, (int)ptrX - curHotX);
+        float cursorY = (float)std::max(0, (int)ptrY - curHotY);
+        WindowPushConstants cursorPush{};
+        cursorPush.ndcX0 = (ox + cursorX * sx) / cw * 2.f - 1.f;
+        cursorPush.ndcY0 = (oy + cursorY * sy) / ch * 2.f - 1.f;
+        cursorPush.ndcX1 = (ox + (cursorX + curW) * sx) / cw * 2.f - 1.f;
+        cursorPush.ndcY1 = (oy + (cursorY + curH) * sy) / ch * 2.f - 1.f;
+        cursorPush.useTexAlpha = 1;
+        vk_.CmdPushConstants(command, pipeLayout,
+                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                             0, sizeof(cursorPush), &cursorPush);
+        vk_.CmdDraw(command, 4, 1, 0, 0);
+    }
     vk_.CmdEndRenderPass(command);
     if (vk_.EndCommandBuffer(command) != VK_SUCCESS) return false;
 
@@ -1688,6 +1776,8 @@ ok=true;}catch(...){}
         return;
     }
 
+    bool frameGenHasNewContent = frameGenContentDirty.exchange(false, std::memory_order_acq_rel);
+
     float ox,oy,sx,sy,cw,ch;
     short ptrX,ptrY,curHotX,curHotY,curW,curH; bool curVis;
     VkBuffer curUpload=VK_NULL_HANDLE; bool hasCurUpload=false;
@@ -1747,14 +1837,27 @@ ok=true;}catch(...){}
 
     bool effectiveCurVis = curVis && !scanoutActive.load();
     int multiplier = frameGenMultiplier.load(std::memory_order_relaxed);
-    if (multiplier >= 2 && !scanoutActive.load() &&
-        stageFrameGenHistory(frameDraws, curUpload, hasCurUpload,
-            ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
-            effectiveCurVis, effectiveScissor)) {
-        for (int generatedIndex = 1; generatedIndex <= multiplier; generatedIndex++) {
-            if (!presentFrameGenPhase((float)generatedIndex / (float)multiplier)) break;
+    if (multiplier >= 2 && !scanoutActive.load()) {
+        bool historyReady = frameGenHistoryCount >= 2;
+        if (frameGenHasNewContent || !historyReady) {
+            historyReady = stageFrameGenHistory(frameDraws, curUpload, hasCurUpload,
+                ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
+                false, effectiveScissor);
+            // Cursor upload was recorded into the history command, but curVis=false
+            // guarantees that cursor pixels never become part of either history frame.
+            hasCurUpload = false;
         }
-        return;
+        if (historyReady) {
+            int firstPhase = frameGenHasNewContent ? 1 : multiplier;
+            for (int generatedIndex = firstPhase; generatedIndex <= multiplier; generatedIndex++) {
+                if (!presentFrameGenPhase((float)generatedIndex / (float)multiplier,
+                    curUpload, hasCurUpload,
+                    ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
+                    effectiveCurVis, effectiveScissor)) break;
+                hasCurUpload = false;
+            }
+            return;
+        }
     }
 
     if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return;
@@ -1816,7 +1919,9 @@ ok=true;}catch(...){}
 void VulkanRendererContext::onSurfaceResized(int w, int h) {
     std::lock_guard<std::mutex> lk(renderMutex);
     if (w==0||h==0) return;
-    surfaceWidth=w; surfaceHeight=h; fbResized.store(true); dirtyCV.notify_one();
+    surfaceWidth=w; surfaceHeight=h;
+    invalidateFrameGenHistory();
+    fbResized.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::detachSurface() {
@@ -1870,6 +1975,7 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
 
         surfaceDetached.store(false, std::memory_order_release);
     }
+    invalidateFrameGenHistory();
     needsRender.store(true, std::memory_order_release);
     dirtyCV.notify_all();
     __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Renderer", "reattachSurface: OK");
@@ -1877,7 +1983,11 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
 }
 
 void VulkanRendererContext::setTransform(float ox, float oy, float sx, float sy) {
-    { std::lock_guard<std::mutex> lk(renderMutex); sceneOffsetX=ox;sceneOffsetY=oy;sceneScaleX=sx;sceneScaleY=sy; }
+    bool changed;
+    { std::lock_guard<std::mutex> lk(renderMutex);
+      changed = sceneOffsetX != ox || sceneOffsetY != oy || sceneScaleX != sx || sceneScaleY != sy;
+      sceneOffsetX=ox;sceneOffsetY=oy;sceneScaleX=sx;sceneScaleY=sy; }
+    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -1926,6 +2036,7 @@ void VulkanRendererContext::updateWindowContent(int64_t id, void* px, short w, s
         auto it=texMap.find(id);
         if (it!=texMap.end()) it->second.dirty=true;
     }
+    frameGenContentDirty.store(true, std::memory_order_release);
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -1963,13 +2074,24 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
         wt.needsTransition  = true;
         src.needsTransition = false;
     }
+    frameGenContentDirty.store(true, std::memory_order_release);
     needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::setRenderList(const int64_t* ids, const int* xs, const int* ys, int count) {
     std::lock_guard<std::mutex> lk(renderMutex);
+    bool changed = (int)renderList.size() != count;
+    if (!changed) {
+        for (int i=0;i<count;i++) {
+            if (renderList[i].id != ids[i] || renderList[i].x != xs[i] || renderList[i].y != ys[i]) {
+                changed = true;
+                break;
+            }
+        }
+    }
     renderList.resize(count);
     for (int i=0;i<count;i++) renderList[i]={ids[i],xs[i],ys[i]};
+    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2000,6 +2122,7 @@ void VulkanRendererContext::removeWindow(int64_t id) {
 
     renderList.erase(std::remove_if(renderList.begin(),renderList.end(),
         [id](const RenderEntry& e){return e.id==id;}),renderList.end());
+    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2070,6 +2193,7 @@ void VulkanRendererContext::setFilterMode(int mode) {
 
     for (auto& [ahb,wt]:ahbImportCache) updateDS(wt.ds, wt.view);
     if (cursorDS!=VK_NULL_HANDLE&&cursorView!=VK_NULL_HANDLE) updateDS(cursorDS, cursorView);
+    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2078,6 +2202,7 @@ void VulkanRendererContext::setStretchMode(int mode) {
     if (stretchMode == mode) return;
     stretchMode = mode;
     if (mode == 1 && stretchPipeline == VK_NULL_HANDLE) createStretchPipeline();
+    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2085,7 +2210,8 @@ void VulkanRendererContext::setSwapRB(bool enabled) {
     if (swapRB == enabled) return;
     swapRB = enabled;
     RLOG("setSwapRB: %d", (int)swapRB);
-
+    invalidateFrameGenHistory();
+    needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::setPresentMode(VkPresentModeKHR mode) {
@@ -2107,14 +2233,22 @@ std::vector<int> VulkanRendererContext::getSupportedPresentModes() const {
 
 void VulkanRendererContext::setCustomScissor(int x, int y, int w, int h) {
     std::lock_guard<std::mutex> lk(renderMutex);
-    customScissor  = {{x, y}, {(uint32_t)std::max(0, w), (uint32_t)std::max(0, h)}};
+    VkRect2D updated = {{x, y}, {(uint32_t)std::max(0, w), (uint32_t)std::max(0, h)}};
+    bool changed = !hasCustomScissor || customScissor.offset.x != updated.offset.x ||
+        customScissor.offset.y != updated.offset.y ||
+        customScissor.extent.width != updated.extent.width ||
+        customScissor.extent.height != updated.extent.height;
+    customScissor = updated;
     hasCustomScissor = true;
+    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::clearCustomScissor() {
     std::lock_guard<std::mutex> lk(renderMutex);
+    bool changed = hasCustomScissor;
     hasCustomScissor = false;
+    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 

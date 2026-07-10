@@ -28,6 +28,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.tabs.TabLayout;
@@ -361,6 +362,23 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         final Spinner sFEXCoreVersion = findViewById(R.id.SFEXCoreVersion);
         FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion, shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion()));
+        final SwitchCompat swUseUnixLibs = findViewById(R.id.SWUseUnixLibs);
+        swUseUnixLibs.setChecked("1".equals(shortcut.getExtra(
+                "useUnixLibs", shortcut.container.isUseUnixLibs() ? "1" : "0")));
+        Runnable updateUnixLibsToggle = () -> FEXCoreManager.updateUnixLibsToggle(
+                swUseUnixLibs, sFEXCoreVersion, shortcut.container.getWineVersion());
+        sFEXCoreVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View selectedView, int position, long id) {
+                updateUnixLibsToggle.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateUnixLibsToggle.run();
+            }
+        });
+        updateUnixLibsToggle.run();
         View btBox64VersionRemove = findViewById(R.id.BTBox64VersionRemove);
         View btBox64VersionDownload = findViewById(R.id.BTBox64VersionDownload);
         View btFEXCoreVersionRemove = findViewById(R.id.BTFEXCoreVersionRemove);
@@ -558,6 +576,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
                 String fexcorePreset = FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset);
                 shortcut.putExtra("fexcorePreset", fexcorePreset);
+
+                boolean useUnixLibs = swUseUnixLibs.isChecked();
+                shortcut.putExtra("useUnixLibs",
+                        useUnixLibs != shortcut.container.isUseUnixLibs()
+                                ? (useUnixLibs ? "1" : "0") : null);
 
                 String box64Preset = Box64PresetManager.getSpinnerSelectedId(sBox64Preset);
                 shortcut.putExtra("box64Preset", box64Preset);

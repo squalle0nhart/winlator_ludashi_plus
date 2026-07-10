@@ -312,6 +312,7 @@ private:
     std::vector<uint32_t>  cursorPixels;
     std::atomic<bool> isCursorImageDirty{false};
     std::atomic<bool> cursorMoved{false};
+    std::atomic<bool> cursorImageInitialized{false};
 
     VkImage         cursorImg   = VK_NULL_HANDLE;
     VkDeviceMemory  cursorMem   = VK_NULL_HANDLE;
@@ -363,6 +364,7 @@ private:
     VkFence               frameGenStageFence = VK_NULL_HANDLE;
     std::atomic<int>      frameGenMultiplier{0};
     std::atomic<bool>     frameGenResetRequested{false};
+    std::atomic<bool>     frameGenContentDirty{true};
     uint32_t              frameGenHistoryCurrent = 0;
     uint32_t              frameGenHistoryCount = 0;
     bool                  frameGenMotionValid = false;
@@ -446,7 +448,12 @@ private:
         float ox, float oy, float sx, float sy, float cw, float ch,
         short ptrX, short ptrY, short curHotX, short curHotY,
         short curW, short curH, bool curVis, VkRect2D scissorRect);
-    bool presentFrameGenPhase(float phase);
+    bool presentFrameGenPhase(float phase,
+        VkBuffer cursorUpload, bool hasCursorUpload,
+        float ox, float oy, float sx, float sy, float cw, float ch,
+        short ptrX, short ptrY, short curHotX, short curHotY,
+        short curW, short curH, bool curVis, VkRect2D scissorRect);
+    void invalidateFrameGenHistory(bool contentDirty = true);
 
     uint32_t        findMemType(uint32_t filter, VkMemoryPropertyFlags props);
     void            createBuffer(VkDeviceSize sz, VkBufferUsageFlags usage,

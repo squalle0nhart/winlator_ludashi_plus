@@ -35,6 +35,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.fragment.app.Fragment;
 import androidx.preference.PreferenceManager;
 
@@ -775,6 +776,24 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         final Spinner sFEXCoreVersion = view.findViewById(R.id.SFEXCoreVersion);
         FEXCoreManager.loadFEXCoreVersion(context, contentsManager, sFEXCoreVersion,
                 isEditMode() ? container.getFEXCoreVersion() : DefaultVersion.FEXCORE);
+        final SwitchCompat swUseUnixLibs = view.findViewById(R.id.SWUseUnixLibs);
+        swUseUnixLibs.setChecked(!isEditMode() || container.isUseUnixLibs());
+        Runnable updateUnixLibsToggle = () -> FEXCoreManager.updateUnixLibsToggle(
+                swUseUnixLibs, sFEXCoreVersion,
+                sWineVersion.getSelectedItem() != null
+                        ? sWineVersion.getSelectedItem().toString() : "");
+        sFEXCoreVersion.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View selectedView, int position, long id) {
+                updateUnixLibsToggle.run();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                updateUnixLibsToggle.run();
+            }
+        });
+        updateUnixLibsToggle.run();
         View btFEXCoreVersionRemove = view.findViewById(R.id.BTFEXCoreVersionRemove);
         View btFEXCoreVersionDownload = view.findViewById(R.id.BTFEXCoreVersionDownload);
         Runnable refreshBox64 = () -> {
@@ -901,6 +920,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 String box64Version = sBox64Version.getSelectedItem().toString();
                 String fexcoreVersion = sFEXCoreVersion.getSelectedItem().toString();
                 String fexcorePreset = FEXCorePresetManager.getSpinnerSelectedId(sFEXCorePreset);
+                boolean useUnixLibs = swUseUnixLibs.isChecked();
                 String box64Preset = Box64PresetManager.getSpinnerSelectedId(sBox64Preset);
                 String desktopTheme = getDesktopTheme(view);
                 // Capture missing properties
@@ -948,6 +968,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setBox64Preset(box64Preset);
                     container.setFEXCoreVersion(fexcoreVersion);
                     container.setFEXCorePreset(fexcorePreset);
+                    container.setUseUnixLibs(useUnixLibs);
                     container.setDesktopTheme(desktopTheme);
                     container.setMidiSoundFont(midiSoundFont);
                     container.setLC_ALL(lc_all);
@@ -996,6 +1017,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("box64Preset", box64Preset);
                     data.put("fexcoreVersion", fexcoreVersion);
                     data.put("fexcorePreset", fexcorePreset);
+                    data.put("useUnixLibs", useUnixLibs);
                     data.put("desktopTheme", desktopTheme);
                     data.put("wineVersion", sWineVersion.getSelectedItem().toString());
                     data.put("midiSoundFont", midiSoundFont);
@@ -1480,6 +1502,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 }
                 loadBox64VersionSpinner(context, container, contentsManager, sBox64Version, wineInfo.isArm64EC());
                 setupDXWrapperSpinnerWithFragment(sDXWrapper, vDXWrapperConfig, wineInfo.isArm64EC());
+                FEXCoreManager.updateUnixLibsToggle(
+                        view.findViewById(R.id.SWUseUnixLibs),
+                        view.findViewById(R.id.SFEXCoreVersion), wineVersion);
             }
 
             @Override

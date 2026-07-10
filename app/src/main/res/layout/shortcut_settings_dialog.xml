@@ -468,10 +468,24 @@
                 android:layout_marginTop="8dp">
                 
                 <LinearLayout style="@style/FieldSet">
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/fexcore_version" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/fexcore_version" />
+
+                        <androidx.appcompat.widget.SwitchCompat
+                            android:id="@+id/SWUseUnixLibs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/use_unix_libs" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"

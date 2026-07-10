@@ -99,19 +99,26 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         }
     }
 
-    private void extractEmulatorsDlls() {;
+    private void extractEmulatorsDlls() {
         Context context = environment.getContext();
-        File rootDir = environment.getImageFs().getRootDir();
+        ImageFs imageFs = environment.getImageFs();
+        File rootDir = imageFs.getRootDir();
         File system32dir = new File(rootDir + "/home/xuser/.wine/drive_c/windows/system32");
         boolean containerDataChanged = false;
 
         String wowbox64Version = container.getBox64Version();
         String fexcoreVersion = container.getFEXCoreVersion();
+        boolean useUnixLibs = container.isUseUnixLibs();
 
         if (shortcut != null) {
             wowbox64Version = shortcut.getExtra("box64Version", shortcut.container.getBox64Version());
             fexcoreVersion = shortcut.getExtra("fexcoreVersion", shortcut.container.getFEXCoreVersion());
+            useUnixLibs = "1".equals(shortcut.getExtra(
+                    "useUnixLibs", container.isUseUnixLibs() ? "1" : "0"));
         }
+
+        if (wowbox64Version == null) wowbox64Version = "";
+        if (fexcoreVersion == null) fexcoreVersion = "";
 
         Log.d("GuestProgramLauncherComponent", "box64Version in use: " + wowbox64Version);
         Log.d("GuestProgramLauncherComponent", "fexcoreVersion in use: " + fexcoreVersion);
@@ -126,15 +133,49 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             containerDataChanged = true;
         }
 
-        if (!fexcoreVersion.equals(container.getExtra("fexcoreVersion"))) {
-            ContentProfile profile = contentsManager.getProfileByEntryName("fexcore-" + fexcoreVersion);
-            if (profile != null)
-                contentsManager.applyContent(profile);
-            else
-                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, environment.getContext(), "fexcore/fexcore-" + fexcoreVersion + ".tzst", system32dir);
+        ContentProfile fexcoreProfile = fexcoreVersion.isEmpty()
+                ? null : contentsManager.getProfileByEntryName("fexcore-" + fexcoreVersion);
+        boolean unixLibsCompatible = FEXCoreManager.isUnixLibsCompatible(
+                fexcoreVersion, container.getWineVersion());
+        boolean fexUnixLibsActive = useUnixLibs
+                && unixLibsCompatible
+                && contentsManager.fexcoreVersionHasUnixLibs(fexcoreVersion);
+        String fexcoreMode = fexUnixLibsActive ? "unixlibs" : "dll";
+        boolean fexcoreDllsMissing = !new File(system32dir, "libwow64fex.dll").isFile()
+                || !new File(system32dir, "libarm64ecfex.dll").isFile();
+        boolean fexcoreNeedsExtraction = !fexcoreVersion.equals(container.getExtra("fexcoreVersion"))
+                || !fexcoreMode.equals(container.getExtra("fexcoreMode"))
+                || (!fexUnixLibsActive && fexcoreDllsMissing);
+
+        if (useUnixLibs && !unixLibsCompatible) {
+            Log.i("GuestProgramLauncherComponent",
+                    "UnixLibs requested but the selected FEXCore/Wine names are not compatible");
+        }
+
+        if (fexcoreNeedsExtraction) {
+            if (fexcoreProfile != null) {
+                contentsManager.applyContent(fexcoreProfile);
+            } else if (!fexcoreVersion.isEmpty()) {
+                TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context,
+                        "fexcore/fexcore-" + fexcoreVersion + ".tzst", system32dir);
+            }
             container.putExtra("fexcoreVersion", fexcoreVersion);
+            container.putExtra("fexcoreMode", fexcoreMode);
             containerDataChanged = true;
         }
+
+        File imageFsUnixDir = new File(rootDir, "usr/lib/wine/aarch64-unix");
+        File wineUnixDir = new File(imageFs.getWinePath(), "lib/wine/aarch64-unix");
+        if (fexUnixLibsActive) {
+            contentsManager.clearFEXUnixLibsFromDir(wineUnixDir);
+            contentsManager.copyUnixLibsToDir(fexcoreProfile, wineUnixDir);
+        } else {
+            contentsManager.clearFEXUnixLibsFromDir(imageFsUnixDir);
+            contentsManager.clearFEXUnixLibsFromDir(wineUnixDir);
+        }
+
+        Log.i("GuestProgramLauncherComponent", "FEXCore backend: version="
+                + fexcoreVersion + " mode=" + fexcoreMode);
         if (containerDataChanged) container.saveData();
     }
 

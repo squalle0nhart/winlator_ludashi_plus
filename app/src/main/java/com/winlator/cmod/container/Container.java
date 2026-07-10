@@ -78,6 +78,7 @@ public class Container {
     private String desktopTheme = WineThemeManager.DEFAULT_DESKTOP_THEME;
     private String fexcoreVersion;
     private String fexcorePreset = FEXCorePreset.INTERMEDIATE;
+    private boolean useUnixLibs = true;
     private String box64Preset = Box64Preset.COMPATIBILITY;
     private File rootDir;
     private JSONObject extraData;
@@ -427,6 +428,14 @@ public class Container {
         return fexcorePreset;
     }
 
+    public boolean isUseUnixLibs() {
+        return useUnixLibs;
+    }
+
+    public void setUseUnixLibs(boolean useUnixLibs) {
+        this.useUnixLibs = useUnixLibs;
+    }
+
     public String getBox64Preset() {
         return box64Preset;
     }
@@ -614,6 +623,7 @@ public class Container {
             data.put("box64Version", box64Version);
             data.put("fexcorePreset", fexcorePreset);
             data.put("fexcoreVersion", fexcoreVersion);
+            data.put("useUnixLibs", useUnixLibs);
             data.put("box64Preset", box64Preset);
             data.put("desktopTheme", desktopTheme);
             data.put("extraData", extraData);
@@ -731,6 +741,9 @@ public class Container {
                     break;
                 case "fexcorePreset":
                     setFEXCorePreset(data.getString(key));
+                    break;
+                case "useUnixLibs":
+                    setUseUnixLibs(data.getBoolean(key));
                     break;
                 case "box64Preset" :
                     setBox64Preset(data.getString(key));

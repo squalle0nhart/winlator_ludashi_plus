@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class ContentsManager {
@@ -34,7 +35,10 @@ public class ContentsManager {
             "${syswow64}/d3d12core.dll", "${syswow64}/d3d12.dll"};
     public static final String[] BOX64_TRUST_FILES = {"${bindir}/box64"};
     public static final String[] WOWBOX64_TRUST_FILES = {"${system32}/wowbox64.dll"};
-    public static final String[] FEXCORE_TRUST_FILES = {"${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll"};
+    public static final String[] FEXCORE_TRUST_FILES = {
+            "${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll",
+            "${libdir}/wine/aarch64-unix/libwow64fex.so",
+            "${libdir}/wine/aarch64-unix/libarm64ecfex.so"};
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -503,6 +507,59 @@ public class ContentsManager {
         return null;
     }
 
+    public boolean profileHasUnixLibs(ContentProfile profile) {
+        if (profile == null) return false;
+        return dirContainsSharedObject(getInstallDir(context, profile));
+    }
+
+    public boolean fexcoreVersionHasUnixLibs(String fexcoreVersion) {
+        if (fexcoreVersion == null || fexcoreVersion.isEmpty()) return false;
+        return profileHasUnixLibs(getProfileByEntryName("fexcore-" + fexcoreVersion));
+    }
+
+    private static boolean dirContainsSharedObject(File dir) {
+        if (dir == null) return false;
+        File[] files = dir.listFiles();
+        if (files == null) return false;
+        for (File file : files) {
+            if (file.isDirectory()) {
+                if (dirContainsSharedObject(file)) return true;
+            } else if (isSharedObject(file.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSharedObject(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".so") || lower.contains(".so.");
+    }
+
+    public void copyUnixLibsToDir(ContentProfile profile, File destDir) {
+        if (profile == null || profile.fileList == null) return;
+        for (ContentProfile.ContentFile contentFile : profile.fileList) {
+            String name = new File(contentFile.target).getName();
+            if (!isSharedObject(name)) continue;
+            File sourceFile = new File(getInstallDir(context, profile), contentFile.source);
+            if (!sourceFile.exists()) continue;
+            File destFile = new File(destDir, name);
+            FileUtils.copy(sourceFile, destFile);
+            FileUtils.chmod(destFile, 0771);
+        }
+    }
+
+    public void clearFEXUnixLibsFromDir(File destDir) {
+        if (destDir == null) return;
+        String[] names = {"libarm64ecfex.so", "libwow64fex.so"};
+        for (String name : names) {
+            File file = new File(destDir, name);
+            if (file.exists() && !file.delete()) {
+                Log.w("ContentsManager", "Failed to remove stale FEX UnixLib: " + file);
+            }
+        }
+    }
+
     public boolean applyContent(ContentProfile profile) {
         if (profile.type != ContentProfile.ContentType.CONTENT_TYPE_WINE || profile.type != ContentProfile.ContentType.CONTENT_TYPE_PROTON) {
             for (ContentProfile.ContentFile contentFile : profile.fileList) {
@@ -512,7 +569,8 @@ public class ContentsManager {
                 targetFile.delete();
                 FileUtils.copy(sourceFile, targetFile);
 
-                if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64) {
+                if (profile.type == ContentProfile.ContentType.CONTENT_TYPE_BOX64
+                        || isSharedObject(targetFile.getName())) {
                     FileUtils.chmod(targetFile, 0771);
                 }
             }
