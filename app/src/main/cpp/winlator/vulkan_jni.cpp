@@ -294,6 +294,14 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetPresentMode(JNIEnv*, job
     if (r) r->setPresentMode((VkPresentModeKHR)mode);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetFrameGenerationMultiplier(
+    JNIEnv*, jobject, jlong handle, jint multiplier)
+{
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setFrameGenerationMultiplier((int)multiplier);
+}
+
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeGetSupportedPresentModes(JNIEnv* env, jobject, jlong handle) {
     auto* r = reinterpret_cast<VulkanRendererContext*>(handle);

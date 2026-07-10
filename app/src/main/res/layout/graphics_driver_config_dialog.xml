@@ -2,6 +2,7 @@
 
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/LLGraphicsDriverConfigRoot"
     android:layout_width="match_parent"
     android:orientation="vertical"
     android:layout_height="wrap_content" >
@@ -28,7 +29,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:entries="@array/vulkan_version_entries"
                 android:id="@+id/SGraphicsDriverVulkanVersion"
                 android:spinnerMode="dialog"/>
@@ -43,7 +44,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverVersion"
                 android:spinnerMode="dialog"/>
 
@@ -58,7 +59,7 @@
             <com.winlator.cmod.widget.MultiSelectionComboBox
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/MSCAvailableExtensions"
                 android:spinnerMode="dialog"/>
 
@@ -72,7 +73,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverGPUName"
                 android:spinnerMode="dialog"/>
 
@@ -87,7 +88,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverMaxDeviceMemory"
                 android:entries="@array/device_memory_entries"
                 android:spinnerMode="dialog"/>
@@ -103,7 +104,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverPresentMode"
                 android:entries="@array/present_mode_entries"
                 android:spinnerMode="dialog"/>
@@ -118,7 +119,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverResourceType"
                 android:entries="@array/resource_type_entries"
                 android:spinnerMode="dialog"/>
@@ -133,7 +134,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverBCnEmulation"
                 android:entries="@array/bcn_emulation_entries"
                 android:spinnerMode="dialog"/>
@@ -148,7 +149,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverBCnEmulationType"
                 android:entries="@array/bcn_emulation_type_entries"
                 android:spinnerMode="dialog"/>
@@ -163,7 +164,7 @@
             <Spinner
                 style="@style/ComboBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:id="@+id/SGraphicsDriverBCnEmulationCache"
                 android:entries="@array/bcn_emulation_cache_entries"
                 android:spinnerMode="dialog"/>

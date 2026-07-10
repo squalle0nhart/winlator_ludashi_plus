@@ -37,7 +37,7 @@ public class EnvVarsView extends FrameLayout {
         {"TU_DEBUG", "SELECT_MULTIPLE", "forcecb", "nocb", "deck_emu", "startup", "nir", "nobin", "sysmem", "gmem", "forcebin", "layout", "noubwc", "nomultipos", "nolrz", "nolrzfc", "perf", "perfc", "flushall", "syncdraw", "push_consts_per_stage", "rast_order", "unaligned_store", "log_skip_gmem_ops", "dynamic", "bos", "3d_load", "fdm", "noconform", "rd"},
         {"DXVK_HUD", "SELECT_MULTIPLE", "scale=0.5", "scale=0.7", "opacity=0.5", "opacity=0.7", "devinfo", "fps", "frametimes", "submissions", "drawcalls", "pipelines", "descriptors", "memory", "gpuload", "version", "api", "cs", "compiler", "samplers"},
         {"MESA_EXTENSION_MAX_YEAR", "TEXT"},
-        {"VKD3D_SHADER_MODEL", "TEXT"},
+        {"VKD3D_SHADER_MODEL", "SELECT", "6_6", "6_5", "6_4", "6_3", "6_2", "6_1", "6_0", "5_1"},
         {"WRAPPER_BLIT", "TEXT"},
         {"FD_DEV_FEATURES", "TEXT"},
         {"IR3_SHADER_DEBUG", "SELECT_MULTIPLE", "nouboopt", "nopreamble", "noearlypreamble", "nofp16", "nocache", "spillall", "fullsync", "fullnop", "nodescprefetch", "expandrpt", "noaliastex", "noaliasrt"},
@@ -48,7 +48,27 @@ public class EnvVarsView extends FrameLayout {
         {"WINE_NEW_MEDIASOURCE", "CHECKBOX", "0", "1"},
         {"GALLIUM_HUD", "SELECT_MULTIPLE", "simple", "fps", "frametime"},
         {"WINE_LARGE_ADDRESS_AWARE", "CHECKBOX", "0", "1"},
-        {"WINEDLLOVERRIDES", "TEXT"}
+        // DXVK tuning
+        {"DXVK_DISABLE_TIMELINE_SEMAPHORES", "CHECKBOX", "0", "1"},
+        {"DXVK_FRAME_RATE", "NUMBER"},
+        {"DXVK_STATE_CACHE", "CHECKBOX", "0", "1"},
+        {"DXVK_LOG_LEVEL", "SELECT", "none", "error", "warn", "info", "debug"},
+        // VKD3D (D3D12) tuning
+        {"VKD3D_FEATURE_LEVEL", "SELECT", "12_2", "12_1", "12_0", "11_1", "11_0"},
+        {"VKD3D_CONFIG", "SELECT_MULTIPLE", "dxr", "dxr11", "force_static_cbv", "no_upload_hvv", "force_host_cached", "single_queue", "force_bindless_texel_buffer"},
+        {"VKD3D_DEBUG", "SELECT", "none", "err", "fixme", "warn", "trace"},
+        // Wine tuning
+        {"WINEFSYNC", "CHECKBOX", "0", "1"},
+        {"WINEDEBUG", "SELECT", "-all", "fixme-all", "+seh", "+relay", "warn+all"},
+        {"WINEDLLOVERRIDES", "TEXT"},
+        {"WINE_FULLSCREEN_FSR", "CHECKBOX", "0", "1"},
+        {"WINE_FULLSCREEN_FSR_STRENGTH", "NUMBER"},
+        // Mesa / Turnip present + driver
+        {"MESA_VK_WSI_PRESENT_MODE", "SELECT", "fifo", "mailbox", "immediate", "relaxed"},
+        {"MESA_NO_ERROR", "CHECKBOX", "0", "1"},
+        // GPU selection / present latency
+        {"DXVK_FILTER_DEVICE_NAME", "TEXT"},
+        {"VKD3D_SWAPCHAIN_LATENCY_FRAMES", "NUMBER"}
     };
     private final LinearLayout container;
     private final TextView emptyTextView;

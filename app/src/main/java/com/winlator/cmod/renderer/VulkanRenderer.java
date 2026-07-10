@@ -113,6 +113,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeSetPresentMode(long handle, int mode);
     private native int[] nativeGetSupportedPresentModes(long handle);
     private native int[] nativeGetSwapchainSize(long handle);
+    private native void nativeSetFrameGenerationMultiplier(long handle, int multiplier);
 
     
     
@@ -158,9 +159,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         }
                         
                         
-                        nativeSetPresentMode(nativeHandle, pendingPresentMode);
+                        nativeSetPresentMode(nativeHandle, pendingFrameGenMultiplier >= 2 ? 2 : pendingPresentMode);
                         nativeSetFilterMode(nativeHandle, pendingFilterMode);
                         nativeSetSwapRB(nativeHandle, pendingSwapRB);
+                        nativeSetFrameGenerationMultiplier(nativeHandle, pendingFrameGenMultiplier);
                         nativeSetStretchMode(nativeHandle, pendingStretchMode);
                         nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
                         nativeSetSharpness(nativeHandle, pendingSharpness);
@@ -174,9 +176,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 nativeHandle = nativeInit(surface, xServer.screenInfo.width, xServer.screenInfo.height, driverPath, driverLibraryName, nativeLibDir);
                 if (nativeHandle != 0) {
 
-                    nativeSetPresentMode(nativeHandle, pendingPresentMode);
+                    nativeSetPresentMode(nativeHandle, pendingFrameGenMultiplier >= 2 ? 2 : pendingPresentMode);
                     nativeSetFilterMode(nativeHandle, pendingFilterMode);
                     nativeSetSwapRB(nativeHandle, pendingSwapRB);
+                    nativeSetFrameGenerationMultiplier(nativeHandle, pendingFrameGenMultiplier);
                     nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
                     nativeSetSharpness(nativeHandle, pendingSharpness);
                     updateTransform();
@@ -733,7 +736,25 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     public void setVkPresentMode(int mode) {
         pendingPresentMode = mode;
-        synchronized (lock) { if (nativeHandle != 0) nativeSetPresentMode(nativeHandle, mode); }
+        synchronized (lock) {
+            if (nativeHandle != 0) nativeSetPresentMode(nativeHandle, pendingFrameGenMultiplier >= 2 ? 2 : mode);
+        }
+    }
+
+    public void setFrameGenerationMultiplier(int multiplier) {
+        pendingFrameGenMultiplier = multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier));
+        synchronized (lock) {
+            if (nativeHandle != 0) {
+                // This compositor port emits one interpolated frame per FIFO slot. Mailbox would
+                // collapse the generated burst, so restore the user's present mode when FG turns off.
+                nativeSetPresentMode(nativeHandle, pendingFrameGenMultiplier >= 2 ? 2 : pendingPresentMode);
+                nativeSetFrameGenerationMultiplier(nativeHandle, pendingFrameGenMultiplier);
+            }
+        }
+    }
+
+    public int getFrameGenerationMultiplier() {
+        return pendingFrameGenMultiplier;
     }
 
     public int[] getSupportedPresentModes() {
@@ -785,6 +806,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private int     pendingPostFXMode     = 0;
     private float   pendingSharpness      = 0.5f;
     private boolean pendingSwapRB         = false;
+    private int     pendingFrameGenMultiplier = 0;
     public int getFpsLimit() { return fpsLimit; }
     public void setFpsLimit(int limit) {
         this.fpsLimit = limit;

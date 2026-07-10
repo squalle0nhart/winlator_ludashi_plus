@@ -139,6 +139,39 @@ add_custom_command(
     COMMENT "Compiling window_postfx.frag → window_postfx_frag.h"
 )
 
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/framegen_vert.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} vert framegen_vert_code
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen.vert
+            ${CMAKE_CURRENT_BINARY_DIR}/framegen_vert.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen.vert
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+    COMMENT "Compiling framegen.vert -> framegen_vert.h"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/framegen_motion_comp.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} comp framegen_motion_comp_code
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen_motion.comp
+            ${CMAKE_CURRENT_BINARY_DIR}/framegen_motion_comp.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen_motion.comp
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+    COMMENT "Compiling framegen_motion.comp -> framegen_motion_comp.h"
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/framegen_interpolate_frag.h
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+            ${GLSLC} frag framegen_interpolate_frag_code
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen_interpolate.frag
+            ${CMAKE_CURRENT_BINARY_DIR}/framegen_interpolate_frag.h
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/winlator/framegen_interpolate.frag
+            ${CMAKE_CURRENT_SOURCE_DIR}/winlator/gen_shader_header.sh
+    COMMENT "Compiling framegen_interpolate.frag -> framegen_interpolate_frag.h"
+)
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(vulkan_renderer SHARED
@@ -153,6 +186,9 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_legacy_upscale_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/framegen_vert.h
+        ${CMAKE_CURRENT_BINARY_DIR}/framegen_motion_comp.h
+        ${CMAKE_CURRENT_BINARY_DIR}/framegen_interpolate_frag.h
 )
 
 target_compile_options(vulkan_renderer PRIVATE
@@ -174,6 +210,7 @@ target_link_libraries(vulkan_renderer
 add_library(asurface_renderer SHARED
         asurfacerenderer/asurface_jni.cpp
         asurfacerenderer/ASurfaceRendererContext.cpp
+        asurfacerenderer/blit_converter.cpp
 )
 
 target_compile_options(asurface_renderer PRIVATE
@@ -185,6 +222,26 @@ target_link_libraries(asurface_renderer
         android
         dl
         atomic
+        EGL
+        GLESv3
+)
+
+add_library(ahbimage SHARED
+        asurfacerenderer/ahbimage.c
+)
+
+target_compile_definitions(ahbimage PRIVATE
+        EGL_EGLEXT_PROTOTYPES
+        GL_GLEXT_PROTOTYPES
+)
+
+target_compile_options(ahbimage PRIVATE -Wall -Wextra)
+
+target_link_libraries(ahbimage
+        log
+        android
+        EGL
+        GLESv2
 )
 
 add_library(direct_scanout SHARED

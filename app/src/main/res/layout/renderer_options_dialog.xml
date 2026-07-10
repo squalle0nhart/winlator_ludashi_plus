@@ -101,6 +101,12 @@
                 android:text="Swap red/blue channels" />
 
             <CheckBox
+                android:id="@+id/CBRendererSfCompatMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/renderer_sf_compat" />
+
+            <CheckBox
                 android:id="@+id/CBRendererLegacyScanout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

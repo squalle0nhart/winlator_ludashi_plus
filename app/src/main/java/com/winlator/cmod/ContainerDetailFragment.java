@@ -487,6 +487,15 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
+                            public boolean getRendererSfCompatMode() {
+                                return rendererCfgHolder.getRendererSfCompatMode();
+                            }
+
+                            public void setRendererSfCompatMode(boolean val) {
+                                rendererCfgHolder.setRendererSfCompatMode(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
                             public boolean getRendererLegacyScanout() {
                                 return rendererCfgHolder.getRendererLegacyScanout();
                             }
@@ -629,6 +638,15 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setBionicFgModel(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
+                            }
+
+                            public int getNativeFgMultiplier() {
+                                return rendererCfgHolder.getNativeFgMultiplier();
+                            }
+
+                            public void setNativeFgMultiplier(int val) {
+                                rendererCfgHolder.setNativeFgMultiplier(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
                             }
                         }, rendererCfgHolder.isRendererNative()).show();
             };
@@ -913,6 +931,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setRendererDriverId(rendererCfgHolder.getRendererDriverId());
                     container.setRendererFilterMode(rendererCfgHolder.getRendererFilterMode());
                     container.setRendererSwapRB(rendererCfgHolder.getRendererSwapRB());
+                    container.setRendererSfCompatMode(rendererCfgHolder.getRendererSfCompatMode());
                     container.setRendererLegacyScanout(rendererCfgHolder.getRendererLegacyScanout());
                     container.setDXWrapperConfig(dxwrapperConfig);
                     container.setAudioDriver(audioDriver);
@@ -958,6 +977,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                         data.put("rendererFilterMode", rendererCfgHolder.getRendererFilterMode());
                     if (rendererCfgHolder.getRendererSwapRB())
                         data.put("rendererSwapRB", true);
+                    if (!rendererCfgHolder.getRendererSfCompatMode())
+                        data.put("rendererSfCompatMode", false);
                     if (rendererCfgHolder.getRendererLegacyScanout())
                         data.put("rendererLegacyScanout", true);
                     data.put("dxwrapperConfig", dxwrapperConfig);
@@ -1701,6 +1722,15 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             onFinished.run();
             return;
         }
+        if (packageInfo.contentPackage) {
+            ContentProfile profile = createReleaseProtonContentProfile(packageInfo);
+            if (profile == null) {
+                AppUtils.showToast(getContext(), R.string.unable_to_install_proton);
+                return;
+            }
+            downloadAndInstallProfile(profile, onFinished);
+            return;
+        }
         DownloadProgressDialog dialog = new DownloadProgressDialog(getActivity());
         dialog.show(R.string.downloading_proton);
         CONTENT_IO_EXECUTOR.execute(() -> {
@@ -1717,16 +1747,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 return;
             }
 
-            if (packageInfo.contentPackage) {
-                requireActivity().runOnUiThread(() -> {
-                    dialog.closeOnUiThread();
-                    installImportedContent(Uri.fromFile(output),
-                            Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_PROTON),
-                            onFinished);
-                });
-                return;
-            }
-
             boolean installed = ProtonPackageManager.installPackage(getContext(), packageInfo.identifier, output);
             requireActivity().runOnUiThread(() -> {
                 dialog.closeOnUiThread();
@@ -1736,6 +1756,39 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 onFinished.run();
             });
         });
+    }
+
+    @Nullable
+    private ContentProfile createReleaseProtonContentProfile(ProtonPackageManager.PackageInfo packageInfo) {
+        if (!packageInfo.contentPackage || packageInfo.directUrl == null || packageInfo.directUrl.isEmpty()) {
+            return null;
+        }
+        ContentProfile profile = contentsManager.getProfileByEntryName(packageInfo.identifier);
+        if (profile != null) {
+            if (profile.remoteUrl == null || profile.remoteUrl.isEmpty()) {
+                profile.remoteUrl = packageInfo.directUrl;
+            }
+            return profile;
+        }
+
+        int firstDashIndex = packageInfo.identifier.indexOf('-');
+        int lastDashIndex = packageInfo.identifier.lastIndexOf('-');
+        if (firstDashIndex <= 0 || lastDashIndex <= firstDashIndex) {
+            return null;
+        }
+
+        try {
+            ContentProfile profileFromPackage = new ContentProfile();
+            profileFromPackage.type = ContentProfile.ContentType.getTypeByName(
+                    packageInfo.identifier.substring(0, firstDashIndex));
+            profileFromPackage.verName = packageInfo.identifier.substring(firstDashIndex + 1, lastDashIndex);
+            profileFromPackage.verCode = Integer.parseInt(packageInfo.identifier.substring(lastDashIndex + 1));
+            profileFromPackage.remoteUrl = packageInfo.directUrl;
+            profileFromPackage.desc = packageInfo.title;
+            return profileFromPackage.type == null ? null : profileFromPackage;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void removeWineVersion(String selected, Spinner sWineVersion, Runnable refreshAction) {

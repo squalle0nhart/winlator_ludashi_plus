@@ -8,11 +8,14 @@ import com.winlator.cmod.container.Shortcut;
 public abstract class FrameGenManager {
     public static final String BACKEND_LSFG_VK = "lsfg_vk";
     public static final String BACKEND_BIONIC_FG = "bionic_fg";
+    public static final String BACKEND_NATIVE_FG = "native_fg";
 
     private FrameGenManager() {}
 
     public static String normalizeBackend(String backend) {
-        return BACKEND_BIONIC_FG.equalsIgnoreCase(backend) ? BACKEND_BIONIC_FG : BACKEND_LSFG_VK;
+        if (BACKEND_BIONIC_FG.equalsIgnoreCase(backend)) return BACKEND_BIONIC_FG;
+        if (BACKEND_NATIVE_FG.equalsIgnoreCase(backend)) return BACKEND_NATIVE_FG;
+        return BACKEND_LSFG_VK;
     }
 
     public static String getBackend(Container container) {
@@ -24,6 +27,7 @@ public abstract class FrameGenManager {
     }
 
     public static boolean ensureRuntimeInstalled(Context context, Container container) {
+        if (BACKEND_NATIVE_FG.equals(getBackend(container))) return true;
         if (BACKEND_BIONIC_FG.equals(getBackend(container))) {
             return BionicFgManager.ensureRuntimeInstalled(context, container);
         }
@@ -31,6 +35,7 @@ public abstract class FrameGenManager {
     }
 
     public static boolean ensureRuntimeInstalled(Context context, Shortcut shortcut) {
+        if (BACKEND_NATIVE_FG.equals(getBackend(shortcut))) return true;
         if (BACKEND_BIONIC_FG.equals(getBackend(shortcut))) {
             return BionicFgManager.ensureRuntimeInstalled(context, shortcut);
         }
@@ -38,6 +43,7 @@ public abstract class FrameGenManager {
     }
 
     public static boolean writeConfig(Container container) {
+        if (BACKEND_NATIVE_FG.equals(getBackend(container))) return true;
         if (BACKEND_BIONIC_FG.equals(getBackend(container))) {
             return BionicFgManager.writeConfig(container);
         }
@@ -45,6 +51,7 @@ public abstract class FrameGenManager {
     }
 
     public static boolean writeConfig(Shortcut shortcut) {
+        if (BACKEND_NATIVE_FG.equals(getBackend(shortcut))) return true;
         if (BACKEND_BIONIC_FG.equals(getBackend(shortcut))) {
             return BionicFgManager.writeConfig(shortcut);
         }
@@ -54,6 +61,11 @@ public abstract class FrameGenManager {
     public static boolean applyLaunchEnv(Container container, EnvVars envVars) {
         LsfgVkManager.clearLaunchEnv(envVars);
         BionicFgManager.clearLaunchEnv(envVars);
+        if (BACKEND_NATIVE_FG.equals(getBackend(container))) {
+            envVars.put("DISABLE_LSFG", "1");
+            envVars.put("BIONIC_FG_DISABLE", "1");
+            return true;
+        }
         if (BACKEND_BIONIC_FG.equals(getBackend(container))) {
             envVars.put("DISABLE_LSFG", "1");
             return BionicFgManager.applyLaunchEnv(container, envVars);
@@ -65,6 +77,11 @@ public abstract class FrameGenManager {
     public static boolean applyLaunchEnv(Shortcut shortcut, EnvVars envVars) {
         LsfgVkManager.clearLaunchEnv(envVars);
         BionicFgManager.clearLaunchEnv(envVars);
+        if (BACKEND_NATIVE_FG.equals(getBackend(shortcut))) {
+            envVars.put("DISABLE_LSFG", "1");
+            envVars.put("BIONIC_FG_DISABLE", "1");
+            return true;
+        }
         if (BACKEND_BIONIC_FG.equals(getBackend(shortcut))) {
             envVars.put("DISABLE_LSFG", "1");
             return BionicFgManager.applyLaunchEnv(shortcut, envVars);

@@ -10,9 +10,12 @@ import android.widget.CheckedTextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.ListPopupWindow;
 
+import com.winlator.cmod.R;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.Collections;
@@ -99,6 +102,12 @@ public class MultiSelectionComboBox extends AppCompatTextView {
             public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
                 CheckedTextView checkedTextView = (CheckedTextView)super.getView(position, convertView, parent);
                 checkedTextView.setChecked(selectedItemSet.contains(items[position]));
+                checkedTextView.setTextColor(ThemeUtils.getColorAttr(getContext(), R.attr.colorOnSurface));
+                checkedTextView.setMinHeight((int) UnitUtils.dpToPx(48));
+                int horizontalPadding = (int) UnitUtils.dpToPx(16);
+                int verticalPadding = (int) UnitUtils.dpToPx(10);
+                checkedTextView.setPaddingRelative(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
+                checkedTextView.setBackgroundResource(R.drawable.spinner_dropdown_item_amoled_bg);
                 if (!text.isEmpty())
                     setText(selectedItemSet.size() + " " + text);
                 else
@@ -111,6 +120,7 @@ public class MultiSelectionComboBox extends AppCompatTextView {
         popupWindow.setAdapter(adapter);
         popupWindow.setAnchorView(this);
         popupWindow.setWidth((int)UnitUtils.dpToPx(260));
+        popupWindow.setBackgroundDrawable(AppCompatResources.getDrawable(getContext(), ThemeUtils.getPopupBackgroundRes()));
 
         popupWindow.setOnItemClickListener((parent, view, position, id) -> {
             String item = items[position];

@@ -9,10 +9,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PictureInPictureParams;
 import android.graphics.Rect;
-import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.util.Rational;
-import android.util.TypedValue;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -77,8 +74,10 @@ import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.RuntimeBackendProbe;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.core.WineInfo;
 import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineRequestHandler;
@@ -202,6 +201,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private short taskAffinityMaskWoW64 = 0;
     private String wineCpuTopologyValue = "";
     private int frameRatingWindowId = -1;
+    private String activeFrameGenBackend;
+    private int activeFrameGenMultiplier;
 
     private int activeRendererWindowId = -1;
     private String lastRendererName = null;
@@ -426,6 +427,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        setTheme(ThemeUtils.getFullscreenThemeResId(this));
         super.onCreate(savedInstanceState);
         AppUtils.hideSystemUI(this);
         AppUtils.keepScreenOn(this);
@@ -678,10 +680,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (frameRatingWindowId == window.id) {
                     if (classicHud != null) classicHud.update();
                     if (modernHud != null) modernHud.onFrame();
-                } else if (frameRatingWindowId == -1 && lastRendererName != null
-                        && window.isApplicationWindow()
+                } else if (frameRatingWindowId == -1 && window.isApplicationWindow()
                         && ((modernHud != null && modernHud.isUserEnabled())
-                         || (classicHud != null && classicHud.getVisibility() == View.VISIBLE))) {
+                         || (classicHud != null && classicHud.isUserEnabled()))) {
 
                     frameRatingWindowId = window.id;
                     activeRendererWindowId = window.id;
@@ -1021,6 +1022,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
+        if (handler != null) {
+            handler.removeCallbacks(savePlaytimeRunnable);
+        }
         super.onDestroy();
     }
 
@@ -1335,8 +1339,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             glRenderer.setInitialNativeMode(nativeMode);
         } else if (renderer instanceof ASurfaceRenderer) {
             ASurfaceRenderer asrRenderer = (ASurfaceRenderer) renderer;
-            asrRenderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
-                    : (container != null && container.getRendererSwapRB()));
+            asrRenderer.setSfCompatMode(shortcut != null ? shortcut.getRendererSfCompatMode()
+                    : (container == null || container.getRendererSfCompatMode()));
         }
 
         if (shortcut != null) {
@@ -1392,6 +1396,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 rootView.addView(classicHud);
                 renderer.setFrameRating(classicHud);
                 classicHud.setRenderer(rendererLabel);
+                classicHud.enableByUser();
             } else if (hudMode == 2) {
 
                 modernHud = new WinlatorHUD(this);
@@ -1424,6 +1429,47 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
+        setupRuntimeBackendIndicator();
+    }
+
+    private void setupRuntimeBackendIndicator() {
+        TextView indicator = findViewById(R.id.TVRuntimeBackend);
+        if (indicator == null || wineInfo == null) return;
+
+        boolean arm64ec = wineInfo.isArm64EC();
+        String arch = arm64ec ? "arm64ec" : "x86-64";
+        String normalizedEmulator = emulator == null ? "" : emulator.toLowerCase(java.util.Locale.ROOT);
+        String translator = !arm64ec ? "Box64"
+                : normalizedEmulator.contains("wowbox64") ? "wowbox64" : "FEXCore";
+        String baseLabel = arch + " · " + translator;
+
+        indicator.setText(baseLabel + (arm64ec ? " · N/A" : ""));
+        indicator.setVisibility(View.VISIBLE);
+        if (!arm64ec) return;
+
+        new Thread(() -> {
+            RuntimeBackendProbe.FexMode mode = RuntimeBackendProbe.FexMode.NA;
+            for (int i = 0; i < 15 && mode == RuntimeBackendProbe.FexMode.NA; i++) {
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                mode = RuntimeBackendProbe.detect(GuestProgramLauncherComponent.getPid());
+            }
+
+            RuntimeBackendProbe.FexMode detectedMode = mode;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                String modeLabel = detectedMode == RuntimeBackendProbe.FexMode.UNIXLIB
+                        ? "unixlib" : detectedMode == RuntimeBackendProbe.FexMode.DLL ? "DLL" : "N/A";
+                indicator.setText(baseLabel + " · " + modeLabel);
+                indicator.setTextColor(detectedMode == RuntimeBackendProbe.FexMode.UNIXLIB
+                        ? android.graphics.Color.rgb(76, 175, 80)
+                        : ThemeUtils.getColorAttr(this, R.attr.colorOnSurfaceVariant));
+            });
+        }, "fex-runtime-probe").start();
     }
 
     private void applyScreenEffects(GLRenderer renderer, float brightness, float contrast, float gamma,
@@ -1530,6 +1576,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void wireSidebarListeners(boolean enableLogs) {
+        applySidebarSpinnerTheme();
 
         View btItemLogs = findViewById(R.id.BTItemLogs);
         if (btItemLogs != null)
@@ -1547,11 +1594,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         toggleOnClick(R.id.BTItemGraphics, R.id.LLSubGraphics);
         toggleOnClick(R.id.BTItemScreen, R.id.LLSubScreen);
         openSidebarPanel(R.id.BTItemFPS, R.id.LLSubFPS);
-
-        View btLsfg = findViewById(R.id.BTLsfgSettings);
-        if (btLsfg != null) {
-            btLsfg.setOnClickListener(v -> showLsfgQuickDialog());
-        }
 
         ViewGroup btItemPause = (ViewGroup) findViewById(R.id.BTItemPause);
         if (btItemPause != null) {
@@ -1727,21 +1769,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void setSidebarActiveItem(int activeId) {
-        float density = getResources().getDisplayMetrics().density;
         for (int itemId : sidebarItemIds) {
             View item = findViewById(itemId);
             if (item == null) continue;
             if (itemId == activeId) {
-                GradientDrawable background = new GradientDrawable();
-                background.setColor(Color.parseColor("#0F2D42"));
-                background.setStroke((int) (1.1f * density), Color.parseColor("#0288D1"));
-                background.setCornerRadius(density * 15);
-                item.setBackground(background);
+                item.setBackgroundResource(R.drawable.sidebar_nav_icon_active);
                 item.animate().scaleX(1.025f).scaleY(1.025f).setDuration(105).start();
             } else {
-                TypedValue outValue = new TypedValue();
-                getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
-                item.setBackgroundResource(outValue.resourceId);
+                item.setBackgroundResource(R.drawable.sidebar_nav_icon_bg);
                 item.animate().scaleX(1.0f).scaleY(1.0f).setDuration(90).start();
             }
         }
@@ -1773,26 +1808,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private ArrayAdapter<String> createSidebarSpinnerAdapter(String[] items) {
-        return new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
-            @NonNull
-            @Override
-            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                TextView view = (TextView) super.getView(position, convertView, parent);
-                view.setTextColor(Color.parseColor("#EEF7FF"));
-                view.setTextSize(14);
-                view.setSingleLine(true);
-                return view;
-            }
+        return ThemeUtils.createSpinnerAdapter(this, items);
+    }
 
-            @Override
-            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                TextView view = (TextView) super.getDropDownView(position, convertView, parent);
-                view.setTextColor(Color.parseColor("#EEF7FF"));
-                view.setBackgroundColor(Color.parseColor("#0E2231"));
-                view.setTextSize(14);
-                return view;
-            }
+    private void applySidebarSpinnerTheme() {
+        int[] spinnerIds = {
+            R.id.SPNativeFPS,
+            R.id.SPUpscalerMode,
+            R.id.SPPostFXMode,
+            R.id.SPColorMode,
+            R.id.SPInputControlsProfile,
+            R.id.SPHudStyle
         };
+
+        for (int spinnerId : spinnerIds) {
+            Spinner spinner = findViewById(spinnerId);
+            if (spinner != null) ThemeUtils.applySpinnerTheme(spinner);
+        }
     }
 
     private void setupSidebarHudControls() {
@@ -1975,8 +2007,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner spPostFXMode       = findViewById(R.id.SPPostFXMode);
         Spinner spColorMode        = findViewById(R.id.SPColorMode);
         View    btSaveGraphicsPreset = findViewById(R.id.BTSaveGraphicsPreset);
-        View    llFrameGenOptions  = findViewById(R.id.LLFrameGenOptions);
-        Spinner spFrameGenFPS      = findViewById(R.id.SPFrameGenFPS);
         View    btScalingNone      = findViewById(R.id.BTScalingNone);
         View    btScalingLinear    = findViewById(R.id.BTScalingLinear);
         View    btScalingNearest   = findViewById(R.id.BTScalingNearest);
@@ -1986,8 +2016,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View    btScalingDls       = findViewById(R.id.BTScalingDls);
         View    btScalingNis       = findViewById(R.id.BTScalingNis);
 
-        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
-        if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
         if (spColorMode    != null) spColorMode.setVisibility(View.GONE);
 
         final int[]    fpsValues = {0, 30, 60, 90, 120};
@@ -2005,7 +2033,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (llStandardOptions != null) llStandardOptions.setVisibility(View.VISIBLE);
-                    if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
                     renderer.setFpsLimit(pos < fpsValues.length ? fpsValues[pos] : 0);
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
@@ -2290,6 +2317,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (glRenderer != null) {
             applyGlEffectsRef[0].run();
         }
+        setupSidebarFrameGenControls(vkRenderer);
         updateSharpnessVis.run();
 
         if (btSaveGraphicsPreset != null) {
@@ -2313,224 +2341,138 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        final String[] frameGenLabels = {"2x Interpolation", "Always On"};
-        if (spFrameGenFPS != null) {
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(frameGenLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spFrameGenFPS.setAdapter(a);
-        }
     }
 
-    private void showLsfgQuickDialog() {
-        if (container == null) {
-            AppUtils.showToast(this, "Container is not ready");
-            return;
-        }
+    private void setupSidebarFrameGenControls(VulkanRenderer vkRenderer) {
+        if (container == null) return;
 
         boolean dllAvailable = shortcut != null
                 ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
                 : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
-
-        FrameGenQuickMenuHelper.Settings currentSettings = shortcut != null
-                ? FrameGenQuickMenuHelper.readSettings(shortcut)
-                : FrameGenQuickMenuHelper.readSettings(container);
-        final String[] selectedBackend = {currentSettings.backend};
-        final int[] selectedLsfgMultiplier = {shortcut != null ? shortcut.getLsfgMultiplier() : container.getLsfgMultiplier()};
-        final float[] selectedLsfgFlowScale = {shortcut != null ? shortcut.getLsfgFlowScale() : container.getLsfgFlowScale()};
-        final boolean[] selectedPerformanceMode = {shortcut != null ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode()};
-        final int[] selectedBionicMultiplier = {shortcut != null ? shortcut.getBionicFgMultiplier() : container.getBionicFgMultiplier()};
-        final float[] selectedBionicFlowScale = {shortcut != null ? shortcut.getBionicFgFlowScale() : container.getBionicFgFlowScale()};
-        final int[] selectedBionicModel = {shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
-
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        int padding = Math.round(getResources().getDisplayMetrics().density * 16.0f);
-        layout.setPadding(padding, padding / 2, padding, 0);
-
-        TextView backendLabel = new TextView(this);
-        backendLabel.setText("Backend");
-        layout.addView(backendLabel);
-
-        Spinner backendSpinner = new Spinner(this);
-        android.widget.ArrayAdapter<String> backendAdapter = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, new String[]{"LSFG-VK", "Bionic-FG"});
-        backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        backendSpinner.setAdapter(backendAdapter);
-        backendSpinner.setSelection(currentSettings.backend.equals(FrameGenManager.BACKEND_BIONIC_FG) ? 1 : 0);
-        layout.addView(backendSpinner);
-
-        TextView status = new TextView(this);
-        status.setPadding(0, padding / 2, 0, 0);
-        layout.addView(status);
-
-        TextView description = new TextView(this);
-        description.setPadding(0, padding / 2, 0, 0);
-        description.setText("Frame multiplier - generates intermediate frames between rendered ones.");
-        layout.addView(description);
-
-        android.widget.RadioGroup multiplierGroup = new android.widget.RadioGroup(this);
-        multiplierGroup.setOrientation(android.widget.RadioGroup.VERTICAL);
-        int initialMultiplier = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
-                ? selectedBionicMultiplier[0]
-                : selectedLsfgMultiplier[0];
-        int[] multiplierValues = {0, 2, 3, 4};
-        for (int value : multiplierValues) {
-            android.widget.RadioButton radioButton = new android.widget.RadioButton(this);
-            radioButton.setId(View.generateViewId());
-            radioButton.setTag(value);
-            radioButton.setText(value == 0 ? "Off" : value + "x");
-            boolean checked = value == initialMultiplier || (value == 0 && initialMultiplier < 2);
-            radioButton.setChecked(checked);
-            multiplierGroup.addView(radioButton);
+        final String[] selectedBackend = {shortcut != null
+                ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container)};
+        final int[] selectedMultiplier = {getFrameGenMultiplier(selectedBackend[0])};
+        if (activeFrameGenBackend == null) {
+            activeFrameGenBackend = selectedBackend[0];
+            activeFrameGenMultiplier = selectedMultiplier[0];
         }
-        layout.addView(multiplierGroup);
+        TextView status = findViewById(R.id.TVFrameGenStatus);
 
-        TextView flowLabel = new TextView(this);
-        flowLabel.setPadding(0, padding, 0, 0);
-        layout.addView(flowLabel);
-
-        android.widget.SeekBar flowSeekBar = new android.widget.SeekBar(this);
-        flowSeekBar.setMax(75);
-        flowSeekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + (progress / 100.0f));
-                if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
-                    selectedBionicFlowScale[0] = value;
+        Runnable updateUi = () -> {
+            boolean nativeBackend = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
+            boolean bionicBackend = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+            setSelectedModeButton(R.id.BTFrameGenLsfg, FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]));
+            setSelectedModeButton(R.id.BTFrameGenBionic, bionicBackend);
+            setSelectedModeButton(R.id.BTFrameGenNative, nativeBackend);
+            setSelectedModeButton(R.id.BTFrameGenOff, selectedMultiplier[0] < 2);
+            setSelectedModeButton(R.id.BTFrameGen2x, selectedMultiplier[0] == 2);
+            setSelectedModeButton(R.id.BTFrameGen3x, selectedMultiplier[0] == 3);
+            setSelectedModeButton(R.id.BTFrameGen4x, selectedMultiplier[0] == 4);
+            if (status != null) {
+                if (nativeBackend) {
+                    boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
+                            || activeFrameGenMultiplier < 2;
+                    status.setText(vkRenderer == null
+                            ? "Native Framegen requires the Vulkan renderer."
+                            : canApplyLive
+                                    ? "Native optical-flow frame generation applies immediately."
+                                    : "Relaunch to switch from the active external framegen layer.");
+                } else if (bionicBackend) {
+                    status.setText("Bionic-FG changes apply after relaunch.");
                 } else {
-                    selectedLsfgFlowScale[0] = value;
-                }
-                flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", value));
-            }
-
-            @Override
-            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
-
-            @Override
-            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {}
-        });
-        layout.addView(flowSeekBar);
-
-        TextView modelLabel = new TextView(this);
-        modelLabel.setPadding(0, padding, 0, 0);
-        modelLabel.setText("Model");
-        layout.addView(modelLabel);
-
-        Spinner modelSpinner = new Spinner(this);
-        android.widget.ArrayAdapter<String> modelAdapter = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, new String[]{"Model 0", "Model 1"});
-        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        modelSpinner.setAdapter(modelAdapter);
-        modelSpinner.setSelection(Math.max(0, Math.min(1, selectedBionicModel[0])));
-        modelSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                selectedBionicModel[0] = position;
-            }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-        });
-        layout.addView(modelSpinner);
-
-        CheckBox performanceMode = new CheckBox(this);
-        performanceMode.setText("Performance mode");
-        performanceMode.setChecked(selectedPerformanceMode[0]);
-        performanceMode.setOnCheckedChangeListener((buttonView, isChecked) -> selectedPerformanceMode[0] = isChecked);
-        layout.addView(performanceMode);
-
-        final boolean[] syncingUi = {false};
-        Runnable syncUi = () -> {
-            syncingUi[0] = true;
-            selectedBackend[0] = backendSpinner.getSelectedItemPosition() == 1
-                    ? FrameGenManager.BACKEND_BIONIC_FG
-                    : FrameGenManager.BACKEND_LSFG_VK;
-            boolean useBionicFg = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
-            status.setText(useBionicFg
-                    ? "Bionic-FG is bundled with the app and does not require Lossless.dll."
-                    : (dllAvailable
-                            ? "LSFG-VK uses the imported Lossless.dll."
-                            : "Import Lossless.dll in app settings before enabling LSFG-VK."));
-
-            int selectedMultiplier = useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
-            for (int i = 0; i < multiplierGroup.getChildCount(); i++) {
-                View child = multiplierGroup.getChildAt(i);
-                if (child instanceof android.widget.RadioButton) {
-                    Object tag = child.getTag();
-                    ((android.widget.RadioButton) child).setChecked(tag instanceof Integer
-                            && ((Integer) tag) == selectedMultiplier);
-                    child.setEnabled(useBionicFg || dllAvailable);
+                    status.setText(dllAvailable
+                            ? "LSFG-VK changes apply after relaunch."
+                            : "Import Lossless.dll before enabling LSFG-VK.");
                 }
             }
-            float currentFlowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
-            flowSeekBar.setEnabled(useBionicFg || dllAvailable);
-            flowSeekBar.setProgress(Math.round((currentFlowScale - 0.25f) * 100.0f));
-            flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", currentFlowScale));
-            modelLabel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-            modelSpinner.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-            performanceMode.setVisibility(useBionicFg ? View.GONE : View.VISIBLE);
-            performanceMode.setEnabled(dllAvailable);
-            syncingUi[0] = false;
+            if (vkRenderer != null) {
+                boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
+                        || activeFrameGenMultiplier < 2;
+                vkRenderer.setFrameGenerationMultiplier(nativeBackend && canApplyLive ? selectedMultiplier[0] : 0);
+            }
         };
 
-        backendSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                syncUi.run();
+        View.OnClickListener backendListener = view -> {
+            String backend = view.getId() == R.id.BTFrameGenBionic
+                    ? FrameGenManager.BACKEND_BIONIC_FG
+                    : view.getId() == R.id.BTFrameGenNative
+                            ? FrameGenManager.BACKEND_NATIVE_FG
+                            : FrameGenManager.BACKEND_LSFG_VK;
+            if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend) && vkRenderer == null) {
+                AppUtils.showToast(this, "Native Framegen requires the Vulkan renderer");
+                return;
             }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-        });
-        multiplierGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (syncingUi[0]) return;
-            View checkedView = group.findViewById(checkedId);
-            Object tag = checkedView != null ? checkedView.getTag() : null;
-            if (!(tag instanceof Integer)) return;
-            if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
-                selectedBionicMultiplier[0] = (Integer) tag;
-            } else {
-                selectedLsfgMultiplier[0] = (Integer) tag;
+            boolean changed = !backend.equals(selectedBackend[0]);
+            selectedBackend[0] = backend;
+            selectedMultiplier[0] = getFrameGenMultiplier(backend);
+            persistFrameGenSelection(backend, selectedMultiplier[0]);
+            updateUi.run();
+            boolean needsRelaunch = changed && (!FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
+                    || (!FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
+                            && activeFrameGenMultiplier >= 2));
+            if (needsRelaunch) {
+                AppUtils.showToast(this, "Framegen backend changed. Relaunch the game to apply it.");
             }
-        });
-        syncUi.run();
+        };
+        setOnClickListenerIfPresent(R.id.BTFrameGenLsfg, backendListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenBionic, backendListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenNative, backendListener);
 
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Frame Generation")
-                .setView(layout)
-                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                    boolean backendChanged = !currentSettings.backend.equals(selectedBackend[0]);
-                    int selectedMultiplier = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
-                            ? selectedBionicMultiplier[0]
-                            : selectedLsfgMultiplier[0];
-                    FrameGenQuickMenuHelper.Settings newSettings = new FrameGenQuickMenuHelper.Settings(
-                            selectedBackend[0],
-                            selectedMultiplier,
-                            FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
-                                    ? selectedBionicFlowScale[0]
-                                    : selectedLsfgFlowScale[0],
-                            selectedPerformanceMode[0],
-                            selectedBionicModel[0]);
-                    if (shortcut != null) {
-                        FrameGenQuickMenuHelper.applySettings(shortcut, newSettings);
-                        if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
-                        FrameGenManager.writeConfig(shortcut);
-                    } else {
-                        FrameGenQuickMenuHelper.applySettings(container, newSettings);
-                        if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, container);
-                        FrameGenManager.writeConfig(container);
-                    }
-                    if (backendChanged) {
-                        AppUtils.showToast(this, "Frame generation backend changed. Relaunch the game to apply it.");
-                    } else {
-                        String backendLabelText = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]) ? "Bionic-FG" : "LSFG-VK";
-                        AppUtils.showToast(this, selectedMultiplier >= 2
-                                ? backendLabelText + " enabled: " + selectedMultiplier + "x"
-                                : "Frame generation disabled");
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        View.OnClickListener multiplierListener = view -> {
+            int multiplier = view.getId() == R.id.BTFrameGen2x ? 2
+                    : view.getId() == R.id.BTFrameGen3x ? 3
+                    : view.getId() == R.id.BTFrameGen4x ? 4 : 0;
+            if (multiplier >= 2 && FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]) && !dllAvailable) {
+                AppUtils.showToast(this, "Import Lossless.dll before enabling LSFG-VK");
+                return;
+            }
+            selectedMultiplier[0] = multiplier;
+            persistFrameGenSelection(selectedBackend[0], multiplier);
+            updateUi.run();
+            if (!FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
+                AppUtils.showToast(this, multiplier >= 2
+                        ? "Framegen set to " + multiplier + "x. Relaunch the game to apply it."
+                        : "Frame generation disabled after relaunch");
+            }
+        };
+        setOnClickListenerIfPresent(R.id.BTFrameGenOff, multiplierListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGen2x, multiplierListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGen3x, multiplierListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGen4x, multiplierListener);
+        updateUi.run();
+    }
+
+    private int getFrameGenMultiplier(String backend) {
+        if (shortcut != null) {
+            if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return shortcut.getNativeFgMultiplier();
+            if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return shortcut.getBionicFgMultiplier();
+            return shortcut.getLsfgMultiplier();
+        }
+        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return container.getNativeFgMultiplier();
+        if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return container.getBionicFgMultiplier();
+        return container.getLsfgMultiplier();
+    }
+
+    private void persistFrameGenSelection(String backend, int multiplier) {
+        float flowScale = shortcut != null
+                ? (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
+                        ? shortcut.getBionicFgFlowScale() : shortcut.getLsfgFlowScale())
+                : (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
+                        ? container.getBionicFgFlowScale() : container.getLsfgFlowScale());
+        boolean performanceMode = shortcut != null
+                ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode();
+        int model = shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel();
+        FrameGenQuickMenuHelper.Settings settings = new FrameGenQuickMenuHelper.Settings(
+                backend, multiplier, flowScale, performanceMode, model);
+        if (shortcut != null) {
+            FrameGenQuickMenuHelper.applySettings(shortcut, settings);
+            if (multiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
+            FrameGenManager.writeConfig(shortcut);
+        } else {
+            FrameGenQuickMenuHelper.applySettings(container, settings);
+            if (multiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, container);
+            FrameGenManager.writeConfig(container);
+        }
     }
 
     private void setupSidebarInputControls() {
@@ -2989,7 +2931,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return "wrapper";
         }
         if (graphicsDriver.startsWith("wrapper-v2")) {
-            return "wrapper-original";
+            return "wrapper-gamenative";
         }
         if (graphicsDriver.startsWith("wrapper-original")) {
             return "wrapper-original";

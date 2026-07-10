@@ -4,7 +4,7 @@ import androidx.annotation.Keep;
 import com.winlator.cmod.xserver.Drawable;
 import java.nio.ByteBuffer;
 
-public class GPUImage extends Texture {
+public class GPUImage extends NativeTexture {
     private long hardwareBufferPtr;
     private long imageKHRPtr;
     private ByteBuffer virtualData;
@@ -65,6 +65,7 @@ public class GPUImage extends Texture {
         return hardwareBufferPtr;
     }
 
+    @Override
     public short getStride() {
         return stride;
     }
@@ -74,6 +75,7 @@ public class GPUImage extends Texture {
         this.stride = stride;
     }
 
+    @Override
     public ByteBuffer getVirtualData() {
         return virtualData;
     }

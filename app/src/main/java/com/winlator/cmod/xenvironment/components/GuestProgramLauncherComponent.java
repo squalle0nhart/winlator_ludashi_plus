@@ -219,6 +219,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         return terminationCallback;
     }
 
+    public static int getPid() {
+        return pid;
+    }
+
     public void setTerminationCallback(Callback<Integer> terminationCallback) {
         this.terminationCallback = terminationCallback;
     }

@@ -315,6 +315,12 @@ public class Shortcut {
     }
     public void setRendererSwapRB(boolean v) { putExtra("rendererSwapRB", v ? "1" : "0"); }
 
+    public boolean getRendererSfCompatMode() {
+        String v = getExtra("rendererSfCompatMode", null);
+        return v != null ? v.equals("1") : container.getRendererSfCompatMode();
+    }
+    public void setRendererSfCompatMode(boolean v) { putExtra("rendererSfCompatMode", v ? "1" : "0"); }
+
     public boolean getRendererLegacyScanout() {
         String v = getExtra("rendererLegacyScanout", null);
         return v != null ? v.equals("1") : container.getRendererLegacyScanout();
@@ -426,5 +432,20 @@ public class Shortcut {
 
     public void setBionicFgModel(int model) {
         putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+    }
+
+    public int getNativeFgMultiplier() {
+        String value = getExtra("nativeFgMultiplier", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    : container.getNativeFgMultiplier();
+        } catch (NumberFormatException e) {
+            return container.getNativeFgMultiplier();
+        }
+    }
+
+    public void setNativeFgMultiplier(int multiplier) {
+        putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
     }
 }

@@ -4,7 +4,9 @@ import android.graphics.Bitmap;
 
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.math.Mathf;
+import com.winlator.cmod.renderer.AHBImage;
 import com.winlator.cmod.renderer.GPUImage;
+import com.winlator.cmod.renderer.NativeTexture;
 import com.winlator.cmod.renderer.Texture;
 
 import java.nio.ByteBuffer;
@@ -26,6 +28,10 @@ public class Drawable extends XResource {
         DRAWABLE_FOR_ASR = value;
     }
 
+    public static boolean IS_ASR() {
+        return DRAWABLE_FOR_ASR;
+    }
+
     static {
         System.loadLibrary("winlator");
     }
@@ -36,7 +42,7 @@ public class Drawable extends XResource {
         this.height = (short)height;
         this.visual = visual;
         if (DRAWABLE_FOR_ASR && width > 0 && height > 0) {
-            GPUImage g = new GPUImage((short) width, (short) height);
+            AHBImage g = new AHBImage((short) width, (short) height);
             ByteBuffer vd = g.getHardwareBufferPtr() != 0 ? g.getVirtualData() : null;
             if (vd != null) {
                 this.texture = g;
@@ -64,8 +70,8 @@ public class Drawable extends XResource {
     }
 
     public void setTexture(Texture texture) {
-        if (texture instanceof GPUImage) {
-            ByteBuffer vd = ((GPUImage)texture).getVirtualData();
+        if (texture instanceof NativeTexture) {
+            ByteBuffer vd = ((NativeTexture)texture).getVirtualData();
             if (vd != null) data = vd;
 
         }
@@ -73,8 +79,8 @@ public class Drawable extends XResource {
     }
 
     public void refreshDataFromTexture() {
-        if (texture instanceof GPUImage) {
-            ByteBuffer vd = ((GPUImage) texture).getVirtualData();
+        if (texture instanceof NativeTexture) {
+            ByteBuffer vd = ((NativeTexture) texture).getVirtualData();
             if (vd != null) data = vd;
         }
     }
@@ -100,7 +106,7 @@ public class Drawable extends XResource {
     }
 
     private short getStride() {
-        return texture instanceof GPUImage ? ((GPUImage)texture).getStride() : width;
+        return texture instanceof NativeTexture ? ((NativeTexture)texture).getStride() : width;
     }
 
     public Runnable getOnDrawListener() {

@@ -23,6 +23,7 @@ import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.StringUtils;
+import com.winlator.cmod.core.ThemeUtils;
 import com.winlator.cmod.widget.MultiSelectionComboBox;
 
 import org.json.JSONArray;
@@ -107,11 +108,45 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 String gpuName = jobj.getString("name");
                 entries.add(gpuName);
             }
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, entries);
-            spinner.setAdapter(adapter);
+            spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, entries));
+            ThemeUtils.applySpinnerTheme(spinner);
         }
         catch (JSONException e) {
         }
+    }
+
+    private void applyDialogFieldTheme() {
+        int textColor = ThemeUtils.getColorAttr(getContext(), R.attr.colorOnSurface);
+        ViewGroup root = findViewById(R.id.LLGraphicsDriverConfigRoot);
+        if (root == null) return;
+        applyTextColorRecursively(root, textColor);
+    }
+
+    private void applyTextColorRecursively(View view, int textColor) {
+        if (view instanceof CheckBox) {
+            ((CheckBox) view).setTextColor(textColor);
+        } else if (view instanceof TextView && !(view instanceof Spinner) && !(view instanceof MultiSelectionComboBox)) {
+            ((TextView) view).setTextColor(textColor);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyTextColorRecursively(group.getChildAt(i), textColor);
+            }
+        }
+    }
+
+    private void applySpinnerTheme(Spinner... spinners) {
+        for (Spinner spinner : spinners) {
+            if (spinner != null) {
+                ThemeUtils.applySpinnerTheme(spinner);
+            }
+        }
+    }
+
+    private void bindSpinnerEntries(Context context, Spinner spinner, int entriesResId) {
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(context, context.getResources().getStringArray(entriesResId)));
+        ThemeUtils.applySpinnerTheme(spinner);
     }
 
     public static HashMap<String, String> parseGraphicsDriverConfig(String graphicsDriverConfig) {
@@ -210,6 +245,16 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         cbTimelineSemaphores = findViewById(R.id.CBTimelineSemaphores);
         cbTuDebugSysmem = findViewById(R.id.CBTuDebugSysmem);
         cbMesaGlthread = findViewById(R.id.CBMesaGlthread);
+
+        bindSpinnerEntries(anchor.getContext(), sVulkanVersion, R.array.vulkan_version_entries);
+        bindSpinnerEntries(anchor.getContext(), sMaxDeviceMemory, R.array.device_memory_entries);
+        bindSpinnerEntries(anchor.getContext(), sPresentMode, R.array.present_mode_entries);
+        bindSpinnerEntries(anchor.getContext(), sResourceType, R.array.resource_type_entries);
+        bindSpinnerEntries(anchor.getContext(), sBCnEmulation, R.array.bcn_emulation_entries);
+        bindSpinnerEntries(anchor.getContext(), sBCnEmulationType, R.array.bcn_emulation_type_entries);
+        bindSpinnerEntries(anchor.getContext(), sBCnEmulationCache, R.array.bcn_emulation_cache_entries);
+        applySpinnerTheme(sVersion, sGPUName);
+        applyDialogFieldTheme();
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
@@ -417,9 +462,8 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         wrapperVersions.addAll(adrenotoolsManager.enumarateInstalledDrivers());
 
         // Set the adapter and select the initial version
-        ArrayAdapter<String> wrapperAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_dropdown_item, wrapperVersions);
-        
-        sVersion.setAdapter(wrapperAdapter);
+        sVersion.setAdapter(ThemeUtils.createSpinnerAdapter(context, wrapperVersions));
+        ThemeUtils.applySpinnerTheme(sVersion);
         
         // We can start logging selected graphics driver and initial version
         Log.d(TAG, "Graphics driver: " + graphicsDriver);

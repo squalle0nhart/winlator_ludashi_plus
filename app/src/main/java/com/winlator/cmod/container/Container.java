@@ -63,6 +63,7 @@ public class Container {
     private String rendererDriverId = "system";
     private int rendererFilterMode = 0;
     private boolean rendererSwapRB = false;
+    private boolean rendererSfCompatMode = true;
     private boolean rendererLegacyScanout = false;
     public static final int FULLSCREEN_OFF = 0;
     public static final int FULLSCREEN_FIT = 1;
@@ -154,6 +155,8 @@ public class Container {
     public void setRendererFilterMode(int v) { this.rendererFilterMode = v; }
     public boolean getRendererSwapRB() { return rendererSwapRB; }
     public void setRendererSwapRB(boolean v) { this.rendererSwapRB = v; }
+    public boolean getRendererSfCompatMode() { return rendererSfCompatMode; }
+    public void setRendererSfCompatMode(boolean v) { this.rendererSfCompatMode = v; }
     public boolean getRendererLegacyScanout() { return rendererLegacyScanout; }
     public void setRendererLegacyScanout(boolean v) { this.rendererLegacyScanout = v; }
 
@@ -254,6 +257,20 @@ public class Container {
 
     public void setBionicFgModel(int model) {
         putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+    }
+
+    public int getNativeFgMultiplier() {
+        String value = getExtra("nativeFgMultiplier", "0");
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed < 2 ? 0 : Math.max(2, Math.min(4, parsed));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public void setNativeFgMultiplier(int multiplier) {
+        putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
     }
 
     public String getDXWrapper() {
@@ -582,6 +599,7 @@ public class Container {
             if (!rendererDriverId.isEmpty()) data.put("rendererDriverId", rendererDriverId);
             if (rendererFilterMode != 0) data.put("rendererFilterMode", rendererFilterMode);
             if (rendererSwapRB) data.put("rendererSwapRB", true);
+            if (!rendererSfCompatMode) data.put("rendererSfCompatMode", false);
             if (rendererLegacyScanout) data.put("rendererLegacyScanout", true);
             data.put("emulator", emulator);
             data.put("dxwrapper", dxwrapper);
@@ -615,6 +633,7 @@ public class Container {
     public void loadData(JSONObject data) throws JSONException {
         wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
         dxwrapperConfig = "";
+        rendererSfCompatMode = true;
         checkObsoleteOrMissingProperties(data);
 
         for (Iterator<String> it = data.keys(); it.hasNext(); ) {
@@ -658,6 +677,9 @@ public class Container {
                     break;
                 case "rendererSwapRB":
                     rendererSwapRB = data.getBoolean(key);
+                    break;
+                case "rendererSfCompatMode":
+                    rendererSfCompatMode = data.getBoolean(key);
                     break;
                 case "rendererLegacyScanout":
                     rendererLegacyScanout = data.getBoolean(key);

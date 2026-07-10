@@ -49,6 +49,9 @@ public class RendererOptionsDialog extends ContentDialog {
         boolean getRendererSwapRB();
         void setRendererSwapRB(boolean v);
 
+        boolean getRendererSfCompatMode();
+        void setRendererSfCompatMode(boolean v);
+
         boolean getRendererLegacyScanout();
         void setRendererLegacyScanout(boolean v);
 
@@ -83,6 +86,9 @@ public class RendererOptionsDialog extends ContentDialog {
         void setBionicFgFlowScale(float v);
         int getBionicFgModel();
         void setBionicFgModel(int v);
+
+        int getNativeFgMultiplier();
+        void setNativeFgMultiplier(int v);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
@@ -96,8 +102,8 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
-    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg"};
-    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG"};
+    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg", "native_fg"};
+    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG", "Native Framegen"};
     private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
     private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
@@ -128,6 +134,7 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbNativeRendering = findViewById(R.id.CBRendererNative);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
+        CheckBox cbSfCompatMode = findViewById(R.id.CBRendererSfCompatMode);
         CheckBox cbLegacyScanout = findViewById(R.id.CBRendererLegacyScanout);
         CheckBox cbDefaultUpscaler = findViewById(R.id.CBDefaultUpscaler);
         CheckBox cbDefaultSupersampling = findViewById(R.id.CBDefaultSupersampling);
@@ -179,7 +186,8 @@ public class RendererOptionsDialog extends ContentDialog {
             if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
             if (cbNativeRendering != null) cbNativeRendering.setVisibility(isGlRenderer ? View.VISIBLE : View.GONE);
-            if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer || isSurfaceFlingerRenderer) ? View.VISIBLE : View.GONE);
+            if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
+            if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(isSurfaceFlingerRenderer ? View.VISIBLE : View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
         };
         spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -224,6 +232,7 @@ public class RendererOptionsDialog extends ContentDialog {
         spFilter.setSelection(config.getRendererFilterMode());
         cbNativeRendering.setChecked(isNativeMode);
         cbSwapRB.setChecked(config.getRendererSwapRB());
+        cbSfCompatMode.setChecked(config.getRendererSfCompatMode());
         cbLegacyScanout.setChecked(config.getRendererLegacyScanout());
 
         setAmoledAdapter(ctx, spDefaultUpscaler, UPSCALER_LABELS);
@@ -257,6 +266,7 @@ public class RendererOptionsDialog extends ContentDialog {
             final int[] selectedBionicMultiplier = {config.getBionicFgMultiplier()};
             final float[] selectedBionicFlowScale = {sanitizeFlowScale(config.getBionicFgFlowScale())};
             final int[] selectedBionicModel = {config.getBionicFgModel()};
+            final int[] selectedNativeMultiplier = {config.getNativeFgMultiplier()};
             final boolean[] syncingFrameGenUi = {false};
 
             int backendSelection = 0;
@@ -272,15 +282,19 @@ public class RendererOptionsDialog extends ContentDialog {
             Runnable syncFrameGenUi = () -> {
                 syncingFrameGenUi[0] = true;
                 boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
-                boolean dllAvailable = !useBionicFg && config.isLsfgDllAvailable();
-                int multiplier = useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
+                boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
+                boolean dllAvailable = !useBionicFg && !useNativeFg && config.isLsfgDllAvailable();
+                int multiplier = useNativeFg ? selectedNativeMultiplier[0]
+                        : (useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0]);
                 float flowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
 
-                tvLsfgStatus.setText(useBionicFg
+                tvLsfgStatus.setText(useNativeFg
+                        ? "Open optical-flow interpolation in the native Vulkan compositor."
+                        : (useBionicFg
                         ? "Bundled Vulkan frame generation layer. No DLL import required."
                         : (dllAvailable
                                 ? "LSFG-VK runtime will use the imported Lossless.dll at launch."
-                                : "Import Lossless.dll in app settings before enabling LSFG-VK."));
+                                : "Import Lossless.dll in app settings before enabling LSFG-VK.")));
 
                 int multiplierSelection = 0;
                 for (int i = 0; i < LSFG_MULTIPLIER_VALUES.length; i++) {
@@ -296,8 +310,10 @@ public class RendererOptionsDialog extends ContentDialog {
                 cbLsfgPerformanceMode.setChecked(selectedLsfgPerformanceMode[0]);
                 groupBionicFgModel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
                 spBionicFgModel.setSelection(Math.max(0, Math.min(BIONIC_FG_MODEL_VALUES.length - 1, selectedBionicModel[0])));
-                cbLsfgPerformanceMode.setVisibility(useBionicFg ? View.GONE : View.VISIBLE);
-                spLsfgMultiplier.setEnabled(useBionicFg || dllAvailable);
+                cbLsfgPerformanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
+                spLsfgMultiplier.setEnabled(useBionicFg || useNativeFg || dllAvailable);
+                sbLsfgFlowScale.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
+                tvLsfgFlowScale.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
                 sbLsfgFlowScale.setEnabled(useBionicFg || dllAvailable);
                 cbLsfgPerformanceMode.setEnabled(dllAvailable);
                 spBionicFgModel.setEnabled(useBionicFg);
@@ -318,7 +334,9 @@ public class RendererOptionsDialog extends ContentDialog {
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     if (syncingFrameGenUi[0]) return;
                     boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
-                    if (useBionicFg) selectedBionicMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
+                    boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
+                    if (useNativeFg) selectedNativeMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
+                    else if (useBionicFg) selectedBionicMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
                     else selectedLsfgMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
                 }
 
@@ -370,6 +388,7 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setRendererFilterMode(spFilter.getSelectedItemPosition());
                 config.setRendererNative(cbNativeRendering.isChecked());
                 config.setRendererSwapRB(cbSwapRB.isChecked());
+                config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
                 config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
 
                 String backend = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()];
@@ -381,6 +400,7 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setBionicFgMultiplier(selectedBionicMultiplier[0]);
                 config.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                 config.setBionicFgModel(selectedBionicModel[0]);
+                config.setNativeFgMultiplier(selectedNativeMultiplier[0]);
             });
             return;
         }
@@ -398,6 +418,7 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererNative(cbNativeRendering.isChecked());
             config.setRendererSwapRB(cbSwapRB.isChecked());
+            config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
             config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
         });
     }

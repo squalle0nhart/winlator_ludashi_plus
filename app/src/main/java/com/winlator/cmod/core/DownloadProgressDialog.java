@@ -35,7 +35,11 @@ public class DownloadProgressDialog {
     }
 
     public void show() {
-        show(null);
+        show((CharSequence)null);
+    }
+
+    public void show(CharSequence text) {
+        show(text, null);
     }
 
     public void show(int textResId) {
@@ -44,6 +48,23 @@ public class DownloadProgressDialog {
 
     public void show(Runnable onCancelCallback) {
         show(0, onCancelCallback);
+    }
+
+    public void show(CharSequence text, final Runnable onCancelCallback) {
+        if (isShowing()) return;
+        close();
+        if (dialog == null) create();
+
+        if (text != null) ((TextView)dialog.findViewById(R.id.TextView)).setText(text);
+
+        setProgress(0);
+        if (onCancelCallback != null) {
+            dialog.findViewById(R.id.BTCancel).setOnClickListener((v) -> onCancelCallback.run());
+            dialog.findViewById(R.id.LLBottomBar).setVisibility(View.VISIBLE);
+        } else {
+            dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
+        }
+        dialog.show();
     }
 
     public void show(int textResId, final Runnable onCancelCallback) {
@@ -57,6 +78,8 @@ public class DownloadProgressDialog {
         if (onCancelCallback != null) {
             dialog.findViewById(R.id.BTCancel).setOnClickListener((v) -> onCancelCallback.run());
             dialog.findViewById(R.id.LLBottomBar).setVisibility(View.VISIBLE);
+        } else {
+            dialog.findViewById(R.id.LLBottomBar).setVisibility(View.GONE);
         }
         dialog.show();
     }
@@ -80,6 +103,11 @@ public class DownloadProgressDialog {
     public void setMessage(int textResId) {
         if (textResId > 0) 
             ((TextView)dialog.findViewById(R.id.TextView)).setText(textResId);
+    }
+
+    public void setMessage(CharSequence text) {
+        if (text != null)
+            ((TextView)dialog.findViewById(R.id.TextView)).setText(text);
     }
 
     public void closeOnUiThread() {

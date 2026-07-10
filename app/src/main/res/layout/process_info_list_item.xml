@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp" />
 
         <TextView
@@ -36,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:textColor="#8FD8FF"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -45,7 +45,7 @@
         android:layout_width="64dp"
         android:layout_height="wrap_content"
         android:gravity="end"
-        android:textColor="#DDF6FF"
+        android:textColor="?attr/themeAccentColor"
         android:textSize="12sp" />
 
     <ImageButton
@@ -55,6 +55,6 @@
         android:layout_marginStart="6dp"
         android:background="@android:color/transparent"
         android:src="@drawable/icon_list_item_menu"
-        app:tint="#40C4FF" />
+        app:tint="?attr/themeAccentColor" />
 
 </LinearLayout>

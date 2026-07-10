@@ -37,6 +37,10 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static Settings readSettings(Container container) {
         String backend = FrameGenManager.getBackend(container);
+        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
+            return new Settings(backend, container.getNativeFgMultiplier(), container.getLsfgFlowScale(),
+                    container.getLsfgPerformanceMode(), container.getBionicFgModel());
+        }
         if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) {
             return new Settings(backend, container.getBionicFgMultiplier(), container.getBionicFgFlowScale(),
                     container.getLsfgPerformanceMode(), container.getBionicFgModel());
@@ -47,6 +51,10 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static Settings readSettings(Shortcut shortcut) {
         String backend = FrameGenManager.getBackend(shortcut);
+        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
+            return new Settings(backend, shortcut.getNativeFgMultiplier(), shortcut.getLsfgFlowScale(),
+                    shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
+        }
         if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) {
             return new Settings(backend, shortcut.getBionicFgMultiplier(), shortcut.getBionicFgFlowScale(),
                     shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
@@ -57,7 +65,10 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static void applySettings(Container container, Settings settings) {
         container.setFrameGenBackend(settings.backend);
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
+        if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
+            container.setNativeFgMultiplier(settings.multiplier);
+            container.setLsfgEnabled(false);
+        } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
             container.setBionicFgMultiplier(settings.multiplier);
             container.setBionicFgFlowScale(settings.flowScale);
             container.setBionicFgModel(settings.model);
@@ -73,7 +84,10 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static void applySettings(Shortcut shortcut, Settings settings) {
         shortcut.setFrameGenBackend(settings.backend);
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
+        if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
+            shortcut.setNativeFgMultiplier(settings.multiplier);
+            shortcut.setLsfgEnabled(false);
+        } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
             shortcut.setBionicFgMultiplier(settings.multiplier);
             shortcut.setBionicFgFlowScale(settings.flowScale);
             shortcut.setBionicFgModel(settings.model);

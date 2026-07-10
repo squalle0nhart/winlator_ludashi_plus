@@ -145,6 +145,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
         final boolean[] rendererSwapRBHolder = new boolean[] { shortcut.getRendererSwapRB() };
+        final boolean[] rendererSfCompatModeHolder = new boolean[] { shortcut.getRendererSfCompatMode() };
         final boolean[] rendererLegacyScanoutHolder = new boolean[] { shortcut.getRendererLegacyScanout() };
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
@@ -172,6 +173,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererFilterMode(int val) { rendererFilterHolder[0] = val; }
                 public boolean getRendererSwapRB() { return rendererSwapRBHolder[0]; }
                 public void setRendererSwapRB(boolean val) { rendererSwapRBHolder[0] = val; }
+                public boolean getRendererSfCompatMode() { return rendererSfCompatModeHolder[0]; }
+                public void setRendererSfCompatMode(boolean val) { rendererSfCompatModeHolder[0] = val; }
                 public boolean getRendererLegacyScanout() { return rendererLegacyScanoutHolder[0]; }
                 public void setRendererLegacyScanout(boolean val) { rendererLegacyScanoutHolder[0] = val; }
                 public int getGraphicsFilterMode() {
@@ -217,6 +220,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setBionicFgFlowScale(float val) { shortcut.setBionicFgFlowScale(val); }
                 public int getBionicFgModel() { return shortcut.getBionicFgModel(); }
                 public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
+                public int getNativeFgMultiplier() { return shortcut.getNativeFgMultiplier(); }
+                public void setNativeFgMultiplier(int val) { shortcut.setNativeFgMultiplier(val); }
             }, rendererNativeHolder[0]).show();
         if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
         if (rendererTrigger != null) rendererTrigger.setOnClickListener(openRendererOptions);
@@ -530,6 +535,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);
                 shortcut.setRendererFilterMode(rendererFilterHolder[0]);
                 shortcut.setRendererSwapRB(rendererSwapRBHolder[0]);
+                shortcut.setRendererSfCompatMode(rendererSfCompatModeHolder[0]);
                 shortcut.setRendererLegacyScanout(rendererLegacyScanoutHolder[0]);
                 shortcut.putExtra("emulator", emulator);
                 shortcut.putExtra("midiSoundFont", midiSoundFont);

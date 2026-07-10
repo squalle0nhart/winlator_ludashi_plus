@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme.Base" parent="@style/Theme.AppCompat.NoActionBar">
+    <style name="BaseAppTheme" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="colorWindowBackground">@color/theme_light_window</item>
         <item name="colorSurface">@color/theme_light_surface</item>
         <item name="colorSurfaceElevated">@color/theme_light_surface_elevated</item>
@@ -31,7 +31,7 @@
         <item name="popupMenuStyle">@style/PopupMenu</item>
     </style>
 
-    <style name="AppTheme.Base.Dark" parent="@style/Theme.AppCompat.NoActionBar">
+    <style name="BaseAppTheme.Dark" parent="@style/BaseAppTheme">
         <item name="colorWindowBackground">@color/theme_dark_window</item>
         <item name="colorSurface">@color/theme_dark_surface</item>
         <item name="colorSurfaceElevated">@color/theme_dark_surface_elevated</item>
@@ -62,64 +62,75 @@
         <item name="popupMenuStyle">@style/PopupMenu</item>
     </style>
 
-    <style name="AppTheme.Blue" parent="@style/AppTheme.Base">
+    <style name="AppTheme.Blue" parent="@style/BaseAppTheme">
         <item name="colorAccent">@color/theme_blue_500</item>
         <item name="colorPrimary">@color/theme_blue_500</item>
         <item name="colorPrimaryDark">@color/theme_blue_700</item>
         <item name="themeAccentColor">@color/theme_blue_500</item>
     </style>
 
-    <style name="AppTheme.Blue.Dark" parent="@style/AppTheme.Base.Dark">
+    <style name="AppTheme.Blue.Dark" parent="@style/BaseAppTheme.Dark">
         <item name="colorAccent">@color/theme_blue_500</item>
         <item name="colorPrimary">@color/theme_blue_500</item>
         <item name="colorPrimaryDark">@color/theme_blue_700</item>
         <item name="themeAccentColor">@color/theme_blue_500</item>
     </style>
 
-    <style name="AppTheme.Emerald" parent="@style/AppTheme.Base">
+    <style name="AppTheme.Emerald" parent="@style/BaseAppTheme">
         <item name="colorAccent">@color/theme_emerald_500</item>
         <item name="colorPrimary">@color/theme_emerald_500</item>
         <item name="colorPrimaryDark">@color/theme_emerald_700</item>
         <item name="themeAccentColor">@color/theme_emerald_500</item>
     </style>
 
-    <style name="AppTheme.Emerald.Dark" parent="@style/AppTheme.Base.Dark">
+    <style name="AppTheme.Emerald.Dark" parent="@style/BaseAppTheme.Dark">
         <item name="colorAccent">@color/theme_emerald_500</item>
         <item name="colorPrimary">@color/theme_emerald_500</item>
         <item name="colorPrimaryDark">@color/theme_emerald_700</item>
         <item name="themeAccentColor">@color/theme_emerald_500</item>
     </style>
 
-    <style name="AppTheme.Sunset" parent="@style/AppTheme.Base">
+    <style name="AppTheme.Sunset" parent="@style/BaseAppTheme">
         <item name="colorAccent">@color/theme_sunset_500</item>
         <item name="colorPrimary">@color/theme_sunset_500</item>
         <item name="colorPrimaryDark">@color/theme_sunset_700</item>
         <item name="themeAccentColor">@color/theme_sunset_500</item>
     </style>
 
-    <style name="AppTheme.Sunset.Dark" parent="@style/AppTheme.Base.Dark">
+    <style name="AppTheme.Sunset.Dark" parent="@style/BaseAppTheme.Dark">
         <item name="colorAccent">@color/theme_sunset_500</item>
         <item name="colorPrimary">@color/theme_sunset_500</item>
         <item name="colorPrimaryDark">@color/theme_sunset_700</item>
         <item name="themeAccentColor">@color/theme_sunset_500</item>
     </style>
 
-    <style name="AppTheme.Rose" parent="@style/AppTheme.Base">
+    <style name="AppTheme.Rose" parent="@style/BaseAppTheme">
         <item name="colorAccent">@color/theme_rose_500</item>
         <item name="colorPrimary">@color/theme_rose_500</item>
         <item name="colorPrimaryDark">@color/theme_rose_700</item>
         <item name="themeAccentColor">@color/theme_rose_500</item>
     </style>
 
-    <style name="AppTheme.Rose.Dark" parent="@style/AppTheme.Base.Dark">
+    <style name="AppTheme.Rose.Dark" parent="@style/BaseAppTheme.Dark">
         <item name="colorAccent">@color/theme_rose_500</item>
         <item name="colorPrimary">@color/theme_rose_500</item>
         <item name="colorPrimaryDark">@color/theme_rose_700</item>
         <item name="themeAccentColor">@color/theme_rose_500</item>
     </style>
 
-    <style name="AppTheme" parent="@style/AppTheme.Blue" />
-    <style name="AppTheme.Dark" parent="@style/AppTheme.Blue.Dark" />
+    <style name="AppTheme" parent="@style/BaseAppTheme">
+        <item name="colorAccent">@color/theme_blue_500</item>
+        <item name="colorPrimary">@color/theme_blue_500</item>
+        <item name="colorPrimaryDark">@color/theme_blue_700</item>
+        <item name="themeAccentColor">@color/theme_blue_500</item>
+    </style>
+
+    <style name="AppTheme.Dark" parent="@style/BaseAppTheme.Dark">
+        <item name="colorAccent">@color/theme_blue_500</item>
+        <item name="colorPrimary">@color/theme_blue_500</item>
+        <item name="colorPrimaryDark">@color/theme_blue_700</item>
+        <item name="themeAccentColor">@color/theme_blue_500</item>
+    </style>
 
     <style name="AppThemeFullscreen.Blue" parent="@style/AppTheme.Blue">
         <item name="android:windowFullscreen">true</item>
@@ -177,14 +188,14 @@
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
-    <style name="AppThemeFullscreen" parent="@style/AppThemeFullscreen.Blue">
+    <style name="AppThemeFullscreen" parent="@style/AppTheme">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
-    <style name="AppThemeFullscreen.Dark" parent="@style/AppThemeFullscreen.Blue.Dark">
+    <style name="AppThemeFullscreen.Dark" parent="@style/AppTheme.Dark">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowTranslucentStatus">true</item>
