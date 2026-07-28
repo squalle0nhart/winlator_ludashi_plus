@@ -161,6 +161,9 @@ public class SettingsFragment extends Fragment {
 
         initCustomApiKeySettings(view);
 
+        view.findViewById(R.id.BTPowerUserPerformance).setOnClickListener(
+                v -> com.winlator.cmod.contentdialog.PerformanceControlDialog.showGlobal(requireContext()));
+
         // Initialize the cursor lock checkbox
         cbCursorLock = view.findViewById(R.id.CBCursorLock);
         cbCursorLock.setChecked(preferences.getBoolean("cursor_lock", true));

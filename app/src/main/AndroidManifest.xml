@@ -43,6 +43,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name="com.winlator.cmod.LudashiApp"
         android:label="Winlator Ludashi"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

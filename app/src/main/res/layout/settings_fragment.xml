@@ -623,6 +623,30 @@
                     style="@style/FieldSetLabel"
                     android:text="LSFG-VK" />
             </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout style="@style/FieldSet">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/performance_global_summary" />
+
+                    <Button
+                        android:id="@+id/BTPowerUserPerformance"
+                        style="@style/ButtonPositive"
+                        android:layout_width="240dp"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:text="@string/power_user_performance" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/FieldSetLabel"
+                    android:text="@string/power_user_performance" />
+            </FrameLayout>
         </LinearLayout>
     </ScrollView>
 

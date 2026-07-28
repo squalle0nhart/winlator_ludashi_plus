@@ -58,6 +58,7 @@ import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.DebugDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
+import com.winlator.cmod.contentdialog.PerformanceControlDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
 import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
@@ -111,6 +112,8 @@ import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
+import com.winlator.cmod.winhandler.OnGetProcessInfoListener;
+import com.winlator.cmod.winhandler.ProcessInfo;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
 import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
@@ -203,10 +206,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private DebugDialog debugDialog;
     private short taskAffinityMask = 0;
     private short taskAffinityMaskWoW64 = 0;
+    private final HashMap<Integer, Integer> bigCoreAffinitySnapshot = new HashMap<>();
     private String wineCpuTopologyValue = "";
     private int frameRatingWindowId = -1;
     private String activeFrameGenBackend;
     private int activeFrameGenMultiplier;
+    private boolean performanceControlsReverted;
 
     private int activeRendererWindowId = -1;
     private String lastRendererName = null;
@@ -575,6 +580,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut = new Shortcut(container, new File(shortcutPath));
         }
 
+        boolean sustainedPerformance = resolvedPerformanceBoolean(
+                com.winlator.cmod.perf.PerformanceSettings.KEY_SUSTAINED);
+        boolean preferBigCores = resolvedPerformanceBoolean(
+                com.winlator.cmod.perf.PerformanceSettings.KEY_BIG_CORES);
+        getWindow().setSustainedPerformanceMode(sustainedPerformance);
+        com.winlator.cmod.perf.TempWatchdog.INSTANCE.start(this);
+
         taskAffinityMask = (short) ProcessHelper.getAffinityMask(container.getCPUList(true));
         taskAffinityMaskWoW64 = (short) ProcessHelper.getAffinityMask(container.getCPUListWoW64(true));
 
@@ -584,6 +596,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
             affinityCpuList = shortcut.getExtra("cpuList", container.getCPUList(true));
             taskAffinityMask = (short) ProcessHelper.getAffinityMask(affinityCpuList);
             taskAffinityMaskWoW64 = taskAffinityMask;
+        }
+
+        if (preferBigCores) {
+            String bigCoreList = com.winlator.cmod.perf.CpuTopology.INSTANCE.detectBigCoreCpuList();
+            if (bigCoreList != null && !bigCoreList.isEmpty()) {
+                affinityCpuList = bigCoreList;
+                taskAffinityMask = (short) ProcessHelper.getAffinityMask(bigCoreList);
+                taskAffinityMaskWoW64 = taskAffinityMask;
+            }
+        }
+
+        if (com.winlator.cmod.perf.RootManager.INSTANCE.isGranted()) {
+            applyEffectiveRootPerformance();
+        } else {
+            handler.postDelayed(this::applyEffectiveRootPerformance, 3000);
         }
 
         boolean syncCpuTopology = shortcut != null
@@ -900,6 +927,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (environment != null) {
             xServerView.onResume();
             environment.onResume();
+            com.winlator.cmod.perf.TempWatchdog.INSTANCE.start(this);
+            applyEffectiveRootPerformance();
         }
         startTime = System.currentTimeMillis();
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
@@ -984,6 +1013,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private void exit() {
+        stopAndRevertPerformanceControls();
         boolean removeLoadingBar = PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean("remove_loading_bar_when_booting_games", false);
         if (!removeLoadingBar) preloaderDialog.showOnUiThread(R.string.shutdown);
@@ -1033,6 +1063,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        stopAndRevertPerformanceControls();
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         if (handler != null) {
             handler.removeCallbacks(savePlaytimeRunnable);
@@ -1291,6 +1322,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         environment.startEnvironmentComponents();
+
+        if (resolvedPerformanceBoolean(com.winlator.cmod.perf.PerformanceSettings.KEY_PRIORITY)) {
+            handler.postDelayed(
+                    () -> com.winlator.cmod.perf.PerfPriority.INSTANCE.boost(
+                            GuestProgramLauncherComponent.getPid()),
+                    5000);
+        }
 
         winHandler.start();
 
@@ -1761,6 +1799,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 exit();
             });
         }
+
+        View performanceControls = findViewById(R.id.BTPowerUserPerformance);
+        if (performanceControls != null) {
+            performanceControls.setOnClickListener(v -> {
+                drawerLayout.closeDrawers();
+                PerformanceControlDialog.showInGame(
+                        this,
+                        shortcut,
+                        this::applyPerformanceKeyLive);
+            });
+        }
     }
 
     private int activeSidebarItemId = R.id.BTItemFPS;
@@ -1881,7 +1930,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (spHudStyle != null) {
             ArrayAdapter<String> styleAdapter = createSidebarSpinnerAdapter(new String[]{"Classic", "Modern"});
-            styleAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spHudStyle.setAdapter(styleAdapter);
             spHudStyle.setSelection(isModern ? 1 : 0, false);
         }
@@ -2047,7 +2095,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (spNativeFPS != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(fpsLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spNativeFPS.setAdapter(a);
             String savedFps = getLaunchGraphicsExtra("graphicsFpsPreset", "");
             int savedFpsPos = savedFps.isEmpty() ? 0 : Integer.parseInt(savedFps);
@@ -2070,7 +2117,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spUpscalerMode.setAdapter(a);
             spUpscalerMode.setSelection(getSavedUpscalerSelection(getLaunchGraphicsExtra("graphicsFilterMode", "")));
         }
@@ -2078,7 +2124,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final String[] pfxLabels = {"None", "DLS", "CRT", "HDR", "Natural"};
         if (spPostFXMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(pfxLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spPostFXMode.setAdapter(a);
 
             String savedPFX = getLaunchGraphicsExtra("graphicsPostFXMode", "");
@@ -2583,25 +2628,31 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         TextView backendLabel = new TextView(this);
         backendLabel.setText("Backend");
+        backendLabel.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         layout.addView(backendLabel);
 
         Spinner backendSpinner = new Spinner(this);
-        ArrayAdapter<String> backendAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item,
+        ArrayAdapter<String> backendAdapter = ThemeUtils.createSpinnerAdapter(
+                this,
                 new String[]{"LSFG-VK", "Bionic-FG", "Native Framegen"});
-        backendAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         backendSpinner.setAdapter(backendAdapter);
+        ThemeUtils.applySpinnerTheme(backendSpinner);
+        backendSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
+        backendSpinner.setPadding(padding / 2, 0, padding / 2, 0);
+        backendSpinner.setMinimumHeight(padding * 3);
         backendSpinner.setSelection(FrameGenManager.BACKEND_BIONIC_FG.equals(currentSettings.backend) ? 1
                 : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 2 : 0);
         layout.addView(backendSpinner);
 
         TextView status = new TextView(this);
         status.setPadding(0, padding / 2, 0, 0);
+        status.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurfaceVariant));
         layout.addView(status);
 
         TextView multiplierLabel = new TextView(this);
         multiplierLabel.setPadding(0, padding, 0, 0);
         multiplierLabel.setText("Frame Multiplier");
+        multiplierLabel.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         layout.addView(multiplierLabel);
 
         android.widget.RadioGroup multiplierGroup = new android.widget.RadioGroup(this);
@@ -2612,12 +2663,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             radioButton.setId(View.generateViewId());
             radioButton.setTag(value);
             radioButton.setText(value == 0 ? "Off" : value + "x");
+            radioButton.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
             multiplierGroup.addView(radioButton);
         }
         layout.addView(multiplierGroup);
 
         TextView flowLabel = new TextView(this);
         flowLabel.setPadding(0, padding, 0, 0);
+        flowLabel.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         layout.addView(flowLabel);
 
         android.widget.SeekBar flowSeekBar = new android.widget.SeekBar(this);
@@ -2627,19 +2680,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
         TextView modelLabel = new TextView(this);
         modelLabel.setPadding(0, padding, 0, 0);
         modelLabel.setText("Bionic-FG Model");
+        modelLabel.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         layout.addView(modelLabel);
 
         Spinner modelSpinner = new Spinner(this);
-        ArrayAdapter<String> modelAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item,
+        ArrayAdapter<String> modelAdapter = ThemeUtils.createSpinnerAdapter(
+                this,
                 new String[]{"Default", "Traced graph", "V2 engine", "FSR3", "FSR3+"});
-        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         modelSpinner.setAdapter(modelAdapter);
+        ThemeUtils.applySpinnerTheme(modelSpinner);
+        modelSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
+        modelSpinner.setPadding(padding / 2, 0, padding / 2, 0);
+        modelSpinner.setMinimumHeight(padding * 3);
         modelSpinner.setSelection(FrameGenQuickMenuHelper.sanitizeModel(selectedBionicModel[0]));
         layout.addView(modelSpinner);
 
         CheckBox performanceMode = new CheckBox(this);
         performanceMode.setText("LSFG performance mode");
+        performanceMode.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         performanceMode.setChecked(selectedPerformanceMode[0]);
         layout.addView(performanceMode);
 
@@ -2748,10 +2806,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
         scrollView.addView(layout);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Framegen Advanced")
-                .setView(scrollView)
-                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+        ContentDialog frameGenDialog = new ContentDialog(this);
+        FrameLayout dialogFrame = frameGenDialog.findViewById(R.id.FrameLayout);
+        dialogFrame.setVisibility(View.VISIBLE);
+        int dialogHeight = Math.max(
+                padding * 5,
+                Math.min(
+                        getResources().getDisplayMetrics().heightPixels - padding * 12,
+                        Math.round(getResources().getDisplayMetrics().density * 480.0f)));
+        dialogFrame.addView(scrollView, new FrameLayout.LayoutParams(
+                AppUtils.getPreferredDialogWidth(this),
+                dialogHeight));
+        frameGenDialog.setTitle("Framegen Advanced");
+        frameGenDialog.setOnConfirmCallback(() -> {
                     int selectedMultiplier = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
                             ? selectedNativeMultiplier[0]
                             : FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
@@ -2792,9 +2859,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     AppUtils.showToast(this, appliesLive
                             ? "Framegen advanced settings saved"
                             : "Framegen settings saved. Relaunch the game to apply them.");
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
+        frameGenDialog.show();
     }
 
     private int getFrameGenMultiplier(String backend) {
@@ -2855,7 +2921,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             ArrayAdapter<String> adapter = createSidebarSpinnerAdapter(profileItems.toArray(new String[0]));
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spInputControlsProfile.setAdapter(adapter);
             spInputControlsProfile.setSelection(selectedPosition, false);
         };
@@ -3739,6 +3804,126 @@ public class XServerDisplayActivity extends AppCompatActivity {
         WineUtils.applySystemTweaks(this, wineInfo);
         container.putExtra("graphicsDriver", null);
         container.putExtra("desktopTheme", null);
+    }
+
+    private boolean resolvedPerformanceBoolean(String key) {
+        boolean global = com.winlator.cmod.perf.PerformanceSettings.INSTANCE.globalDefault(key);
+        if (shortcut == null || !shortcut.hasExtra(key)) return global;
+        String value = shortcut.getExtra(key, global ? "1" : "0");
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    private void applyEffectiveRootPerformance() {
+        if (!com.winlator.cmod.perf.RootManager.INSTANCE.isGranted()) return;
+        HashMap<String, Boolean> effective = new HashMap<>();
+        for (String key : com.winlator.cmod.perf.PerfRootApplier.INSTANCE.getROOT_KEYS()) {
+            effective.put(key, resolvedPerformanceBoolean(key));
+        }
+        new Thread(
+                () -> com.winlator.cmod.perf.PerfRootApplier.INSTANCE.applyEffective(effective),
+                "perf-root-launch").start();
+    }
+
+    private void applyPerformanceKeyLive(String key, boolean enabled) {
+        performanceControlsReverted = false;
+        if (com.winlator.cmod.perf.PerformanceSettings.KEY_SUSTAINED.equals(key)) {
+            getWindow().setSustainedPerformanceMode(enabled);
+            return;
+        }
+        if (com.winlator.cmod.perf.PerformanceSettings.KEY_PRIORITY.equals(key)) {
+            new Thread(() -> {
+                if (enabled) {
+                    com.winlator.cmod.perf.PerfPriority.INSTANCE.boost(
+                            GuestProgramLauncherComponent.getPid());
+                } else {
+                    com.winlator.cmod.perf.PerfPriority.INSTANCE.restore();
+                }
+            }, "perf-priority-toggle").start();
+            return;
+        }
+        if (com.winlator.cmod.perf.PerformanceSettings.KEY_BIG_CORES.equals(key)) {
+            if (enabled) {
+                String bigList = com.winlator.cmod.perf.CpuTopology.INSTANCE.detectBigCoreCpuList();
+                if (bigList == null || bigList.isEmpty()) return;
+                taskAffinityMask = (short) ProcessHelper.getAffinityMask(bigList);
+                taskAffinityMaskWoW64 = taskAffinityMask;
+            } else {
+                String cpuList = shortcut != null
+                        ? shortcut.getExtra("cpuList", container.getCPUList(true))
+                        : container.getCPUList(true);
+                taskAffinityMask = (short) ProcessHelper.getAffinityMask(cpuList);
+                taskAffinityMaskWoW64 = shortcut != null
+                        ? taskAffinityMask
+                        : (short) ProcessHelper.getAffinityMask(container.getCPUListWoW64(true));
+            }
+            reapplyBigCoresToRunningGuest(enabled);
+            return;
+        }
+        if (com.winlator.cmod.perf.PerfRootApplier.INSTANCE.getROOT_KEYS().contains(key)) {
+            new Thread(
+                    () -> com.winlator.cmod.perf.PerfRootApplier.INSTANCE.apply(key, enabled),
+                    "perf-root-toggle").start();
+        }
+    }
+
+    private void reapplyBigCoresToRunningGuest(boolean enabled) {
+        if (winHandler == null) return;
+        if (!enabled && bigCoreAffinitySnapshot.isEmpty()) return;
+        final int bigMask;
+        if (enabled) {
+            String bigList = com.winlator.cmod.perf.CpuTopology.INSTANCE.detectBigCoreCpuList();
+            if (bigList == null || bigList.isEmpty()) return;
+            bigMask = ProcessHelper.getAffinityMask(bigList);
+        } else {
+            bigMask = 0;
+        }
+
+        String cpuList = shortcut != null
+                ? shortcut.getExtra("cpuList", container.getCPUList(true))
+                : container.getCPUList(true);
+        final int fallbackMask = ProcessHelper.getAffinityMask(
+                cpuList != null && !cpuList.isEmpty()
+                        ? cpuList
+                        : Container.getFallbackCPUList());
+
+        final OnGetProcessInfoListener previous = winHandler.getOnGetProcessInfoListener();
+        final ArrayList<ProcessInfo> collected = new ArrayList<>();
+        winHandler.setOnGetProcessInfoListener((index, count, info) -> {
+            if (index == 0) collected.clear();
+            if (info != null && info.pid > 0) collected.add(info);
+            if (count == 0 || index == count - 1) {
+                for (ProcessInfo process : collected) {
+                    if (enabled) {
+                        if (!bigCoreAffinitySnapshot.containsKey(process.pid)) {
+                            bigCoreAffinitySnapshot.put(process.pid, process.affinityMask);
+                        }
+                        winHandler.setProcessAffinity(process.pid, bigMask);
+                    } else {
+                        Integer original = bigCoreAffinitySnapshot.get(process.pid);
+                        winHandler.setProcessAffinity(
+                                process.pid,
+                                original != null ? original : fallbackMask);
+                    }
+                }
+                if (!enabled) bigCoreAffinitySnapshot.clear();
+                winHandler.setOnGetProcessInfoListener(previous);
+            }
+        });
+        winHandler.listProcesses();
+    }
+
+    private void stopAndRevertPerformanceControls() {
+        if (performanceControlsReverted) return;
+        performanceControlsReverted = true;
+        if (handler != null) handler.removeCallbacksAndMessages(null);
+        com.winlator.cmod.perf.TempWatchdog.INSTANCE.stop();
+        com.winlator.cmod.perf.PerfPriority.INSTANCE.restore();
+        getWindow().setSustainedPerformanceMode(false);
+        try {
+            com.winlator.cmod.perf.PerfRevertRegistry.INSTANCE.revertAll();
+        } catch (Throwable throwable) {
+            Log.w("XServerDisplayActivity", "Performance-state revert failed", throwable);
+        }
     }
 
     private void assignTaskAffinity(Window window) {

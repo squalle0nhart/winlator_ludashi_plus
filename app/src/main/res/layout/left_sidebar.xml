@@ -1254,6 +1254,23 @@
                         android:textStyle="bold" />
                 </LinearLayout>
                 <LinearLayout
+                    android:id="@+id/BTPowerUserPerformance"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/sidebar_action">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/power_user_performance"
+                        android:textColor="?attr/themeAccentColor"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+                <LinearLayout
                     android:id="@+id/BTItemLogs"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"

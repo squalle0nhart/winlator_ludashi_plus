@@ -167,10 +167,13 @@ dependencies {
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'com.github.topjohnwu.libsu:core:6.0.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.7.0'
     implementation 'com.google.zxing:core:3.5.3'
     implementation 'in.dragonbra:javasteam:1.8.0'
     implementation 'in.dragonbra:javasteam-depotdownloader:1.8.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
+    testImplementation 'junit:junit:4.13.2'
 }
 
 

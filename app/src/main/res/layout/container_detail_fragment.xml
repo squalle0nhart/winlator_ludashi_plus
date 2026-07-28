@@ -477,7 +477,7 @@
                             <com.winlator.cmod.widget.ColorPickerView
                                 android:id="@+id/CPVDesktopBackgroundColor"
                                 android:layout_width="84dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="42dp"
                                 android:visibility="gone" />
 
                             <com.winlator.cmod.widget.ImagePickerView

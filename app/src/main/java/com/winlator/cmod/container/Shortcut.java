@@ -144,6 +144,10 @@ public class Shortcut {
 
     public String getExtra(String name) { return getExtra(name, ""); }
 
+    public boolean hasExtra(String name) {
+        return extraData.has(name);
+    }
+
     public String getExtra(String name, String fallback) {
         try { return extraData.has(name) ? extraData.getString(name) : fallback; }
         catch (JSONException e) { return fallback; }
@@ -157,6 +161,10 @@ public class Shortcut {
             else extraData.remove(name);
         }
         catch (JSONException e) {}
+    }
+
+    public void removeExtra(String name) {
+        extraData.remove(name);
     }
 
     public void saveData() {

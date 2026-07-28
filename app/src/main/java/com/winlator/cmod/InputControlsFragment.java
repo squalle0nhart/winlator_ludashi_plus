@@ -20,7 +20,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.FrameLayout;
@@ -73,8 +72,6 @@ public class InputControlsFragment extends Fragment {
 
     private static final String ARG_SELECTED_PROFILE_ID = "selected_profile_id";
 
-    private boolean isDarkMode;
-
     // Fragments precisam de um construtor público sem argumentos: o FragmentManager usa
     // reflection pra recriar fragments (ex: depois que o Android mata o processo em
     // background e o usuário volta pro app). Sem esse construtor, isso causa o crash
@@ -100,7 +97,6 @@ public class InputControlsFragment extends Fragment {
         selectedProfileId = getArguments() != null ? getArguments().getInt(ARG_SELECTED_PROFILE_ID, 0) : 0;
 
         preferences = PreferenceManager.getDefaultSharedPreferences(getContext());
-        isDarkMode = preferences.getBoolean("dark_mode", false);
     }
 
     @Override
@@ -133,7 +129,7 @@ public class InputControlsFragment extends Fragment {
 
         final Spinner sProfile = view.findViewById(R.id.SProfile);
 
-        sProfile.setPopupBackgroundResource(isDarkMode ? R.drawable.content_dialog_background_dark : R.drawable.content_dialog_background);
+        ThemeUtils.applySpinnerTheme(sProfile);
 
         loadProfileSpinner(sProfile);
 
@@ -318,7 +314,7 @@ public class InputControlsFragment extends Fragment {
             values.add(profile.getName());
         }
 
-        spinner.setAdapter(new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setAdapter(ThemeUtils.createSpinnerAdapter(requireContext(), values));
         spinner.setSelection(selectedPosition, false);
         spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
