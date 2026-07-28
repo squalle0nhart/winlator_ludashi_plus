@@ -334,19 +334,7 @@
                             android:layout_weight="1"
                             android:layout_marginEnd="4dp"
                             android:background="@drawable/sidebar_mode_button_background"
-                            android:text="@string/none"
-                            android:textAllCaps="false"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="13sp" />
-                        <Button
-                            android:id="@+id/BTScalingLinear"
-                            android:layout_width="0dp"
-                            android:layout_height="40dp"
-                            android:layout_weight="1"
-                            android:layout_marginStart="4dp"
-                            android:layout_marginEnd="4dp"
-                            android:background="@drawable/sidebar_mode_button_background"
-                            android:text="@string/linear"
+                            android:text="@string/bilinear"
                             android:textAllCaps="false"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp" />
@@ -356,12 +344,18 @@
                             android:layout_height="40dp"
                             android:layout_weight="1"
                             android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
                             android:background="@drawable/sidebar_mode_button_background"
                             android:text="@string/nearest"
                             android:textAllCaps="false"
                             android:textColor="?attr/colorOnSurface"
                             android:maxLines="1"
                             android:textSize="13sp" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="1dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp" />
                     </LinearLayout>
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -628,6 +622,106 @@
                             android:textAllCaps="false"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/GroupFrameGenModel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Bionic-FG Model"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/BTFrameGenModelDefault"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginEnd="2dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/sidebar_mode_button_background"
+                                android:maxLines="1"
+                                android:paddingStart="2dp"
+                                android:paddingEnd="2dp"
+                                android:text="Default"
+                                android:textAllCaps="false"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="9sp" />
+
+                            <Button
+                                android:id="@+id/BTFrameGenModelTraced"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginHorizontal="2dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/sidebar_mode_button_background"
+                                android:maxLines="1"
+                                android:paddingStart="2dp"
+                                android:paddingEnd="2dp"
+                                android:text="Traced"
+                                android:textAllCaps="false"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="9sp" />
+
+                            <Button
+                                android:id="@+id/BTFrameGenModelV2"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginHorizontal="2dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/sidebar_mode_button_background"
+                                android:maxLines="1"
+                                android:paddingStart="2dp"
+                                android:paddingEnd="2dp"
+                                android:text="V2"
+                                android:textAllCaps="false"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="9sp" />
+
+                            <Button
+                                android:id="@+id/BTFrameGenModelFsr3"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginHorizontal="2dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/sidebar_mode_button_background"
+                                android:maxLines="1"
+                                android:paddingStart="2dp"
+                                android:paddingEnd="2dp"
+                                android:text="FSR3"
+                                android:textAllCaps="false"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="9sp" />
+
+                            <Button
+                                android:id="@+id/BTFrameGenModelFsr3Plus"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginStart="2dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/sidebar_mode_button_background"
+                                android:maxLines="1"
+                                android:paddingStart="2dp"
+                                android:paddingEnd="2dp"
+                                android:text="FSR3+"
+                                android:textAllCaps="false"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="9sp" />
+                        </LinearLayout>
                     </LinearLayout>
 
                     <TextView

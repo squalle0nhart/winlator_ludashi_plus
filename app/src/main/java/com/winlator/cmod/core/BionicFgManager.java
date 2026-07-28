@@ -19,7 +19,7 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "bannerlator-pr96-5df7856";
+    private static final String RUNTIME_VERSION = "bannerlator-d6838323-model4-fence";
 
     private BionicFgManager() {}
 
@@ -66,13 +66,23 @@ public abstract class BionicFgManager {
         File versionFile = new File(layerDir, VERSION_FILENAME);
 
         String installedVersion = versionFile.isFile() ? FileUtils.readString(versionFile).trim() : "";
-        boolean needsInstall = !RUNTIME_VERSION.equals(installedVersion) || !libFile.isFile() || !manifestFile.isFile();
+        long assetSize = FileUtils.getSize(context, ASSET_LIB);
+        boolean needsInstall = !RUNTIME_VERSION.equals(installedVersion)
+                || !libFile.isFile()
+                || libFile.length() != assetSize
+                || !manifestFile.isFile();
         if (!needsInstall) return true;
 
         try {
             localLibDir.mkdirs();
             layerDir.mkdirs();
-            FileUtils.copy(context, ASSET_LIB, libFile);
+            File stagedLib = new File(localLibDir, LIB_FILENAME + ".staging");
+            if (stagedLib.exists()) stagedLib.delete();
+            FileUtils.copy(context, ASSET_LIB, stagedLib);
+            if (!stagedLib.isFile() || stagedLib.length() != assetSize || !stagedLib.renameTo(libFile)) {
+                stagedLib.delete();
+                throw new IllegalStateException("Failed to atomically stage Bionic-FG runtime");
+            }
             FileUtils.copy(context, ASSET_MANIFEST, manifestFile);
             FileUtils.writeString(versionFile, RUNTIME_VERSION);
             FileUtils.chmod(libFile, 0755);
@@ -201,7 +211,7 @@ public abstract class BionicFgManager {
         builder.append("enabled = ").append(enabled ? "true" : "false").append('\n');
         builder.append("multiplier = ").append(enabled ? Math.max(2, Math.min(4, multiplier)) : 0).append('\n');
         builder.append("flow_scale = ").append(String.format(Locale.US, "%.2f", Math.max(0.2f, Math.min(1.0f, flowScale)))).append('\n');
-        builder.append("model = ").append(Math.max(0, Math.min(1, model))).append('\n');
+        builder.append("model = ").append(Math.max(0, Math.min(4, model))).append('\n');
         return builder.toString();
     }
 }

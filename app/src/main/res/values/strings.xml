@@ -95,6 +95,7 @@
     <string name="none">None</string>
     <string name="linear">Linear</string>
     <string name="nearest">Nearest</string>
+    <string name="bilinear">Bilinear</string>
     <string name="scaling_mode">Scaling mode</string>
     <string name="sgsr">SGSR</string>
     <string name="fsr">FSR</string>

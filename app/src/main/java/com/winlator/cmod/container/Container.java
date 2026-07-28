@@ -250,14 +250,14 @@ public class Container {
     public int getBionicFgModel() {
         String value = getExtra("bionicFgModel", "0");
         try {
-            return Math.max(0, Math.min(1, Integer.parseInt(value)));
+            return Math.max(0, Math.min(4, Integer.parseInt(value)));
         } catch (NumberFormatException e) {
             return 0;
         }
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
     }
 
     public int getNativeFgMultiplier() {

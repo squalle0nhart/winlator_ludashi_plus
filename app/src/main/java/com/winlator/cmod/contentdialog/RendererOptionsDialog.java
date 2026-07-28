@@ -98,7 +98,7 @@ public class RendererOptionsDialog extends ContentDialog {
     };
 
     private static final String[] FILTER_LABELS = {
-        "Bilinear",
+        "Bilinear (Linear)",
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
@@ -109,8 +109,14 @@ public class RendererOptionsDialog extends ContentDialog {
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
     private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
-    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1};
-    private static final String[] BIONIC_FG_MODEL_LABELS = {"Model 0", "Model 1"};
+    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1, 2, 3, 4};
+    private static final String[] BIONIC_FG_MODEL_LABELS = {
+        "Default",
+        "Traced graph (experimental)",
+        "V2 engine (experimental)",
+        "FSR3 / FidelityFX optical flow (experimental)",
+        "FSR3+ / block-grid optical flow v2 (experimental)"
+    };
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
         super(anchorView.getContext(), R.layout.renderer_options_dialog);

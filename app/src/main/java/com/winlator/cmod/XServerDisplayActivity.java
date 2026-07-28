@@ -148,10 +148,12 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
+    private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
-    private static final int GRAPHICS_SCALING_NONE = 0;
-    private static final int GRAPHICS_SCALING_LINEAR = 1;
+    private static final int GRAPHICS_SCALING_BILINEAR = 0;
+    // Legacy value from the old UI where "None" and "Linear" both selected bilinear sampling.
+    private static final int GRAPHICS_SCALING_LEGACY_LINEAR = 1;
     private static final int GRAPHICS_SCALING_NEAREST = 2;
     private static final int GRAPHICS_SCALING_SGSR = 3;
     private static final int GRAPHICS_SCALING_FSR = 4;
@@ -343,6 +345,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut.setRendererFilterMode(mode);
         } else if (container != null) {
             container.setRendererFilterMode(mode);
+        }
+    }
+
+    private void setPersistentRendererNative(boolean enabled) {
+        if (shortcut != null) {
+            shortcut.setRendererNative(enabled);
+        } else if (container != null) {
+            container.setRendererNative(enabled);
         }
     }
 
@@ -1090,6 +1100,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String dxwrapper = this.dxwrapper;
         String graphicsDriverState = graphicsDriver + ";" + graphicsDriverConfigData;
+        if ("wrapper-gamenative".equals(resolveGraphicsDriverArchiveName())) {
+            // Include the bundled wrapper revision in the extraction state so existing
+            // containers replace an older libvulkan_wrapper.so after an app update.
+            graphicsDriverState += ";bundle=" + WRAPPER_GAMENATIVE_BUNDLE_VERSION;
+        }
 
         forceGraphicsDriverExtraction = !graphicsDriverState.equals(container.getExtra("graphicsDriver"));
         if (forceGraphicsDriverExtraction) {
@@ -1330,8 +1345,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             vkRenderer.setStretchMode(softStretchEnabled ? 1 : 0);
         } else if (renderer instanceof GLRenderer) {
             GLRenderer glRenderer = (GLRenderer) renderer;
-            glRenderer.setFilterMode(shortcut != null ? shortcut.getRendererFilterMode()
-                    : (container != null ? container.getRendererFilterMode() : 0));
+            int rendererFilterMode = shortcut != null ? shortcut.getRendererFilterMode()
+                    : (container != null ? container.getRendererFilterMode() : 0);
+            // Renderer settings use 0=Bilinear, 1=Nearest. GLRenderer's runtime API uses
+            // 0=Linear and 2=Nearest because mode 2 is also its effect/upscaler path.
+            glRenderer.setFilterMode(rendererFilterMode == 1 ? 2 : 0);
             glRenderer.setSwapRB(shortcut != null ? shortcut.getRendererSwapRB()
                     : (container != null && container.getRendererSwapRB()));
             boolean nativeMode = shortcut != null ? shortcut.getRendererNative()
@@ -2007,8 +2025,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner spPostFXMode       = findViewById(R.id.SPPostFXMode);
         Spinner spColorMode        = findViewById(R.id.SPColorMode);
         View    btSaveGraphicsPreset = findViewById(R.id.BTSaveGraphicsPreset);
-        View    btScalingNone      = findViewById(R.id.BTScalingNone);
-        View    btScalingLinear    = findViewById(R.id.BTScalingLinear);
+        View    btScalingBilinear  = findViewById(R.id.BTScalingNone);
         View    btScalingNearest   = findViewById(R.id.BTScalingNearest);
         View    btScalingSgsr      = findViewById(R.id.BTScalingSgsr);
         View    btScalingFsr       = findViewById(R.id.BTScalingFsr);
@@ -2042,7 +2059,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final String[] upscalerLabels = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
         final Runnable[] applyGlEffectsRef = new Runnable[1];
         final int[] selectedBaseFilterMode = {getPersistentRendererFilterMode()};
-        final int[] selectedScalingMode = {GRAPHICS_SCALING_NONE};
+        final int[] selectedScalingMode = {GRAPHICS_SCALING_BILINEAR};
 
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
@@ -2127,8 +2144,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         final Runnable updateScalingButtons = () -> {
-            setSelectedModeButton(R.id.BTScalingNone, selectedScalingMode[0] == GRAPHICS_SCALING_NONE);
-            setSelectedModeButton(R.id.BTScalingLinear, selectedScalingMode[0] == GRAPHICS_SCALING_LINEAR);
+            setSelectedModeButton(R.id.BTScalingNone,
+                    selectedScalingMode[0] == GRAPHICS_SCALING_BILINEAR
+                            || selectedScalingMode[0] == GRAPHICS_SCALING_LEGACY_LINEAR);
             setSelectedModeButton(R.id.BTScalingNearest, selectedScalingMode[0] == GRAPHICS_SCALING_NEAREST);
             setSelectedModeButton(R.id.BTScalingSgsr, selectedScalingMode[0] == GRAPHICS_SCALING_SGSR);
             setSelectedModeButton(R.id.BTScalingFsr, selectedScalingMode[0] == GRAPHICS_SCALING_FSR);
@@ -2144,7 +2162,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean enableSoftStretch = false;
 
             switch (selectedScalingMode[0]) {
-                case GRAPHICS_SCALING_LINEAR:
+                case GRAPHICS_SCALING_LEGACY_LINEAR:
+                    selectedScalingMode[0] = GRAPHICS_SCALING_BILINEAR;
+                    // Fall through: "Linear" and bilinear texture sampling were always aliases.
+                case GRAPHICS_SCALING_BILINEAR:
                     selectedBaseFilterMode[0] = 0;
                     postFxSelection = 0;
                     break;
@@ -2178,7 +2199,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     upscalerSelection = 3;
                     postFxSelection = 0;
                     break;
-                case GRAPHICS_SCALING_NONE:
                 default:
                     selectedBaseFilterMode[0] = 0;
                     postFxSelection = 0;
@@ -2221,6 +2241,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         try {
             if (!savedScalingModeValue.isEmpty()) {
                 selectedScalingMode[0] = Integer.parseInt(savedScalingModeValue);
+                if (selectedScalingMode[0] == GRAPHICS_SCALING_LEGACY_LINEAR) {
+                    selectedScalingMode[0] = GRAPHICS_SCALING_BILINEAR;
+                }
             } else if (savedFilterMode == 2) {
                 selectedScalingMode[0] = GRAPHICS_SCALING_SGSR;
             } else if (savedFilterMode == 4) {
@@ -2232,10 +2255,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             } else if (selectedBaseFilterMode[0] == 1) {
                 selectedScalingMode[0] = GRAPHICS_SCALING_NEAREST;
             } else {
-                selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
+                selectedScalingMode[0] = GRAPHICS_SCALING_BILINEAR;
             }
         } catch (NumberFormatException ignored) {
-            selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
+            selectedScalingMode[0] = GRAPHICS_SCALING_BILINEAR;
+        }
+        if (glRenderer != null && glRenderer.isNativeMode() && !savedScalingModeValue.isEmpty()) {
+            glRenderer.setNativeMode(false);
+            setPersistentRendererNative(false);
+            persistLaunchGraphicsPreset();
         }
 
         if (spUpscalerMode != null) {
@@ -2277,18 +2305,37 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         View.OnClickListener scalingClickListener = v -> {
             int viewId = v.getId();
-            if (viewId == R.id.BTScalingNone) selectedScalingMode[0] = GRAPHICS_SCALING_NONE;
-            else if (viewId == R.id.BTScalingLinear) selectedScalingMode[0] = GRAPHICS_SCALING_LINEAR;
+            if (viewId == R.id.BTScalingNone) selectedScalingMode[0] = GRAPHICS_SCALING_BILINEAR;
             else if (viewId == R.id.BTScalingNearest) selectedScalingMode[0] = GRAPHICS_SCALING_NEAREST;
             else if (viewId == R.id.BTScalingSgsr) selectedScalingMode[0] = GRAPHICS_SCALING_SGSR;
             else if (viewId == R.id.BTScalingFsr) selectedScalingMode[0] = GRAPHICS_SCALING_FSR;
             else if (viewId == R.id.BTScalingFsrFit) selectedScalingMode[0] = GRAPHICS_SCALING_FSR_FIT;
             else if (viewId == R.id.BTScalingDls) selectedScalingMode[0] = GRAPHICS_SCALING_DLS;
             else if (viewId == R.id.BTScalingNis) selectedScalingMode[0] = GRAPHICS_SCALING_NIS;
+            // GL native scanout bypasses the compositor sampler/effect chain. Turn it off
+            // before applying a scaling selection so the chosen mode has a visible effect.
+            if (glRenderer != null && glRenderer.isNativeMode()) {
+                glRenderer.setNativeMode(false);
+                setPersistentRendererNative(false);
+            }
             applyScalingSelection.run();
+            saveLaunchGraphicsExtra(GRAPHICS_SIDEBAR_SCALING_MODE_KEY,
+                    String.valueOf(selectedScalingMode[0]));
+            int savedGraphicsFilter = selectedScalingMode[0] == GRAPHICS_SCALING_SGSR ? 2
+                    : selectedScalingMode[0] == GRAPHICS_SCALING_FSR
+                            || selectedScalingMode[0] == GRAPHICS_SCALING_FSR_FIT ? 4
+                    : selectedScalingMode[0] == GRAPHICS_SCALING_DLS ? 5
+                    : selectedScalingMode[0] == GRAPHICS_SCALING_NIS ? 3 : 0;
+            saveLaunchGraphicsExtra("graphicsFilterMode", String.valueOf(savedGraphicsFilter));
+            saveLaunchGraphicsExtra("graphicsStretchMode", softStretchEnabled ? "1" : "0");
+            if (selectedScalingMode[0] == GRAPHICS_SCALING_BILINEAR) {
+                setPersistentRendererFilterMode(0);
+            } else if (selectedScalingMode[0] == GRAPHICS_SCALING_NEAREST) {
+                setPersistentRendererFilterMode(1);
+            }
+            persistLaunchGraphicsPreset();
         };
-        if (btScalingNone != null) btScalingNone.setOnClickListener(scalingClickListener);
-        if (btScalingLinear != null) btScalingLinear.setOnClickListener(scalingClickListener);
+        if (btScalingBilinear != null) btScalingBilinear.setOnClickListener(scalingClickListener);
         if (btScalingNearest != null) btScalingNearest.setOnClickListener(scalingClickListener);
         if (btScalingSgsr != null) btScalingSgsr.setOnClickListener(scalingClickListener);
         if (btScalingFsr != null) btScalingFsr.setOnClickListener(scalingClickListener);
@@ -2352,11 +2399,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final String[] selectedBackend = {shortcut != null
                 ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container)};
         final int[] selectedMultiplier = {getFrameGenMultiplier(selectedBackend[0])};
+        final int[] selectedBionicModel = {shortcut != null
+                ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
         if (activeFrameGenBackend == null) {
             activeFrameGenBackend = selectedBackend[0];
             activeFrameGenMultiplier = selectedMultiplier[0];
         }
         TextView status = findViewById(R.id.TVFrameGenStatus);
+        View modelGroup = findViewById(R.id.GroupFrameGenModel);
 
         Runnable updateUi = () -> {
             boolean nativeBackend = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
@@ -2368,6 +2418,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setSelectedModeButton(R.id.BTFrameGen2x, selectedMultiplier[0] == 2);
             setSelectedModeButton(R.id.BTFrameGen3x, selectedMultiplier[0] == 3);
             setSelectedModeButton(R.id.BTFrameGen4x, selectedMultiplier[0] == 4);
+            if (modelGroup != null) {
+                modelGroup.setVisibility(bionicBackend && selectedMultiplier[0] >= 2
+                        ? View.VISIBLE : View.GONE);
+            }
+            setSelectedModeButton(R.id.BTFrameGenModelDefault, selectedBionicModel[0] == 0);
+            setSelectedModeButton(R.id.BTFrameGenModelTraced, selectedBionicModel[0] == 1);
+            setSelectedModeButton(R.id.BTFrameGenModelV2, selectedBionicModel[0] == 2);
+            setSelectedModeButton(R.id.BTFrameGenModelFsr3, selectedBionicModel[0] == 3);
+            setSelectedModeButton(R.id.BTFrameGenModelFsr3Plus, selectedBionicModel[0] == 4);
             if (status != null) {
                 if (nativeBackend) {
                     boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
@@ -2378,7 +2437,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                     ? "Native optical-flow frame generation applies immediately."
                                     : "Relaunch to switch from the active external framegen layer.");
                 } else if (bionicBackend) {
-                    status.setText("Bionic-FG changes apply after relaunch.");
+                    boolean modelAppliesLive = FrameGenManager.BACKEND_BIONIC_FG.equals(activeFrameGenBackend)
+                            && activeFrameGenMultiplier >= 2;
+                    status.setText(modelAppliesLive
+                            ? "Bionic-FG model changes apply immediately. Backend and multiplier changes need a relaunch."
+                            : "Bionic-FG changes apply after relaunch.");
                 } else {
                     status.setText(dllAvailable
                             ? "LSFG-VK changes apply after relaunch."
@@ -2405,7 +2468,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean changed = !backend.equals(selectedBackend[0]);
             selectedBackend[0] = backend;
             selectedMultiplier[0] = getFrameGenMultiplier(backend);
-            persistFrameGenSelection(backend, selectedMultiplier[0]);
+            persistFrameGenSelection(backend, selectedMultiplier[0], selectedBionicModel[0]);
             updateUi.run();
             boolean needsRelaunch = changed && (!FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
                     || (!FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
@@ -2427,7 +2490,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 return;
             }
             selectedMultiplier[0] = multiplier;
-            persistFrameGenSelection(selectedBackend[0], multiplier);
+            persistFrameGenSelection(selectedBackend[0], multiplier, selectedBionicModel[0]);
             updateUi.run();
             if (!FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
                 AppUtils.showToast(this, multiplier >= 2
@@ -2439,6 +2502,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setOnClickListenerIfPresent(R.id.BTFrameGen2x, multiplierListener);
         setOnClickListenerIfPresent(R.id.BTFrameGen3x, multiplierListener);
         setOnClickListenerIfPresent(R.id.BTFrameGen4x, multiplierListener);
+
+        View.OnClickListener modelListener = view -> {
+            int model = view.getId() == R.id.BTFrameGenModelTraced ? 1
+                    : view.getId() == R.id.BTFrameGenModelV2 ? 2
+                    : view.getId() == R.id.BTFrameGenModelFsr3 ? 3
+                    : view.getId() == R.id.BTFrameGenModelFsr3Plus ? 4 : 0;
+            selectedBionicModel[0] = model;
+            persistFrameGenSelection(selectedBackend[0], selectedMultiplier[0], model);
+            updateUi.run();
+            boolean appliesLive = FrameGenManager.BACKEND_BIONIC_FG.equals(activeFrameGenBackend)
+                    && activeFrameGenMultiplier >= 2;
+            AppUtils.showToast(this, appliesLive
+                    ? "Bionic-FG model changed"
+                    : "Bionic-FG model saved. Relaunch the game to apply it.");
+        };
+        setOnClickListenerIfPresent(R.id.BTFrameGenModelDefault, modelListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenModelTraced, modelListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenModelV2, modelListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenModelFsr3, modelListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenModelFsr3Plus, modelListener);
         updateUi.run();
     }
 
@@ -2453,7 +2536,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return container.getLsfgMultiplier();
     }
 
-    private void persistFrameGenSelection(String backend, int multiplier) {
+    private void persistFrameGenSelection(String backend, int multiplier, int bionicModel) {
         float flowScale = shortcut != null
                 ? (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
                         ? shortcut.getBionicFgFlowScale() : shortcut.getLsfgFlowScale())
@@ -2461,9 +2544,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         ? container.getBionicFgFlowScale() : container.getLsfgFlowScale());
         boolean performanceMode = shortcut != null
                 ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode();
-        int model = shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel();
         FrameGenQuickMenuHelper.Settings settings = new FrameGenQuickMenuHelper.Settings(
-                backend, multiplier, flowScale, performanceMode, model);
+                backend, multiplier, flowScale, performanceMode, bionicModel);
         if (shortcut != null) {
             FrameGenQuickMenuHelper.applySettings(shortcut, settings);
             if (multiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
