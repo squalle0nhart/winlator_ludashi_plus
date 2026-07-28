@@ -77,8 +77,10 @@ public class ASurfaceRenderer implements HostRenderer,
     // out BGRA natively, avoiding the blit). Wired to a per-container/per-game setting by the UI
     // layer via setSfCompatMode() at launch. See setSfCompatMode() / pushWindowBuffer().
     private boolean sfCompatMode = true;
+    private boolean directRgbaGameFrames = false;
     public void setSfCompatMode(boolean enabled) { this.sfCompatMode = enabled; }
     public boolean isSfCompatMode() { return sfCompatMode; }
+    public void setDirectRgbaGameFrames(boolean enabled) { this.directRgbaGameFrames = enabled; }
 
     // #1644: CPU-drawn chrome is scanned out at half the rate of the game frame; this counter
     // gates the per-present HUD tick for the CPU path so the HUD still reflects the game cadence.
@@ -436,13 +438,16 @@ public class ASurfaceRenderer implements HostRenderer,
     /**
      * Direct game-frame present (the DXVK/DRI3/Present buffer is a GPUImage — a real
      * AHardwareBuffer). No swapchain/fence swap: the buffer is presented directly, still routed
-     * through the native BGRA->RGBA converter when {@link #sfCompatMode} is on.
+     * through the native BGRA->RGBA converter when {@link #sfCompatMode} is on. Pipetto's wrapper
+     * can explicitly allocate RGBA8 present buffers, which are handed to SurfaceFlinger without
+     * that conversion while CPU-drawn BGRA windows keep the compatibility path.
      * Caller holds {@code drawable.renderLock}.
      */
     private void pushGpuImageToNative(int windowId, GPUImage g) {
         long ahbPtr = g.getHardwareBufferPtr();
         if (ahbPtr == 0) return;
-        nativeSetWindowBuffer(windowId, ahbPtr, -1, windowId, 0, null, -1, sfCompatMode);
+        nativeSetWindowBuffer(windowId, ahbPtr, -1, windowId, 0, null, -1,
+                sfCompatMode && !directRgbaGameFrames);
         if (hudFrameTick != null) hudFrameTick.accept(windowId);
     }
 

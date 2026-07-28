@@ -149,6 +149,7 @@ import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
+    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "e91223d-20260721";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_BILINEAR = 0;
@@ -1100,10 +1101,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String dxwrapper = this.dxwrapper;
         String graphicsDriverState = graphicsDriver + ";" + graphicsDriverConfigData;
-        if ("wrapper-gamenative".equals(resolveGraphicsDriverArchiveName())) {
+        String graphicsDriverArchive = resolveGraphicsDriverArchiveName();
+        if ("wrapper-gamenative".equals(graphicsDriverArchive)) {
             // Include the bundled wrapper revision in the extraction state so existing
             // containers replace an older libvulkan_wrapper.so after an app update.
             graphicsDriverState += ";bundle=" + WRAPPER_GAMENATIVE_BUNDLE_VERSION;
+        } else if ("wrapper-pipetto".equals(graphicsDriverArchive)) {
+            graphicsDriverState += ";bundle=" + WRAPPER_PIPETTO_BUNDLE_VERSION;
         }
 
         forceGraphicsDriverExtraction = !graphicsDriverState.equals(container.getExtra("graphicsDriver"));
@@ -1359,6 +1363,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             ASurfaceRenderer asrRenderer = (ASurfaceRenderer) renderer;
             asrRenderer.setSfCompatMode(shortcut != null ? shortcut.getRendererSfCompatMode()
                     : (container == null || container.getRendererSfCompatMode()));
+            asrRenderer.setDirectRgbaGameFrames(isPipettoDirectRgbaMode());
         }
 
         if (shortcut != null) {
@@ -3002,6 +3007,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String bcnEmulationCache = graphicsDriverConfig.get("bcnEmulationCache");
         envVars.put("WRAPPER_USE_BCN_CACHE", bcnEmulationCache);
 
+        if (isPipettoDirectRgbaMode()) {
+            // Pipetto a1dfbdec: request RGBA8 buffers so SurfaceFlinger can present game frames
+            // directly without the ASR BGRA->RGBA compatibility blit.
+            envVars.put("WRAPPER_SURFACE_FORMAT", "rgba8");
+        }
+
         if (!vkbasaltConfig.isEmpty()) {
             envVars.put("ENABLE_VKBASALT", "1");
             envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
@@ -3027,7 +3038,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (graphicsDriver.startsWith("wrapper-gamenative")) {
             return "wrapper-gamenative";
         }
+        if (graphicsDriver.startsWith("wrapper-pipetto")) {
+            return "wrapper-pipetto";
+        }
         return "wrapper";
+    }
+
+    private boolean isPipettoDirectRgbaMode() {
+        String rendererType = shortcut != null ? shortcut.getRenderer()
+                : (container != null ? container.getRenderer() : "vulkan");
+        return "surfaceflinger".equalsIgnoreCase(rendererType)
+                && "wrapper-pipetto".equals(resolveGraphicsDriverArchiveName());
     }
 
     @Override
