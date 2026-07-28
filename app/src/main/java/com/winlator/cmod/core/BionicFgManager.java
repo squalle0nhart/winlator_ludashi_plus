@@ -19,7 +19,7 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "bannerlator-d6838323-model4-fence";
+    private static final String RUNTIME_VERSION = "bannerlator-35e39f3-starvation-91643d4";
 
     private BionicFgManager() {}
 

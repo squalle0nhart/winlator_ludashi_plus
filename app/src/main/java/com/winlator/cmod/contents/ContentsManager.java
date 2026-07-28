@@ -39,6 +39,12 @@ public class ContentsManager {
             "${system32}/libwow64fex.dll", "${system32}/libarm64ecfex.dll",
             "${libdir}/wine/aarch64-unix/libwow64fex.so",
             "${libdir}/wine/aarch64-unix/libarm64ecfex.so"};
+    public static final String[] VEGAS_TRUST_FILES = {
+            "${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll",
+            "${system32}/d3d10_1.dll", "${system32}/d3d10core.dll", "${system32}/d3d11.dll",
+            "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll",
+            "${syswow64}/d3d10.dll", "${syswow64}/d3d10_1.dll",
+            "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};
     private Map<String, String> dirTemplateMap;
     private Map<ContentProfile.ContentType, List<String>> trustedFilesMap;
 
@@ -162,7 +168,7 @@ public class ContentsManager {
         }
     }
 
-    public void appendVegasDxvkRemoteProfiles(String json) {
+    public void appendVegasRemoteProfiles(String json) {
         ensureRemoteProfiles();
         try {
             JSONArray releases = new JSONArray(json);
@@ -175,15 +181,18 @@ public class ContentsManager {
                     JSONObject asset = assets.getJSONObject(j);
                     String assetName = asset.optString("name", "");
                     String remoteUrl = asset.optString("browser_download_url", "");
-                    if (!assetName.startsWith("dxvk-") || !assetName.endsWith(".wcp") || remoteUrl.isEmpty()) {
+                    if (!assetName.startsWith("vegas-") || !assetName.endsWith(".wcp") || remoteUrl.isEmpty()) {
                         continue;
                     }
 
                     ContentProfile remoteProfile = new ContentProfile();
-                    remoteProfile.type = ContentProfile.ContentType.CONTENT_TYPE_DXVK;
+                    remoteProfile.type = ContentProfile.ContentType.CONTENT_TYPE_VEGAS;
                     remoteProfile.remoteUrl = remoteUrl;
-                    remoteProfile.verName = assetName.substring("dxvk-".length(), assetName.length() - ".wcp".length());
-                    remoteProfile.verCode = asset.optInt("id", release.optInt("id", 0));
+                    remoteProfile.verName = assetName.substring(0, assetName.length() - ".wcp".length());
+                    // isygold VEGAS WCP profiles currently use versionCode 0. Matching it
+                    // here lets syncContents() collapse an installed package and its
+                    // corresponding remote release into one entry.
+                    remoteProfile.verCode = 0;
                     remoteProfile.desc = release.optString("name", release.optString("tag_name", "VEGAS"));
                     addRemoteProfile(remoteProfile);
                 }
@@ -459,6 +468,7 @@ public class ContentsManager {
                     case CONTENT_TYPE_BOX64 -> BOX64_TRUST_FILES;
                     case CONTENT_TYPE_WOWBOX64 -> WOWBOX64_TRUST_FILES;
                     case CONTENT_TYPE_FEXCORE -> FEXCORE_TRUST_FILES;
+                    case CONTENT_TYPE_VEGAS -> VEGAS_TRUST_FILES;
                     default -> new String[0];
                 };
                 for (String path : paths)

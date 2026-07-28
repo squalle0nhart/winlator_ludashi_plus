@@ -2044,7 +2044,14 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         if (byEntry != null) return byEntry;
         for (ContentProfile.ContentType type : types) {
             for (ContentProfile profile : contentsManager.getProfiles(type)) {
-                if (selectedValue.equals(profile.verName) || selectedValue.contains(profile.verName)) return profile;
+                String profileVersion = profile.verName;
+                if (type == ContentProfile.ContentType.CONTENT_TYPE_VEGAS
+                        && profileVersion != null && profileVersion.startsWith("vegas-")) {
+                    profileVersion = profileVersion.substring("vegas-".length());
+                }
+                if (selectedValue.equals(profile.verName)
+                        || selectedValue.equals(profileVersion)
+                        || selectedValue.contains(profile.verName)) return profile;
             }
         }
         return null;
@@ -2060,16 +2067,17 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             boolean includeBannerlator = types.contains(ContentProfile.ContentType.CONTENT_TYPE_BOX64)
                     || types.contains(ContentProfile.ContentType.CONTENT_TYPE_WOWBOX64)
                     || types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK)
-                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_VKD3D);
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_VKD3D)
+                    || types.contains(ContentProfile.ContentType.CONTENT_TYPE_VEGAS);
             String bannerlatorJson = includeBannerlator
                     ? Downloader.downloadString(ContentsManager.BANNERLATOR_REMOTE_PROFILES)
                     : null;
-            boolean includeVegasDxvk = types.contains(ContentProfile.ContentType.CONTENT_TYPE_DXVK);
-            String vegasJson = includeVegasDxvk ? Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API) : null;
+            boolean includeVegas = types.contains(ContentProfile.ContentType.CONTENT_TYPE_VEGAS);
+            String vegasJson = includeVegas ? Downloader.downloadString(ContentsManager.VEGAS_RELEASES_API) : null;
             contentsManager.clearRemoteProfiles();
             if (json != null) contentsManager.appendRemoteProfiles(json);
             if (bannerlatorJson != null) contentsManager.appendBannerlatorRemoteProfiles(bannerlatorJson);
-            if (vegasJson != null) contentsManager.appendVegasDxvkRemoteProfiles(vegasJson);
+            if (vegasJson != null) contentsManager.appendVegasRemoteProfiles(vegasJson);
             contentsManager.syncContents();
             List<ContentProfile> candidates = new ArrayList<>();
             for (ContentProfile.ContentType type : types) {

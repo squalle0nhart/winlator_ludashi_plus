@@ -116,7 +116,7 @@ public class DXVKConfigDialog extends ContentDialog {
 
         KeyValueSet config = parseConfig(anchor.getTag());
         if (isVegas) {
-            loadVegasVersionSpinner(sDXVKVersion);
+            loadVegasVersionSpinner(this.contentsManager, sDXVKVersion);
         } else {
             loadDxvkVersionSpinner(this.contentsManager, sDXVKVersion, isARM64EC);
         }
@@ -183,7 +183,7 @@ public class DXVKConfigDialog extends ContentDialog {
                 }
                 else {
                     if (DXVKConfigDialog.this.isVegas) {
-                        loadVegasVersionSpinner(sDXVKVersion);
+                        loadVegasVersionSpinner(DXVKConfigDialog.this.contentsManager, sDXVKVersion);
                     } else {
                         loadDxvkVersionSpinner(DXVKConfigDialog.this.contentsManager, sDXVKVersion, isARM64EC);
                     }
@@ -199,8 +199,19 @@ public class DXVKConfigDialog extends ContentDialog {
 
         if (installHost != null) {
             if (isVegas) {
-                findViewById(R.id.BTDXVKInstall).setVisibility(View.GONE);
-                findViewById(R.id.BTDXVKRemove).setVisibility(View.GONE);
+                findViewById(R.id.BTDXVKInstall).setOnClickListener(v ->
+                        installHost.showInstallChoicePopup(v, Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_VEGAS), () -> {
+                            this.contentsManager.syncContents();
+                            loadVegasVersionSpinner(this.contentsManager, sDXVKVersion);
+                        }));
+
+                findViewById(R.id.BTDXVKRemove).setOnClickListener(v ->
+                        installHost.removeSelectedContent(Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_VEGAS),
+                                () -> sDXVKVersion.getSelectedItem() != null ? sDXVKVersion.getSelectedItem().toString() : "",
+                                () -> {
+                                    this.contentsManager.syncContents();
+                                    loadVegasVersionSpinner(this.contentsManager, sDXVKVersion);
+                                }));
             } else {
                 findViewById(R.id.BTDXVKInstall).setOnClickListener(v ->
                         installHost.showInstallChoicePopup(v, Collections.singletonList(ContentProfile.ContentType.CONTENT_TYPE_DXVK), () -> {
@@ -371,9 +382,19 @@ public class DXVKConfigDialog extends ContentDialog {
         dxvkVersions = itemList;
     }
 
-    private void loadVegasVersionSpinner(Spinner spinner) {
+    private void loadVegasVersionSpinner(ContentsManager manager, Spinner spinner) {
         String[] originalItems = context.getResources().getStringArray(R.array.vegas_version_entries);
         List<String> itemList = new ArrayList<>(Arrays.asList(originalItems));
+
+        for (ContentProfile profile : manager.getInstalledProfiles(ContentProfile.ContentType.CONTENT_TYPE_VEGAS)) {
+            String version = profile.verName;
+            if (version != null && version.startsWith("vegas-")) {
+                version = version.substring("vegas-".length());
+            }
+            if (version != null && !version.isEmpty() && !itemList.contains(version)) {
+                itemList.add(version);
+            }
+        }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);

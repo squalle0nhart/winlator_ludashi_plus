@@ -90,7 +90,7 @@ public class ContentsFragment extends Fragment {
                 manager.clearRemoteProfiles();
                 if (json != null) manager.appendRemoteProfiles(json);
                 if (bannerlatorJson != null) manager.appendBannerlatorRemoteProfiles(bannerlatorJson);
-                if (vegasJson != null) manager.appendVegasDxvkRemoteProfiles(vegasJson);
+                if (vegasJson != null) manager.appendVegasRemoteProfiles(vegasJson);
                 manager.syncContents();
                 loadContentList();
             });

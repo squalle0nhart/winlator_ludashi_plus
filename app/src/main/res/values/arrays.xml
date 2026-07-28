@@ -23,7 +23,6 @@
         <item>Wrapper-v2</item>
         <item>Wrapper-leegao</item>
         <item>Wrapper-gamenative</item>
-        <item>Wrapper-pipetto</item>
     </string-array>
     <string-array name="wrapper_graphics_driver_version_entries">
         <item>System</item>
@@ -43,7 +42,6 @@
         <item>WineD3D</item>
         <item>DXVK+VKD3D</item>
         <item>VEGAS+VKD3D</item>
-        <item>VEGAS</item>
     </string-array>
     <string-array name="ddrawrapper_entries">
         <item>CnC-DDraw</item>

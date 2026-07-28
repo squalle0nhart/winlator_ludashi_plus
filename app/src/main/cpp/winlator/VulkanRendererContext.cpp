@@ -2167,6 +2167,11 @@ void VulkanRendererContext::dumpRendererInfo() {
 }
 
 void VulkanRendererContext::setFilterMode(int mode) {
+    // renderFrame() holds a shared frame lock while it records and submits command
+    // buffers. Take the exclusive lock before replacing the sampler or rewriting
+    // descriptor sets so no frame can bind the old sampler concurrently.
+    std::unique_lock<std::shared_mutex> frameLock(frameMutex);
+    std::lock_guard<std::mutex> renderLock(renderMutex);
     auto modeName=[](int m){ return m==5?"DLS":m==4?"FSR":m==3?"NIS":m==2?"SGSR":m==1?"NEAREST":"LINEAR"; };
     RLOG("setFilterMode: %d -> %d (%s->%s)", filterMode, mode, modeName(filterMode), modeName(mode));
     if (filterMode==mode) { RLOG("setFilterMode: already set, skipping"); return; }
