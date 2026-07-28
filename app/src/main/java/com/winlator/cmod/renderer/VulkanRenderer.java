@@ -114,6 +114,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native int[] nativeGetSupportedPresentModes(long handle);
     private native int[] nativeGetSwapchainSize(long handle);
     private native void nativeSetFrameGenerationMultiplier(long handle, int multiplier);
+    private native void nativeSetFrameGenerationSmoothing(long handle, float smoothing);
 
     
     
@@ -163,6 +164,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         nativeSetFilterMode(nativeHandle, pendingFilterMode);
                         nativeSetSwapRB(nativeHandle, pendingSwapRB);
                         nativeSetFrameGenerationMultiplier(nativeHandle, pendingFrameGenMultiplier);
+                        nativeSetFrameGenerationSmoothing(nativeHandle, pendingFrameGenSmoothing);
                         nativeSetStretchMode(nativeHandle, pendingStretchMode);
                         nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
                         nativeSetSharpness(nativeHandle, pendingSharpness);
@@ -180,6 +182,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                     nativeSetFilterMode(nativeHandle, pendingFilterMode);
                     nativeSetSwapRB(nativeHandle, pendingSwapRB);
                     nativeSetFrameGenerationMultiplier(nativeHandle, pendingFrameGenMultiplier);
+                    nativeSetFrameGenerationSmoothing(nativeHandle, pendingFrameGenSmoothing);
                     nativeSetPostFXMode(nativeHandle, pendingPostFXMode);
                     nativeSetSharpness(nativeHandle, pendingSharpness);
                     updateTransform();
@@ -757,6 +760,15 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         return pendingFrameGenMultiplier;
     }
 
+    public void setFrameGenerationSmoothing(float smoothing) {
+        pendingFrameGenSmoothing = Math.max(0.0f, Math.min(1.0f, smoothing));
+        synchronized (lock) {
+            if (nativeHandle != 0) {
+                nativeSetFrameGenerationSmoothing(nativeHandle, pendingFrameGenSmoothing);
+            }
+        }
+    }
+
     public int[] getSupportedPresentModes() {
         synchronized (lock) {
             if (nativeHandle != 0) return nativeGetSupportedPresentModes(nativeHandle);
@@ -807,6 +819,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private float   pendingSharpness      = 0.5f;
     private boolean pendingSwapRB         = false;
     private int     pendingFrameGenMultiplier = 0;
+    private float   pendingFrameGenSmoothing = 0.75f;
     public int getFpsLimit() { return fpsLimit; }
     public void setFpsLimit(int limit) {
         this.fpsLimit = limit;

@@ -302,6 +302,14 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetFrameGenerationMultiplie
     if (r) r->setFrameGenerationMultiplier((int)multiplier);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetFrameGenerationSmoothing(
+    JNIEnv*, jobject, jlong handle, jfloat smoothing)
+{
+    auto* r = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (r) r->setFrameGenerationSmoothing((float)smoothing);
+}
+
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeGetSupportedPresentModes(JNIEnv* env, jobject, jlong handle) {
     auto* r = reinterpret_cast<VulkanRendererContext*>(handle);

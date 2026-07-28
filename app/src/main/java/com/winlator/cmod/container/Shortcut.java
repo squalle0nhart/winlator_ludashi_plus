@@ -456,4 +456,20 @@ public class Shortcut {
     public void setNativeFgMultiplier(int multiplier) {
         putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
     }
+
+    public float getNativeFgSmoothing() {
+        String value = getExtra("nativeFgSmoothing", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.0f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getNativeFgSmoothing();
+        } catch (NumberFormatException e) {
+            return container.getNativeFgSmoothing();
+        }
+    }
+
+    public void setNativeFgSmoothing(float smoothing) {
+        putExtra("nativeFgSmoothing",
+                String.valueOf(Math.max(0.0f, Math.min(1.0f, smoothing))));
+    }
 }

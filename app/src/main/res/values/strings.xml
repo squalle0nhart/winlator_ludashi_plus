@@ -202,6 +202,8 @@
     <string name="intermediate">Intermediate</string>
     <string name="performance">Performance</string>
     <string name="performance_tso">Performance (TSO)</string>
+    <string name="extreme">Extreme</string>
+    <string name="extreme_tso">Extreme TSO</string>
     <string name="denuvo">Denuvo</string>
     <string name="preset">Preset</string>
     <string name="you_cannot_remove_this_preset">You cannot remove this preset</string>

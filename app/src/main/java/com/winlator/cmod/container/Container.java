@@ -274,6 +274,20 @@ public class Container {
         putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
     }
 
+    public float getNativeFgSmoothing() {
+        try {
+            return Math.max(0.0f, Math.min(1.0f,
+                    Float.parseFloat(getExtra("nativeFgSmoothing", "0.75"))));
+        } catch (NumberFormatException e) {
+            return 0.75f;
+        }
+    }
+
+    public void setNativeFgSmoothing(float smoothing) {
+        putExtra("nativeFgSmoothing",
+                String.valueOf(Math.max(0.0f, Math.min(1.0f, smoothing))));
+    }
+
     public String getDXWrapper() {
         return dxwrapper;
     }

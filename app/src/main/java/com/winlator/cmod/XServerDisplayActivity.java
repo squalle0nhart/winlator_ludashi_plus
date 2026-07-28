@@ -2507,6 +2507,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (vkRenderer != null) {
                 boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
                         || activeFrameGenMultiplier < 2;
+                float nativeSmoothing = shortcut != null
+                        ? shortcut.getNativeFgSmoothing() : container.getNativeFgSmoothing();
+                vkRenderer.setFrameGenerationSmoothing(nativeSmoothing);
                 vkRenderer.setFrameGenerationMultiplier(nativeBackend && canApplyLive ? selectedMultiplier[0] : 0);
             }
         };
@@ -2620,6 +2623,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
         final int[] selectedNativeMultiplier = {shortcut != null
                 ? shortcut.getNativeFgMultiplier() : container.getNativeFgMultiplier()};
+        final float[] selectedNativeSmoothing = {shortcut != null
+                ? shortcut.getNativeFgSmoothing() : container.getNativeFgSmoothing()};
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -2737,11 +2742,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             float flowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
-            flowLabel.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
-            flowSeekBar.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
+            flowLabel.setVisibility(View.VISIBLE);
+            flowSeekBar.setVisibility(View.VISIBLE);
             flowSeekBar.setEnabled(backendAvailable);
-            flowSeekBar.setProgress(Math.round((flowScale - 0.25f) * 100.0f));
-            flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
+            flowSeekBar.setMax(useNativeFg ? 100 : 75);
+            flowSeekBar.setProgress(useNativeFg
+                    ? Math.round(selectedNativeSmoothing[0] * 100.0f)
+                    : Math.round((flowScale - 0.25f) * 100.0f));
+            flowLabel.setText(useNativeFg
+                    ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
+                    : String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
             modelLabel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
             modelSpinner.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
             performanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
@@ -2775,13 +2785,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
                 if (syncingUi[0]) return;
-                float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + progress / 100.0f);
-                if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
-                    selectedBionicFlowScale[0] = value;
+                if (FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
+                    selectedNativeSmoothing[0] = Math.max(0.0f, Math.min(1.0f, progress / 100.0f));
+                    flowLabel.setText("Smoothness: "
+                            + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%");
                 } else {
-                    selectedLsfgFlowScale[0] = value;
+                    float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + progress / 100.0f);
+                    if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
+                        selectedBionicFlowScale[0] = value;
+                    } else {
+                        selectedLsfgFlowScale[0] = value;
+                    }
+                    flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", value));
                 }
-                flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", value));
             }
 
             @Override
@@ -2834,6 +2850,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         shortcut.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                         shortcut.setBionicFgModel(selectedBionicModel[0]);
                         shortcut.setNativeFgMultiplier(selectedNativeMultiplier[0]);
+                        shortcut.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         shortcut.saveData();
                         if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
                         FrameGenManager.writeConfig(shortcut);
@@ -2848,9 +2865,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         container.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                         container.setBionicFgModel(selectedBionicModel[0]);
                         container.setNativeFgMultiplier(selectedNativeMultiplier[0]);
+                        container.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         container.saveData();
                         if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, container);
                         FrameGenManager.writeConfig(container);
+                    }
+                    if (FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
+                            && xServerView != null
+                            && xServerView.getRenderer() instanceof VulkanRenderer) {
+                        ((VulkanRenderer) xServerView.getRenderer())
+                                .setFrameGenerationSmoothing(selectedNativeSmoothing[0]);
                     }
                     if (onSaved != null) onSaved.run();
                     boolean appliesLive = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
