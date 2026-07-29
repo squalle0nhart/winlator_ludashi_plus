@@ -1403,6 +1403,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             asrRenderer.setSfCompatMode(shortcut != null ? shortcut.getRendererSfCompatMode()
                     : (container == null || container.getRendererSfCompatMode()));
             asrRenderer.setDirectRgbaGameFrames(isDefaultWrapperDirectRgbaMode());
+            String savedGraphicsFilter = getLaunchGraphicsExtra("graphicsFilterMode", "0");
+            try {
+                asrRenderer.setFilterMode(Integer.parseInt(savedGraphicsFilter));
+            } catch (NumberFormatException ignored) {
+                asrRenderer.setFilterMode(0);
+            }
+            asrRenderer.setSharpness(getLaunchGraphicsSharpnessPercent() / 100f);
         }
 
         if (shortcut != null) {
@@ -2068,6 +2075,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final HostRenderer renderer = xServerView.getRenderer();
         final VulkanRenderer vkRenderer = renderer instanceof VulkanRenderer ? (VulkanRenderer) renderer : null;
         final GLRenderer glRenderer = renderer instanceof GLRenderer ? (GLRenderer) renderer : null;
+        final ASurfaceRenderer asrRenderer = renderer instanceof ASurfaceRenderer ? (ASurfaceRenderer) renderer : null;
 
         Spinner spNativeFPS        = findViewById(R.id.SPNativeFPS);
         View    llStandardOptions  = findViewById(R.id.LLStandardOptions);
@@ -2143,6 +2151,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 sbSharpness.setOnValueChangeListener((sb, v) -> {
                     if (tvSharpnessValue != null) tvSharpnessValue.setText(String.valueOf(Math.round(v)));
                     vkRenderer.setSharpness(v / 100f);
+                });
+            } else if (asrRenderer != null) {
+                asrRenderer.setSharpness(initSharp / 100f);
+                sbSharpness.setOnValueChangeListener((sb, v) -> {
+                    if (tvSharpnessValue != null) tvSharpnessValue.setText(String.valueOf(Math.round(v)));
+                    asrRenderer.setSharpness(v / 100f);
                 });
             } else if (glRenderer != null) {
                 sbSharpness.setOnValueChangeListener((sb, v) -> {
@@ -2278,7 +2292,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 int runtimeFilter = glRenderer != null && selectedBaseFilterMode[0] == 1 ? 2 : selectedBaseFilterMode[0];
                 renderer.setFilterMode(runtimeFilter);
                 if (glRenderer != null && applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
-            } else if (vkRenderer != null) {
+            } else if (vkRenderer != null || asrRenderer != null) {
                 renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
             }
 
@@ -2323,7 +2337,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (swEnableFSR != null && swEnableFSR.isChecked()) {
-                        if (vkRenderer != null) renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
+                        if (vkRenderer != null || asrRenderer != null) {
+                            renderer.setFilterMode(getSelectedUpscalerFilterMode(spUpscalerMode));
+                        }
                         else if (applyGlEffectsRef[0] != null) applyGlEffectsRef[0].run();
                     }
                 }
@@ -2333,7 +2349,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (swEnableFSR != null) {
             swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
-                if (vkRenderer != null) {
+                if (vkRenderer != null || asrRenderer != null) {
                     renderer.setFilterMode(checked
                             ? (spUpscalerMode != null ? getSelectedUpscalerFilterMode(spUpscalerMode) : VULKAN_UPSCALER_FILTER_VALUES[0])
                             : selectedBaseFilterMode[0]);

@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <poll.h>
@@ -110,12 +111,124 @@ precision highp int;
 
 uniform highp sampler2D uSource;
 uniform lowp int uSwapRedBlue;
+uniform highp vec2 uSourceSize;
+uniform highp vec2 uDestinationSize;
+uniform highp vec4 uSourceRect;
+uniform lowp int uFilterMode;
+uniform highp float uSharpness;
 layout(location = 0) out highp vec4 outColor;
 
+vec4 readSource(vec2 uv) {
+    vec2 halfTexel = 0.5 / uSourceSize;
+    vec2 minimumUv = uSourceRect.xy / uSourceSize + halfTexel;
+    vec2 maximumUv = uSourceRect.zw / uSourceSize - halfTexel;
+    vec4 color = texture(uSource, clamp(uv, minimumUv, maximumUv));
+    return (uSwapRedBlue != 0) ? color.bgra : color;
+}
+
+vec3 applyFsr(vec2 uv, vec3 center) {
+    vec2 texel = 1.0 / uSourceSize;
+    vec3 top    = readSource(uv + vec2(0.0, -texel.y)).rgb;
+    vec3 bottom = readSource(uv + vec2(0.0,  texel.y)).rgb;
+    vec3 left   = readSource(uv + vec2(-texel.x, 0.0)).rgb;
+    vec3 right  = readSource(uv + vec2( texel.x, 0.0)).rgb;
+
+    vec3 minimumRgb = min(center, min(min(top, bottom), min(left, right)));
+    vec3 maximumRgb = max(center, max(max(top, bottom), max(left, right)));
+    vec3 numerator = min(minimumRgb, 1.0 - maximumRgb);
+    vec3 weightRgb = sqrt(clamp(numerator / max(maximumRgb, vec3(1.0e-4)), 0.0, 1.0));
+    float weight = (weightRgb.r + weightRgb.g + weightRgb.b) / 3.0;
+    float lobe = weight * mix(-0.125, -0.200, uSharpness);
+    return clamp((lobe * (top + bottom + left + right) + center) /
+                 (1.0 + 4.0 * lobe), 0.0, 1.0);
+}
+
+vec3 applyDls(vec2 uv, vec3 center) {
+    vec2 texel = 1.0 / uSourceSize;
+    float saturation = 1.0 + uSharpness * 0.20;
+    float contrast = 1.0 + uSharpness * 0.12;
+    vec3 adjusted = clamp((center - 0.5) * contrast + 0.5, 0.0, 1.0);
+    float grey = dot(adjusted, vec3(0.299, 0.587, 0.114));
+    adjusted = mix(vec3(grey), adjusted, saturation);
+    vec3 blur = (
+            readSource(uv + vec2(0.0, -texel.y)).rgb +
+            readSource(uv + vec2(0.0,  texel.y)).rgb +
+            readSource(uv + vec2(-texel.x, 0.0)).rgb +
+            readSource(uv + vec2( texel.x, 0.0)).rgb) * 0.25;
+    return clamp(adjusted + (center - blur) * (uSharpness * 1.2), 0.0, 1.0);
+}
+
+float luma(vec3 color) {
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 applySgsr(vec2 uv, vec3 center) {
+    vec2 texel = 1.0 / uSourceSize;
+    vec3 top    = readSource(uv + vec2(0.0, -texel.y)).rgb;
+    vec3 bottom = readSource(uv + vec2(0.0,  texel.y)).rgb;
+    vec3 left   = readSource(uv + vec2(-texel.x, 0.0)).rgb;
+    vec3 right  = readSource(uv + vec2( texel.x, 0.0)).rgb;
+    float gradientX = abs(luma(right) - luma(left));
+    float gradientY = abs(luma(bottom) - luma(top));
+    float edge = clamp(max(gradientX, gradientY) * 4.0, 0.0, 1.0);
+    vec3 blur = (top + bottom + left + right + center * 4.0) * 0.125;
+    float strength = mix(0.30, 1.35, uSharpness) * mix(0.40, 1.0, edge);
+    vec3 sharpened = center + (center - blur) * strength;
+    vec3 minimumRgb = min(center, min(min(top, bottom), min(left, right)));
+    vec3 maximumRgb = max(center, max(max(top, bottom), max(left, right)));
+    return clamp(sharpened, minimumRgb, maximumRgb);
+}
+
+vec3 applyNis(vec2 uv, vec3 center) {
+    vec2 texel = 1.0 / uSourceSize;
+    vec3 top    = readSource(uv + vec2(0.0, -texel.y)).rgb;
+    vec3 bottom = readSource(uv + vec2(0.0,  texel.y)).rgb;
+    vec3 left   = readSource(uv + vec2(-texel.x, 0.0)).rgb;
+    vec3 right  = readSource(uv + vec2( texel.x, 0.0)).rgb;
+    vec3 tl = readSource(uv + vec2(-texel.x, -texel.y)).rgb;
+    vec3 tr = readSource(uv + vec2( texel.x, -texel.y)).rgb;
+    vec3 bl = readSource(uv + vec2(-texel.x,  texel.y)).rgb;
+    vec3 br = readSource(uv + vec2( texel.x,  texel.y)).rgb;
+
+    vec3 blur = (center * 4.0 + (top + bottom + left + right) * 2.0 +
+                 tl + tr + bl + br) / 16.0;
+    float localContrast = max(
+            max(abs(luma(left) - luma(right)), abs(luma(top) - luma(bottom))),
+            max(abs(luma(tl) - luma(br)), abs(luma(tr) - luma(bl))));
+    float adaptiveStrength = mix(0.35, 1.65, uSharpness) *
+            smoothstep(0.015, 0.30, localContrast);
+    vec3 sharpened = center + (center - blur) * adaptiveStrength;
+    vec3 minimumRgb = min(center, min(min(top, bottom), min(left, right)));
+    minimumRgb = min(minimumRgb, min(min(tl, tr), min(bl, br)));
+    vec3 maximumRgb = max(center, max(max(top, bottom), max(left, right)));
+    maximumRgb = max(maximumRgb, max(max(tl, tr), max(bl, br)));
+    return clamp(sharpened, minimumRgb, maximumRgb);
+}
+
 void main() {
-    ivec2 pixel = ivec2(gl_FragCoord.xy);
-    vec4 color = texelFetch(uSource, pixel, 0);
-    outColor = (uSwapRedBlue != 0) ? color.bgra : color;
+    if (uFilterMode == 0) {
+        ivec2 pixel = ivec2(gl_FragCoord.xy);
+        vec4 color = texelFetch(uSource, pixel, 0);
+        outColor = (uSwapRedBlue != 0) ? color.bgra : color;
+        return;
+    }
+
+    vec2 destinationUv = gl_FragCoord.xy / uDestinationSize;
+    vec2 sourcePixel = mix(uSourceRect.xy, uSourceRect.zw, destinationUv);
+    vec2 sourceUv = sourcePixel / uSourceSize;
+    vec4 center = readSource(sourceUv);
+
+    vec3 result;
+    if (uFilterMode == 2) {
+        result = applySgsr(sourceUv, center.rgb);
+    } else if (uFilterMode == 3) {
+        result = applyNis(sourceUv, center.rgb);
+    } else if (uFilterMode == 4) {
+        result = applyFsr(sourceUv, center.rgb);
+    } else {
+        result = applyDls(sourceUv, center.rgb);
+    }
+    outColor = vec4(result, center.a);
 }
 )GLSL";
 
@@ -174,8 +287,8 @@ void main() {
                  src.width, src.height, src.layers);
             return false;
         }
-        if (dst.width != src.width || dst.height != src.height || dst.layers != 1) {
-            LOGE("Destination dimensions mismatch: src=%ux%u dst=%ux%u layers=%u",
+        if (dst.width == 0 || dst.height == 0 || dst.layers != 1) {
+            LOGE("Invalid destination dimensions: src=%ux%u dst=%ux%u layers=%u",
                  src.width, src.height, dst.width, dst.height, dst.layers);
             return false;
         }
@@ -310,7 +423,15 @@ void BlitConverter::unregisterBuffer(AHardwareBuffer* buffer) {
     future.get();
 }
 
-std::future<int> BlitConverter::convertBGRAtoRGBA(AHardwareBuffer* source, AHardwareBuffer* destination, int sourceAcquireFenceFd, int destinationAcquireFenceFd) {
+std::future<int> BlitConverter::convertBGRAtoRGBA(
+        AHardwareBuffer* source,
+        AHardwareBuffer* destination,
+        int sourceAcquireFenceFd,
+        int destinationAcquireFenceFd,
+        int srcL, int srcT, int srcR, int srcB,
+        int filterMode,
+        float sharpness,
+        bool swapRedBlue) {
     auto promise = std::make_shared<std::promise<int>>();
     std::future<int> future = promise->get_future();
 
@@ -324,12 +445,17 @@ std::future<int> BlitConverter::convertBGRAtoRGBA(AHardwareBuffer* source, AHard
             return future;
         }
 
-        taskQueue_.push_back([this, source, destination, sourceAcquireFenceFd, destinationAcquireFenceFd, promise]() mutable {
+        taskQueue_.push_back([this, source, destination,
+                              sourceAcquireFenceFd, destinationAcquireFenceFd,
+                              srcL, srcT, srcR, srcB,
+                              filterMode, sharpness, swapRedBlue, promise]() mutable {
             int result = doConvert(
                     source,
                     destination,
                     sourceAcquireFenceFd,
-                    destinationAcquireFenceFd);
+                    destinationAcquireFenceFd,
+                    srcL, srcT, srcR, srcB,
+                    filterMode, sharpness, swapRedBlue);
             promise->set_value(result);
         });
     }
@@ -337,7 +463,15 @@ std::future<int> BlitConverter::convertBGRAtoRGBA(AHardwareBuffer* source, AHard
     return future;
 }
 
-int BlitConverter::doConvert(AHardwareBuffer* source, AHardwareBuffer* destination, int sourceAcquireFenceFd, int destinationAcquireFenceFd) {
+int BlitConverter::doConvert(
+        AHardwareBuffer* source,
+        AHardwareBuffer* destination,
+        int sourceAcquireFenceFd,
+        int destinationAcquireFenceFd,
+        int srcL, int srcT, int srcR, int srcB,
+        int filterMode,
+        float sharpness,
+        bool swapRedBlue) {
     if (!source || !destination || source == destination) {
         LOGE("Invalid source/destination AHardwareBuffer");
         waitAndCloseFenceFd(sourceAcquireFenceFd);
@@ -428,8 +562,8 @@ int BlitConverter::doConvert(AHardwareBuffer* source, AHardwareBuffer* destinati
         importedDst->framebufferValidated = true;
     }
 
-    const GLsizei w = static_cast<GLsizei>(sourceDesc.width);
-    const GLsizei h = static_cast<GLsizei>(sourceDesc.height);
+    const GLsizei w = static_cast<GLsizei>(dstDesc.width);
+    const GLsizei h = static_cast<GLsizei>(dstDesc.height);
     if (currentViewportWidth_ != w || currentViewportHeight_ != h) {
         glViewport(0, 0, w, h);
         currentViewportWidth_  = w;
@@ -441,9 +575,36 @@ int BlitConverter::doConvert(AHardwareBuffer* source, AHardwareBuffer* destinati
     glInvalidateFramebuffer(GL_FRAMEBUFFER, 1, &attachment);
 #endif
 
-    const bool swapRedBlue = sourceDesc.format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-    glUniform1i(swapRedBlueLocation_, swapRedBlue ? 1 : 0);
+    if (filterMode < 2 || filterMode > 5) filterMode = 0;
+    if (filterMode != 0) {
+        srcL = std::max(0, std::min(srcL, static_cast<int>(sourceDesc.width) - 1));
+        srcT = std::max(0, std::min(srcT, static_cast<int>(sourceDesc.height) - 1));
+        srcR = std::max(srcL + 1, std::min(srcR, static_cast<int>(sourceDesc.width)));
+        srcB = std::max(srcT + 1, std::min(srcB, static_cast<int>(sourceDesc.height)));
+    } else {
+        srcL = 0;
+        srcT = 0;
+        srcR = static_cast<int>(sourceDesc.width);
+        srcB = static_cast<int>(sourceDesc.height);
+    }
+
+    glUniform1i(swapRedBlueLocation_,
+                swapRedBlue && sourceDesc.format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM ? 1 : 0);
+    glUniform2f(sourceSizeLocation_,
+                static_cast<float>(sourceDesc.width),
+                static_cast<float>(sourceDesc.height));
+    glUniform2f(destinationSizeLocation_,
+                static_cast<float>(dstDesc.width),
+                static_cast<float>(dstDesc.height));
+    glUniform4f(sourceRectLocation_,
+                static_cast<float>(srcL), static_cast<float>(srcT),
+                static_cast<float>(srcR), static_cast<float>(srcB));
+    glUniform1i(filterModeLocation_, filterMode);
+    glUniform1f(sharpnessLocation_, std::max(0.0f, std::min(1.0f, sharpness)));
     glBindTexture(GL_TEXTURE_2D, importedSource->texture);
+    const GLint sampleFilter = filterMode == 0 ? GL_NEAREST : GL_LINEAR;
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, sampleFilter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, sampleFilter);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     if (!checkGl("fullscreen BGRA-byte to RGBA blit")) {
@@ -532,8 +693,16 @@ bool BlitConverter::initializeGL() {
 
     sourceSamplerLocation_ = glGetUniformLocation(program_, "uSource");
     swapRedBlueLocation_   = glGetUniformLocation(program_, "uSwapRedBlue");
-    if (sourceSamplerLocation_ < 0 || swapRedBlueLocation_ < 0) {
-        LOGE("Could not find shader uniforms: source=%d swap=%d", sourceSamplerLocation_, swapRedBlueLocation_);
+    sourceSizeLocation_ = glGetUniformLocation(program_, "uSourceSize");
+    destinationSizeLocation_ = glGetUniformLocation(program_, "uDestinationSize");
+    sourceRectLocation_ = glGetUniformLocation(program_, "uSourceRect");
+    filterModeLocation_ = glGetUniformLocation(program_, "uFilterMode");
+    sharpnessLocation_ = glGetUniformLocation(program_, "uSharpness");
+    if (sourceSamplerLocation_ < 0 || swapRedBlueLocation_ < 0 ||
+        sourceSizeLocation_ < 0 || destinationSizeLocation_ < 0 ||
+        sourceRectLocation_ < 0 || filterModeLocation_ < 0 ||
+        sharpnessLocation_ < 0) {
+        LOGE("Could not find one or more shader uniforms");
         return false;
     }
 
@@ -573,6 +742,7 @@ void BlitConverter::bindPrivateState() {
     glUseProgram(program_);
     glUniform1i(sourceSamplerLocation_, 0);
     glUniform1i(swapRedBlueLocation_, 0);
+    glUniform1i(filterModeLocation_, 0);
     glActiveTexture(GL_TEXTURE0);
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
@@ -616,7 +786,13 @@ void BlitConverter::cleanupGL() {
     }
 
     program_ = 0; vao_ = 0; fbo_ = 0;
-    sourceSamplerLocation_ = -1; swapRedBlueLocation_ = -1;
+    sourceSamplerLocation_ = -1;
+    swapRedBlueLocation_ = -1;
+    sourceSizeLocation_ = -1;
+    destinationSizeLocation_ = -1;
+    sourceRectLocation_ = -1;
+    filterModeLocation_ = -1;
+    sharpnessLocation_ = -1;
     currentFramebufferTexture_ = 0;
     currentViewportWidth_ = -1; currentViewportHeight_ = -1;
 

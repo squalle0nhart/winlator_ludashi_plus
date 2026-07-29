@@ -19,7 +19,7 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "bannerlator-35e39f3-starvation-91643d4";
+    private static final String RUNTIME_VERSION = "ludashi-bionicfg-layer-path-fastfail-20260728";
 
     private BionicFgManager() {}
 
@@ -139,7 +139,8 @@ public abstract class BionicFgManager {
         envVars.put("BIONIC_FG_FLOW_SCALE", String.format(Locale.US, "%.2f", flowScale(container)));
         envVars.put("BIONIC_FG_MODEL", model(container));
         appendImplicitLayerPath(envVars, layerDirPath(container));
-        Log.i(TAG, "Bionic-FG armed with multiplier=" + multiplier(container) + " model=" + model(container));
+        Log.i(TAG, "Bionic-FG armed with multiplier=" + multiplier(container)
+                + " model=" + model(container) + " layerPath=" + layerDirPath(container));
         return true;
     }
 
@@ -159,7 +160,8 @@ public abstract class BionicFgManager {
         envVars.put("BIONIC_FG_FLOW_SCALE", String.format(Locale.US, "%.2f", flowScale(shortcut)));
         envVars.put("BIONIC_FG_MODEL", model(shortcut));
         appendImplicitLayerPath(envVars, layerDirPath(shortcut));
-        Log.i(TAG, "Bionic-FG armed with multiplier=" + multiplier(shortcut) + " model=" + model(shortcut));
+        Log.i(TAG, "Bionic-FG armed with multiplier=" + multiplier(shortcut)
+                + " model=" + model(shortcut) + " layerPath=" + layerDirPath(shortcut));
         return true;
     }
 
@@ -195,8 +197,8 @@ public abstract class BionicFgManager {
 
     private static void appendImplicitLayerPath(EnvVars envVars, String layerPath) {
         if (layerPath == null || layerPath.isEmpty()) return;
-        String current = envVars.get("VK_ADD_IMPLICIT_LAYER_PATH");
-        envVars.put("VK_ADD_IMPLICIT_LAYER_PATH",
+        String current = envVars.get("VK_LAYER_PATH");
+        envVars.put("VK_LAYER_PATH",
                 current == null || current.isEmpty() ? layerPath : current + ":" + layerPath);
     }
 
