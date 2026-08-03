@@ -29,8 +29,6 @@ import com.winlator.cmod.xserver.events.PresentCompleteNotify;
 import com.winlator.cmod.xserver.events.PresentIdleNotify;
 
 import java.io.IOException;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public class PresentExtension implements Extension {
     public static final byte MAJOR_OPCODE = -103;
@@ -40,19 +38,106 @@ public class PresentExtension implements Extension {
     private final SparseArray<Event> events = new SparseArray<>();
     private SyncExtension syncExtension;
 
-    private static final long FIRE_EARLY_NS = 700_000L;
-    private final ScheduledThreadPoolExecutor idleScheduler = createIdleScheduler();
+    private static class PendingIdle {
+        Window window; Pixmap pixmap; int serial; int idleFence;
+        long targetNs;
+        int  vsyncSkips;
+        PendingIdle(Window w, Pixmap p, int s, int f, long t, int sk) {
+            window = w; pixmap = p; serial = s; idleFence = f; targetNs = t; vsyncSkips = sk;
+        }
+    }
 
-    private static ScheduledThreadPoolExecutor createIdleScheduler() {
-        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1, runnable -> {
-            Thread thread = new Thread(runnable, "PresentPacer-Timer");
-            thread.setDaemon(true);
-            return thread;
-        });
-        scheduler.setRemoveOnCancelPolicy(true);
-        scheduler.setKeepAliveTime(1, TimeUnit.SECONDS);
-        scheduler.allowCoreThreadTimeOut(true);
-        return scheduler;
+    private final java.util.concurrent.ConcurrentHashMap<Integer, PendingIdle> pendingIdles =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private volatile android.view.Choreographer choreographer = null;
+    private volatile boolean choreographerChecked = false;
+    private final Object choreographerLock = new Object();
+
+    private Thread cpuPacerThread = null;
+    private final java.util.concurrent.PriorityBlockingQueue<PendingIdle> cpuQueue =
+        new java.util.concurrent.PriorityBlockingQueue<>(11,
+            java.util.Comparator.comparingLong(p -> p.targetNs));
+
+    private static final long FIRE_EARLY_NS = 700_000L;
+
+    private android.view.Choreographer tryGetChoreographer(VulkanRenderer renderer) {
+        if (choreographerChecked) return choreographer;
+        synchronized (choreographerLock) {
+            if (choreographerChecked) return choreographer;
+            choreographerChecked = true;
+            try {
+                if (renderer != null && renderer.xServerView != null) {
+
+                    choreographer = android.view.Choreographer.getInstance();
+                }
+            } catch (Exception ignored) {
+
+                android.util.Log.w("PresentExtension", "Choreographer unavailable, using CPU pacer");
+            }
+            if (choreographer == null) {
+                startCpuPacer();
+            }
+            return choreographer;
+        }
+    }
+
+    private void startCpuPacer() {
+        if (cpuPacerThread != null) return;
+        cpuPacerThread = new Thread(() -> {
+            while (!Thread.interrupted()) {
+                PendingIdle p = cpuQueue.peek();
+                if (p == null) {
+                    java.util.concurrent.locks.LockSupport.parkNanos(500_000L);
+                    continue;
+                }
+                long now = System.nanoTime();
+                if (now >= p.targetNs) {
+                    cpuQueue.poll();
+
+                    pendingIdles.remove(p.window.id, p);
+                    sendIdleNotify(p.window, p.pixmap, p.serial, p.idleFence);
+                } else {
+                    long diff = p.targetNs - now;
+                    if (diff > 2_000_000L)
+                        java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
+                    else
+                        Thread.yield();
+                }
+            }
+        }, "PresentPacer-CPU");
+        cpuPacerThread.setDaemon(true);
+        cpuPacerThread.setPriority(Thread.MAX_PRIORITY);
+        cpuPacerThread.start();
+    }
+
+    private boolean choreographerPosted = false;
+    private final android.view.Choreographer.FrameCallback vsyncCallback = frameTimeNs -> {
+        choreographerPosted = false;
+        boolean anyRemaining = false;
+        for (java.util.Iterator<java.util.Map.Entry<Integer, PendingIdle>> it =
+                pendingIdles.entrySet().iterator(); it.hasNext(); ) {
+            PendingIdle p = it.next().getValue();
+            if (frameTimeNs >= p.targetNs) {
+                if (p.vsyncSkips > 0) {
+
+                    p.vsyncSkips--;
+                    anyRemaining = true;
+                } else {
+                    it.remove();
+                    sendIdleNotify(p.window, p.pixmap, p.serial, p.idleFence);
+                }
+            } else {
+                anyRemaining = true;
+            }
+        }
+        if (anyRemaining) postChoreographerCallback();
+    };
+
+    private void postChoreographerCallback() {
+        if (choreographer == null || choreographerPosted) return;
+        choreographerPosted = true;
+        choreographer.postFrameCallback(vsyncCallback);
     }
 
     private static class WindowTiming { long nextIdleNs = 0; }
@@ -60,7 +145,7 @@ public class PresentExtension implements Extension {
         new java.util.concurrent.ConcurrentHashMap<>();
 
     private void scheduleIdleNotify(Window window, Pixmap pixmap, int serial,
-                                     int idleFence, int targetFps) {
+                                     int idleFence, int targetFps, VulkanRenderer renderer) {
         if (targetFps <= 0) {
             sendIdleNotify(window, pixmap, serial, idleFence);
             return;
@@ -70,21 +155,23 @@ public class PresentExtension implements Extension {
         long now = System.nanoTime();
 
         WindowTiming wt = windowTimings.computeIfAbsent(window.id, k -> new WindowTiming());
-        final long fireTime;
-        synchronized (wt) {
-            if (wt.nextIdleNs <= now - frameNs) {
-                wt.nextIdleNs = now + frameNs;
-            } else {
-                wt.nextIdleNs += frameNs;
-            }
-            fireTime = wt.nextIdleNs - FIRE_EARLY_NS;
+        if (wt.nextIdleNs <= now - frameNs) {
+            wt.nextIdleNs = now + frameNs;
+        } else {
+            wt.nextIdleNs += frameNs;
         }
+        long fireTime = wt.nextIdleNs - FIRE_EARLY_NS;
 
-        long delayNs = Math.max(0L, fireTime - System.nanoTime());
-        idleScheduler.schedule(
-                () -> sendIdleNotify(window, pixmap, serial, idleFence),
-                delayNs,
-                TimeUnit.NANOSECONDS);
+        android.view.Choreographer ch = tryGetChoreographer(renderer);
+        if (ch != null) {
+
+            pendingIdles.put(window.id,
+                new PendingIdle(window, pixmap, serial, idleFence, fireTime, 0));
+            postChoreographerCallback();
+        } else {
+
+            cpuQueue.offer(new PendingIdle(window, pixmap, serial, idleFence, fireTime, 0));
+        }
     }
 
     private static abstract class ClientOpcodes {
@@ -187,13 +274,13 @@ public class PresentExtension implements Extension {
                         pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);
                     sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
                 }
-                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps);
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
             } else if (renderer != null && window.attributes.isMapped()
                     && pixmap.drawable.getTexture() instanceof GPUImage
                     && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
                 renderer.onUpdateWindowContentDirect(window, pixmap.drawable, xOff, yOff);
-                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps);
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
             } else if (xr instanceof GLRenderer
                     && ((GLRenderer) xr).isNativeMode()
                     && pixmap.drawable.getTexture() instanceof GPUImage
@@ -202,12 +289,12 @@ public class PresentExtension implements Extension {
                 content.setDirectScanout(true);
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
                 ((GLRenderer) xr).presentScanout(window, content);
-                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps);
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, null);
             } else {
                 content.copyArea((short)0, (short)0, xOff, yOff,
                     pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);
                 sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
-                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps);
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, renderer);
             }
         }
     }

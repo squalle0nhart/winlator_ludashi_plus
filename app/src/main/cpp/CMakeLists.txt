@@ -3,10 +3,6 @@ cmake_minimum_required(VERSION 3.22.1)
 project(Winlator)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -Wno-unused-function -Wimplicit-function-declaration")
-# Debug APKs are the normal install path for this fork. Keep debug symbols and
-# assertions, but do not run the renderer, scanout, and translation C++ paths
-# at Clang's unoptimized default.
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
 
 add_subdirectory(OpenXR-SDK)
 add_subdirectory(patchelf)

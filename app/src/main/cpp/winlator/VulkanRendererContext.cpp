@@ -27,6 +27,7 @@ VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH,
     createPipeline(true, pipeline);
     createFramebuffers(); createCmdPool(); createSampler();
     createWinTexPool(); createCursorDS(); createCmdBufs(); createSyncObjects();
+    createFrameGenPipelines();
     isRunning = true;
     renderThread = std::thread(&VulkanRendererContext::renderLoop, this);
 }
@@ -749,9 +750,6 @@ bool VulkanRendererContext::createFrameGenResources() {
     if (frameGenResourcesBuilt) return true;
     if (swapchainExt.width == 0 || swapchainExt.height == 0) return false;
     destroyFrameGenResources();
-    // Native frame generation is optional. Avoid compiling its compute and
-    // interpolation pipelines during renderer startup when the feature is off.
-    createFrameGenPipelines();
 
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1473,16 +1471,6 @@ void VulkanRendererContext::setFrameGenerationMultiplier(int multiplier) {
     }
 }
 
-void VulkanRendererContext::setFrameGenerationSmoothing(float smoothing) {
-    float sanitized = std::clamp(smoothing, 0.0f, 1.0f);
-    float previous = frameGenSmoothing.exchange(sanitized);
-    if (previous != sanitized) {
-        needsRender.store(true, std::memory_order_relaxed);
-        dirtyCV.notify_one();
-        RLOG("Native Framegen smoothing: %.2f", sanitized);
-    }
-}
-
 void VulkanRendererContext::invalidateFrameGenHistory(bool contentDirty) {
     frameGenResetRequested.store(true, std::memory_order_release);
     if (contentDirty) frameGenContentDirty.store(true, std::memory_order_release);
@@ -1559,7 +1547,7 @@ bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& d
     return true;
 }
 
-bool VulkanRendererContext::presentFrameGenPhase(float phase, uint32_t pairCurrent,
+bool VulkanRendererContext::presentFrameGenPhase(float phase,
     VkBuffer cursorUpload, bool hasCursorUpload,
     float ox, float oy, float sx, float sy, float cw, float ch,
     short ptrX, short ptrY, short curHotX, short curHotY,
@@ -1630,9 +1618,7 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase, uint32_t pairCurre
         cursorImageInitialized = true;
     }
 
-    // Present the exact history pair captured for this output slot. This keeps
-    // future asynchronous staging from changing a queued frame underneath it.
-    uint32_t parity = pairCurrent & 1u;
+    uint32_t parity = frameGenHistoryCurrent;
     if (!frameGenMotionValid) {
         VkImageMemoryBarrier prepareMotion{};
         prepareMotion.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1690,8 +1676,7 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase, uint32_t pairCurre
                               &frameGenInterpSets[parity], 0, nullptr);
     FrameGenInterpPush interpPush{
         (float)swapchainExt.width, (float)swapchainExt.height,
-        std::clamp(phase, 0.0f, 1.0f), 0.04f, 0.18f,
-        frameGenSmoothing.load(std::memory_order_relaxed)
+        std::clamp(phase, 0.0f, 1.0f), 0.04f, 0.18f, 0.0f
     };
     vk_.CmdPushConstants(command, frameGenInterpPipeLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
                          0, sizeof(interpPush), &interpPush);
@@ -1863,13 +1848,9 @@ ok=true;}catch(...){}
             hasCurUpload = false;
         }
         if (historyReady) {
-            const uint32_t capturedPairCurrent = frameGenHistoryCurrent;
-            // Interpolation slots lead the real frame. Presenting phase 1.0 last
-            // keeps content time monotonic: 1/M, 2/M, ... 1.
             int firstPhase = frameGenHasNewContent ? 1 : multiplier;
             for (int generatedIndex = firstPhase; generatedIndex <= multiplier; generatedIndex++) {
                 if (!presentFrameGenPhase((float)generatedIndex / (float)multiplier,
-                    capturedPairCurrent,
                     curUpload, hasCurUpload,
                     ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
                     effectiveCurVis, effectiveScissor)) break;

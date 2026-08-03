@@ -12,7 +12,7 @@ layout(push_constant) uniform PC {
     float phase;
     float occlusionLo;
     float occlusionHi;
-    float smoothing;
+    float _pad;
 } pc;
 
 bool offFrame(vec2 uv) {
@@ -41,9 +41,6 @@ void main() {
     float flowJump = max(length(flowX - motion), length(flowY - motion));
     trust *= 1.0 - smoothstep(2.0, 8.0, flowJump);
     if (offFrame(prevPos) || offFrame(currPos)) trust = 0.0;
-    // Higher smoothness favors the nearest real frame in uncertain regions
-    // without changing the motion warp.
-    trust *= 1.0 - 0.30 * clamp(pc.smoothing, 0.0, 1.0);
     vec3 nearest = t < 0.5 ? texture(prevFrame, vUV).rgb : texture(currFrame, vUV).rgb;
     outColor = vec4(clamp(mix(nearest, compensated, trust), 0.0, 1.0), 1.0);
 }

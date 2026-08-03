@@ -649,15 +649,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setNativeFgMultiplier(val);
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
-
-                            public float getNativeFgSmoothing() {
-                                return rendererCfgHolder.getNativeFgSmoothing();
-                            }
-
-                            public void setNativeFgSmoothing(float val) {
-                                rendererCfgHolder.setNativeFgSmoothing(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
                         }, rendererCfgHolder.isRendererNative()).show();
             };
         if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);

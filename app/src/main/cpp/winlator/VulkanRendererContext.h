@@ -183,7 +183,6 @@ public:
     void setSwapRB(bool enabled);
     void setPresentMode(VkPresentModeKHR mode);
     void setFrameGenerationMultiplier(int multiplier);
-    void setFrameGenerationSmoothing(float smoothing);
     int getFrameGenerationMultiplier() const { return frameGenMultiplier.load(); }
     std::vector<int> getSupportedPresentModes() const;
     VkExtent2D getSwapchainExtent() const { return swapchainExt; }
@@ -207,7 +206,7 @@ private:
 
     struct FrameGenInterpPush {
         float width, height;
-        float phase, occlusionLo, occlusionHi, smoothing;
+        float phase, occlusionLo, occlusionHi, pad;
     };
 
     struct WinTex {
@@ -364,7 +363,6 @@ private:
     VkCommandBuffer       frameGenStageCmd = VK_NULL_HANDLE;
     VkFence               frameGenStageFence = VK_NULL_HANDLE;
     std::atomic<int>      frameGenMultiplier{0};
-    std::atomic<float>    frameGenSmoothing{0.75f};
     std::atomic<bool>     frameGenResetRequested{false};
     std::atomic<bool>     frameGenContentDirty{true};
     uint32_t              frameGenHistoryCurrent = 0;
@@ -450,7 +448,7 @@ private:
         float ox, float oy, float sx, float sy, float cw, float ch,
         short ptrX, short ptrY, short curHotX, short curHotY,
         short curW, short curH, bool curVis, VkRect2D scissorRect);
-    bool presentFrameGenPhase(float phase, uint32_t pairCurrent,
+    bool presentFrameGenPhase(float phase,
         VkBuffer cursorUpload, bool hasCursorUpload,
         float ox, float oy, float sx, float sy, float cw, float ch,
         short ptrX, short ptrY, short curHotX, short curHotY,
