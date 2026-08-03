@@ -31,9 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Phase-1 scene compositor ported from GameNative PR #1582 (André Vito), built on StevenMX's
  * scanout work (the shared {@code VulkanRendererScanout.cpp} foundation already in this tree).
  * Each X11 window gets its own Android {@link android.view.SurfaceControl} layer (created in the
- * native lib) fed an AHardwareBuffer; SurfaceFlinger composites them directly. A per-buffer GLES
- * conversion pass is used only when colour compatibility or an upscaler is enabled; scene
- * composition remains in SurfaceFlinger.</p>
+ * native lib) fed an AHardwareBuffer; SurfaceFlinger composites them directly — there is no
+ * GL/Vulkan compositor pass.</p>
  *
  * <p>Structure mirrors Bannerlator's own {@code VulkanRenderer} (same X-server API, {@link XLock}
  * idioms, {@code collectWindows} scene walk, cursor path) so it slots into the existing
@@ -79,8 +78,6 @@ public class ASurfaceRenderer implements HostRenderer,
     // layer via setSfCompatMode() at launch. See setSfCompatMode() / pushWindowBuffer().
     private boolean sfCompatMode = true;
     private boolean directRgbaGameFrames = false;
-    private int filterMode = 0;
-    private float sharpness = 0.5f;
     public void setSfCompatMode(boolean enabled) { this.sfCompatMode = enabled; }
     public boolean isSfCompatMode() { return sfCompatMode; }
     public void setDirectRgbaGameFrames(boolean enabled) { this.directRgbaGameFrames = enabled; }
@@ -162,8 +159,6 @@ public class ASurfaceRenderer implements HostRenderer,
             NATIVE_CONTEXT_GENERATION.incrementAndGet();
             skipFPSCount.set(0);
             nativeSetSfCallbackTarget(this);
-            nativeSetFilterMode(filterMode);
-            nativeSetSharpness(sharpness);
             updateTransform();
             nativeInitScanout();
             sendCursorToNative(lastCursor);
@@ -562,16 +557,7 @@ public class ASurfaceRenderer implements HostRenderer,
         this.unviewableWMClasses = wmClasses != null ? wmClasses.split(";") : null;
     }
 
-    @Override
-    public void setFilterMode(int mode) {
-        filterMode = mode >= 2 && mode <= 5 ? mode : 0;
-        if (surfaceInitialized) nativeSetFilterMode(filterMode);
-    }
-
-    public void setSharpness(float value) {
-        sharpness = Math.max(0.0f, Math.min(1.0f, value));
-        if (surfaceInitialized) nativeSetSharpness(sharpness);
-    }
+    @Override public void setFilterMode(int mode) { /* ASR has no shader/filter pass */ }
     @Override public void setMagnifierZoom(float zoom) { this.magnifierZoom = zoom; }
     @Override public float getMagnifierZoom() { return magnifierZoom; }
     @Override public void toggleFullscreen() { setFullscreenMode(Container.nextFullscreenMode(fullscreenMode)); }
@@ -607,8 +593,6 @@ public class ASurfaceRenderer implements HostRenderer,
     private native void nativeScanoutSetCursorImage(java.nio.ByteBuffer pixels, short w, short h, short stride);
     private native void nativeScanoutSetCursorPos(short x, short y, short hotX, short hotY, boolean cursorVisible);
     private native void nativeScanoutSetDst(int x, int y, int w, int h);
-    private native void nativeSetFilterMode(int mode);
-    private native void nativeSetSharpness(float value);
     private native void nativeSetSfCallbackTarget(Object rendererRef);
     private native void nativeBeginTransaction();
     private native void nativeApplyTransaction();

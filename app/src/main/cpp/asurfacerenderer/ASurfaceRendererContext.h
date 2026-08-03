@@ -45,8 +45,6 @@ public:
     void scanoutSetCursorPos(short x, short y, short hotX, short hotY,
                              bool cursorVisible);
     void scanoutSetCursorVisibility(bool visible);
-    void setFilterMode(int mode);
-    void setSharpness(float value);
     void applyCursorGeometry(short x, short y, short hotX, short hotY,
                              bool cursorVisible);
 
@@ -107,13 +105,6 @@ private:
         std::vector<std::unique_ptr<ConvertedBufferSlot>> slots;
     };
 
-    struct WindowGeometry {
-        bool visible = false;
-        int zOrder = 0;
-        int srcL = 0, srcT = 0, srcR = 0, srcB = 0;
-        int dstL = 0, dstT = 0, dstR = 0, dstB = 0;
-    };
-
     // ---- SurfaceFlinger callbacks -------------------------------------------
     struct PendingSurfaceRelease {
         void*                surfaceControl        = nullptr;
@@ -138,7 +129,6 @@ private:
     std::mutex windowScMutex;
     std::unordered_map<int64_t, void*>                windowScMap;
     std::unordered_map<int64_t, ConvertedBufferSlot*> currentConvertedSlotMap;
-    std::unordered_map<int64_t, WindowGeometry>        windowGeometryMap;
 
     void* currentTx = nullptr;
 
@@ -202,11 +192,7 @@ private:
     int convertBufferGPU(AHardwareBuffer* source,
                          AHardwareBuffer* destination,
                          int sourceAcquireFenceFd,
-                         int destinationAcquireFenceFd,
-                         const WindowGeometry& geometry,
-                         int mode,
-                         float sharpness,
-                         bool swapRedBlue);
+                         int destinationAcquireFenceFd);
     ConvertedBufferSlot* acquireConvertedBuffer(int64_t contentId,
                                                 uint32_t width,
                                                 uint32_t height,
@@ -232,8 +218,6 @@ private:
     std::atomic<bool>                   acceptingConvertedFrames{true};
     std::atomic<bool>                   shutdownStarted{false};
     std::atomic<int64_t>                lastPoolWarningNs{0};
-    std::atomic<int>                    filterMode{0};
-    std::atomic<float>                  filterSharpness{0.5f};
 
     std::mutex cpuSourceMutex;
     std::unordered_set<AHardwareBuffer*> registeredCpuSourceBuffers;
