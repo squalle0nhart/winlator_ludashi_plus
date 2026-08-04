@@ -21,6 +21,8 @@ import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
 
 import java.util.ArrayList;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class VulkanRenderer implements WindowManager.OnWindowModificationListener,
                                        Pointer.OnPointerMotionListener,
@@ -73,7 +75,16 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inScaled = false;
             Bitmap bitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.cursor, options);
-            return Drawable.fromBitmap(bitmap);
+            Drawable drawable = new Drawable(0, bitmap.getWidth(), bitmap.getHeight(), null);
+            ByteBuffer pixels = ByteBuffer.allocateDirect(bitmap.getByteCount())
+                    .order(ByteOrder.LITTLE_ENDIAN);
+            bitmap.copyPixelsToBuffer(pixels);
+            pixels.rewind();
+            drawable.drawImage((short) 0, (short) 0, (short) 0, (short) 0,
+                    drawable.width, drawable.height, (byte) 32, pixels,
+                    drawable.width, drawable.height);
+            bitmap.recycle();
+            return drawable;
         } catch (Exception e) { return null; }
     }
 
@@ -490,13 +501,18 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
             cd = cursor.cursorImage; hotX = (short)cursor.hotSpotX; hotY = (short)cursor.hotSpotY;
         } else { cd = rootCursorDrawable; }
         nativeSetCursorVisible(nativeHandle, effVis);
-        if (effVis && cd != null && cd.getBuffer() != null) {
+        if (effVis && cd != null && cd.backingAHB != 0) {
             synchronized (cd.renderLock) {
-                nativeUpdateCursorImage(nativeHandle, cd.getBuffer(), cd.width, cd.height, hotX, hotY);
-                if (nativeMode) {
-                    java.nio.ByteBuffer buf = cd.getBuffer();
-                    short stride = (short)(buf.capacity() / (cd.height * 4));
-                    nativeScanoutSetCursorImage(nativeHandle, buf, cd.width, cd.height, stride);
+                java.nio.ByteBuffer buf = cd.lockBuffer();
+                if (buf == null) return;
+                try {
+                    nativeUpdateCursorImage(nativeHandle, buf, cd.width, cd.height, hotX, hotY);
+                    if (nativeMode) {
+                        nativeScanoutSetCursorImage(nativeHandle, buf, cd.width, cd.height,
+                                cd.getStride());
+                    }
+                } finally {
+                    cd.unlockBuffer();
                 }
             }
         }
@@ -537,11 +553,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         return;
                     }
                 }
-                java.nio.ByteBuffer buf = pixmap.getBuffer();
-                if (buf == null) return;
-                short stride = (short)(buf.capacity() / (pixmap.height * 4));
-                nativeUpdateWindowContent(nativeHandle, did(window.getContent()), buf,
-                    pixmap.width, pixmap.height, stride, rx, ry);
+                if (pixmap.backingAHB != 0) {
+                    nativeUpdateWindowContentAHB(nativeHandle, did(window.getContent()),
+                            pixmap.backingAHB, pixmap.width, pixmap.height, rx, ry);
+                }
             }
         }
     }
@@ -597,11 +612,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                         return;
                     }
                 }
-                java.nio.ByteBuffer buf = drawable.getBuffer();
-                if (buf == null) return;
-                short stride = (short)(buf.capacity() / (drawable.height * 4));
-                nativeUpdateWindowContent(nativeHandle, did(drawable), buf,
-                    drawable.width, drawable.height, stride, rx, ry);
+                if (drawable.backingAHB != 0) {
+                    nativeUpdateWindowContentAHB(nativeHandle, did(drawable),
+                            drawable.backingAHB, drawable.width, drawable.height, rx, ry);
+                }
             }
         }
     }

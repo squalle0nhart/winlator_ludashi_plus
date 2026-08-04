@@ -19,7 +19,7 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "bannerlator-35e39f3-starvation-91643d4";
+    private static final String RUNTIME_VERSION = "v0.1.1-android-arm64";
 
     private BionicFgManager() {}
 
@@ -211,7 +211,7 @@ public abstract class BionicFgManager {
         builder.append("enabled = ").append(enabled ? "true" : "false").append('\n');
         builder.append("multiplier = ").append(enabled ? Math.max(2, Math.min(4, multiplier)) : 0).append('\n');
         builder.append("flow_scale = ").append(String.format(Locale.US, "%.2f", Math.max(0.2f, Math.min(1.0f, flowScale)))).append('\n');
-        builder.append("model = ").append(Math.max(0, Math.min(4, model))).append('\n');
+        builder.append("model = ").append(Math.max(0, Math.min(1, model))).append('\n');
         return builder.toString();
     }
 }

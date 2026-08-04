@@ -89,17 +89,30 @@ public class Texture {
     }
 
     public void updateFromDrawable(Drawable drawable) {
-        ByteBuffer data = drawable.getData();
+        if (isAllocated() && !needsUpdate) return;
+
+        ByteBuffer data;
+        boolean locked = false;
+        if (drawable.getStride() == drawable.width) {
+            data = drawable.lockBuffer();
+            locked = data != null;
+        } else {
+            data = drawable.getImage((short) 0, (short) 0, drawable.width, drawable.height);
+        }
         if (data == null) return;
 
-        if (!isAllocated()) {
-            allocateTexture(drawable.width, drawable.height, data);
-        }
-        else if (needsUpdate) {
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
-            GLES20.glTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0, drawable.width, drawable.height, format, GLES20.GL_UNSIGNED_BYTE, data);
-            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+        try {
+            if (!isAllocated()) {
+                allocateTexture(drawable.width, drawable.height, data);
+            } else {
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId);
+                GLES20.glTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0,
+                        drawable.width, drawable.height, format, GLES20.GL_UNSIGNED_BYTE, data);
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+            }
             needsUpdate = false;
+        } finally {
+            if (locked) drawable.unlockBuffer();
         }
     }
 

@@ -106,13 +106,13 @@ public abstract class DrawRequests {
 
         Drawable srcDrawable = client.xServer.drawableManager.getDrawable(srcDrawableId);
         if (srcDrawable == null) throw new BadDrawable(srcDrawableId);
-        if (srcDrawable.getData() == null) {
+        if (srcDrawable.backingAHB == 0) {
             throw new IllegalStateException("srcDrawable has null data!");
         }
 
         Drawable dstDrawable = client.xServer.drawableManager.getDrawable(dstDrawableId);
         if (dstDrawable == null) throw new BadDrawable(dstDrawableId);
-        if (dstDrawable.getData() == null) {
+        if (dstDrawable.backingAHB == 0) {
             throw new IllegalStateException("dstDrawable has null data!");
         }
 

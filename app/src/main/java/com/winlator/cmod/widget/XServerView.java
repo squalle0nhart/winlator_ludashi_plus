@@ -12,7 +12,6 @@ import com.winlator.cmod.renderer.ASurfaceRenderer;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.HostRenderer;
 import com.winlator.cmod.renderer.VulkanRenderer;
-import com.winlator.cmod.xserver.Drawable;
 import com.winlator.cmod.xserver.XServer;
 
 import java.util.concurrent.ExecutorService;
@@ -42,7 +41,6 @@ public class XServerView extends FrameLayout {
     public void initRenderer(String rendererType) {
         boolean vulkan = "vulkan".equalsIgnoreCase(rendererType);
         boolean surfaceFlinger = "surfaceflinger".equalsIgnoreCase(rendererType);
-        Drawable.setAsrMode(surfaceFlinger);
 
         if (surfaceFlinger) {
             vulkanSurfaceView = new SurfaceView(getContext());

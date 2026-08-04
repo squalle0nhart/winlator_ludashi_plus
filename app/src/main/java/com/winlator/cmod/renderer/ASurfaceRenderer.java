@@ -404,12 +404,21 @@ public class ASurfaceRenderer implements HostRenderer,
     private void pushWindowBuffer(int windowId, Drawable drawable) {
         if (!windowSurfaces.containsKey(windowId)) return; // SC not created yet; updateScene will
         synchronized (drawable.renderLock) {
-            if (drawable.getTexture() instanceof AHBImage) {
-                pushCpuImageToNative(windowId, (AHBImage) drawable.getTexture());
-            } else if (drawable.getTexture() instanceof GPUImage) {
+            if (drawable.getTexture() instanceof GPUImage) {
                 pushGpuImageToNative(windowId, (GPUImage) drawable.getTexture());
+            } else if (drawable.backingAHB != 0) {
+                pushDrawableToNative(windowId, drawable);
+            } else if (drawable.getTexture() instanceof AHBImage) {
+                pushCpuImageToNative(windowId, (AHBImage) drawable.getTexture());
             }
         }
+    }
+
+    /** Presents the drawable's owned AHardwareBuffer without an intermediate bitmap copy. */
+    private void pushDrawableToNative(int windowId, Drawable drawable) {
+        nativeSetWindowBuffer(windowId, drawable.backingAHB, -1, windowId, 0, null, -1,
+                sfCompatMode && drawable.format == Drawable.HAL_PIXEL_FORMAT_BGRA_8888);
+        if (hudFrameTick != null) hudFrameTick.accept(windowId);
     }
 
     /**
@@ -459,10 +468,15 @@ public class ASurfaceRenderer implements HostRenderer,
         if (!surfaceInitialized || !cursorVisible) return;
         if (cursor != null && !cursor.isVisible()) return;
         Drawable cd = cursor != null ? cursor.cursorImage : null;
-        if (cd == null || cd.getBuffer() == null) return;
+        if (cd == null || cd.backingAHB == 0) return;
         synchronized (cd.renderLock) {
-            ByteBuffer buf = cd.getBuffer();
-            nativeScanoutSetCursorImage(buf, cd.width, cd.height, (short) (buf.capacity() / (cd.height * 4)));
+            ByteBuffer buf = cd.lockBuffer();
+            if (buf == null) return;
+            try {
+                nativeScanoutSetCursorImage(buf, cd.width, cd.height, cd.getStride());
+            } finally {
+                cd.unlockBuffer();
+            }
         }
     }
 

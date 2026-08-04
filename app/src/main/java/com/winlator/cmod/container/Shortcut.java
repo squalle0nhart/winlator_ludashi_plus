@@ -431,7 +431,7 @@ public class Shortcut {
         String value = getExtra("bionicFgModel", null);
         try {
             return value != null && !value.isEmpty()
-                    ? Math.max(0, Math.min(4, Integer.parseInt(value)))
+                    ? Math.max(0, Math.min(1, Integer.parseInt(value)))
                     : container.getBionicFgModel();
         } catch (NumberFormatException e) {
             return container.getBionicFgModel();
@@ -439,7 +439,7 @@ public class Shortcut {
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
     }
 
     public int getNativeFgMultiplier() {

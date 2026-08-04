@@ -80,6 +80,10 @@ public class GPUImage extends NativeTexture {
         return virtualData;
     }
 
+    public boolean isCpuLocked() {
+        return virtualData != null;
+    }
+
     public void lock() {
         if (hardwareBufferPtr != 0 && virtualData == null) {
             virtualData = lockHardwareBuffer(hardwareBufferPtr);

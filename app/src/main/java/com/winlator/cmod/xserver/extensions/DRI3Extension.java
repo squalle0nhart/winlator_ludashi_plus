@@ -4,8 +4,6 @@ import com.winlator.cmod.renderer.GPUImage;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
 
-import com.winlator.cmod.core.Callback;
-import com.winlator.cmod.sysvshm.SysVSharedMemory;
 import com.winlator.cmod.xconnector.XConnectorEpoll;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
@@ -16,7 +14,6 @@ import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.XClient;
 import com.winlator.cmod.xserver.XLock;
 import com.winlator.cmod.xserver.XServer;
-import com.winlator.cmod.xserver.errors.BadAlloc;
 import com.winlator.cmod.xserver.errors.BadDrawable;
 import com.winlator.cmod.xserver.errors.BadIdChoice;
 import com.winlator.cmod.xserver.errors.BadImplementation;
@@ -24,15 +21,9 @@ import com.winlator.cmod.xserver.errors.BadWindow;
 import com.winlator.cmod.xserver.errors.XRequestError;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 public class DRI3Extension implements Extension {
     public static final byte MAJOR_OPCODE = -102;
-
-    private final Callback<Drawable> onDestroyDrawableListener = (drawable) -> {
-        ByteBuffer data = drawable.getData();
-        SysVSharedMemory.unmapSHMSegment(data, data.capacity());
-    };
 
     private static abstract class ClientOpcodes {
         private static final byte QUERY_VERSION = 0;
@@ -76,10 +67,10 @@ public class DRI3Extension implements Extension {
     private void pixmapFromBuffer(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
         int pixmapId = inputStream.readInt();
         int windowId = inputStream.readInt();
-        int size = inputStream.readInt();
+        inputStream.skip(4);
         short width = inputStream.readShort();
         short height = inputStream.readShort();
-        short stride = inputStream.readShort();
+        inputStream.skip(2);
         byte depth = inputStream.readByte();
         inputStream.skip(1);
         Window window = client.xServer.windowManager.getWindow(windowId);
@@ -87,7 +78,7 @@ public class DRI3Extension implements Extension {
         Pixmap pixmap = client.xServer.pixmapManager.getPixmap(pixmapId);
         if (pixmap != null) throw new BadIdChoice(pixmapId);
         int fd = inputStream.getAncillaryFd();
-        pixmapFromFd(client, pixmapId, width, height, stride, 0, depth, fd, size);
+        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
     }
 
     private void pixmapFromBuffers(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
@@ -96,12 +87,10 @@ public class DRI3Extension implements Extension {
         inputStream.skip(4);
         short width = inputStream.readShort();
         short height = inputStream.readShort();
-        int stride = inputStream.readInt();
-        int offset = inputStream.readInt();
-        inputStream.skip(24);
+        inputStream.skip(32);
         byte depth = inputStream.readByte();
         inputStream.skip(3);
-        long modifiers = inputStream.readLong();
+        inputStream.skip(8);
 
         Window window = client.xServer.windowManager.getWindow(windowId);
         if (window == null) throw new BadWindow(windowId);
@@ -109,59 +98,31 @@ public class DRI3Extension implements Extension {
         if (pixmap != null) throw new BadIdChoice(pixmapId);
 
         int fd = inputStream.getAncillaryFd();
-        long size = (long)stride * height;
-
-        if (modifiers == 1255 || modifiers == 1256) {
-            pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
-        } else if (modifiers == 1274) {
-
-            pixmapFromFd(client, pixmapId, width, height, stride, offset, depth, fd, size);
-        } else {
-            pixmapFromFd(client, pixmapId, width, height, stride, offset, depth, fd, size);
-        }
+        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
     }
 
     private void pixmapFromHardwareBuffer(XClient client, int pixmapId, short width, short height, byte depth, int fd) throws IOException, XRequestError {
         GPUImage gpuImage = new GPUImage(fd);
-        if (gpuImage.getHardwareBufferPtr() != 0) {
-            try {
-                short w = gpuImage.getStride() > 0 ? gpuImage.getStride() : width;
-                Drawable drawable = client.xServer.drawableManager.createDrawable(pixmapId, w, height, depth);
-                drawable.setTexture(gpuImage);
-                drawable.setDirectScanout(true);
-                client.xServer.pixmapManager.createPixmap(drawable);
-            } finally {
-                XConnectorEpoll.closeFd(fd);
+        Drawable drawable = null;
+        boolean created = false;
+        try {
+            if (gpuImage.getHardwareBufferPtr() == 0) throw new BadImplementation();
+            drawable = client.xServer.drawableManager.createDrawable(pixmapId, width, height, depth);
+            if (drawable == null) throw new BadIdChoice(pixmapId);
+            drawable.setTexture(gpuImage);
+            drawable.setDirectScanout(true);
+            if (client.xServer.pixmapManager.createPixmap(drawable) == null) {
+                throw new BadIdChoice(pixmapId);
             }
-            return;
-        }
-        gpuImage.destroy();
-
-        try {
-            long size = (long)width * height * 4;
-            java.nio.ByteBuffer buffer = com.winlator.cmod.sysvshm.SysVSharedMemory.mapSHMSegment(fd, size, 0, true);
-            if (buffer == null) throw new BadAlloc();
-            Drawable drawable = client.xServer.drawableManager.createDrawable(pixmapId, width, height, depth);
-            drawable.setData(buffer);
-            drawable.setTexture(null);
-            drawable.setOnDestroyListener(onDestroyDrawableListener);
-            client.xServer.pixmapManager.createPixmap(drawable);
+            created = true;
         } finally {
-            XConnectorEpoll.closeFd(fd);
-        }
-    }
-
-    private void pixmapFromFd(XClient client, int pixmapId, short width, short height, int stride, int offset, byte depth, int fd, long size) throws IOException, XRequestError {
-        try {
-            ByteBuffer buffer = SysVSharedMemory.mapSHMSegment(fd, size, offset, true);
-            if (buffer == null) throw new BadAlloc();
-            short totalWidth = (short)(stride / 4);
-            Drawable drawable = client.xServer.drawableManager.createDrawable(pixmapId, totalWidth, height, depth);
-            drawable.setData(buffer);
-            drawable.setTexture(null);
-            drawable.setOnDestroyListener(onDestroyDrawableListener);
-            client.xServer.pixmapManager.createPixmap(drawable);
-        } finally {
+            if (!created) {
+                if (drawable != null) {
+                    client.xServer.drawableManager.removeDrawable(drawable.id);
+                } else {
+                    gpuImage.destroy();
+                }
+            }
             XConnectorEpoll.closeFd(fd);
         }
     }

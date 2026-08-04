@@ -685,6 +685,7 @@
 
                             <Button
                                 android:id="@+id/BTFrameGenModelV2"
+                                android:visibility="gone"
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_marginHorizontal="2dp"
@@ -700,6 +701,7 @@
 
                             <Button
                                 android:id="@+id/BTFrameGenModelFsr3"
+                                android:visibility="gone"
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_marginHorizontal="2dp"
@@ -715,6 +717,7 @@
 
                             <Button
                                 android:id="@+id/BTFrameGenModelFsr3Plus"
+                                android:visibility="gone"
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_marginStart="2dp"

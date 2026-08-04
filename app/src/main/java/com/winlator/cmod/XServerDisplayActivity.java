@@ -151,8 +151,9 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
-    private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "pipetto-e91223d-20260721";
+    private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
+    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "e91223d-20260721";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -229,6 +230,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean isRelativeMouseMovement = false;
     private boolean isMouseDisabled = false;
     private boolean simulateTouchScreen = false;
+    private boolean isSuspendEnabled = true;
 
     private SensorManager sensorManager;
 
@@ -461,6 +463,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         cursorLock = preferences.getBoolean("cursor_lock", true);
 
         isDarkMode = preferences.getBoolean("dark_mode", false);
+        isSuspendEnabled = preferences.getBoolean("pause_resume_wine", true);
 
         boolean isOpenWithAndroidBrowser = preferences.getBoolean("open_with_android_browser", false);
         boolean isShareAndroidClipboard = preferences.getBoolean("share_android_clipboard", false);
@@ -932,7 +935,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
         startTime = System.currentTimeMillis();
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
-        if (!isInPictureInPictureMode())
+        if (!isInPictureInPictureMode() && isSuspendEnabled)
             ProcessHelper.resumeAllWineProcesses();
     }
 
@@ -947,7 +950,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 xServerView.onPause();
             }
 
-            ProcessHelper.pauseAllWineProcesses();
+            if (isSuspendEnabled)
+                ProcessHelper.pauseAllWineProcesses();
         }
 
         savePlaytimeData();
@@ -1140,6 +1144,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             // Include the bundled wrapper revision in the extraction state so existing
             // containers replace an older libvulkan_wrapper.so after an app update.
             graphicsDriverState += ";bundle=" + WRAPPER_GAMENATIVE_BUNDLE_VERSION;
+        } else if ("wrapper-pipetto".equals(graphicsDriverArchive)) {
+            graphicsDriverState += ";bundle=" + WRAPPER_PIPETTO_BUNDLE_VERSION;
         }
 
         forceGraphicsDriverExtraction = !graphicsDriverState.equals(container.getExtra("graphicsDriver"));
@@ -1402,7 +1408,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             ASurfaceRenderer asrRenderer = (ASurfaceRenderer) renderer;
             asrRenderer.setSfCompatMode(shortcut != null ? shortcut.getRendererSfCompatMode()
                     : (container == null || container.getRendererSfCompatMode()));
-            asrRenderer.setDirectRgbaGameFrames(isDefaultWrapperDirectRgbaMode());
+            asrRenderer.setDirectRgbaGameFrames(isPipettoDirectRgbaMode());
         }
 
         if (shortcut != null) {
@@ -2686,7 +2692,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner modelSpinner = new Spinner(this);
         ArrayAdapter<String> modelAdapter = ThemeUtils.createSpinnerAdapter(
                 this,
-                new String[]{"Default", "Traced graph", "V2 engine", "FSR3", "FSR3+"});
+                new String[]{"Default", "Traced graph"});
         modelSpinner.setAdapter(modelAdapter);
         ThemeUtils.applySpinnerTheme(modelSpinner);
         modelSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
@@ -3339,7 +3345,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String bcnEmulationCache = graphicsDriverConfig.get("bcnEmulationCache");
         envVars.put("WRAPPER_USE_BCN_CACHE", bcnEmulationCache);
 
-        if (isDefaultWrapperDirectRgbaMode()) {
+        if (isPipettoDirectRgbaMode()) {
             // Pipetto a1dfbdec: request RGBA8 buffers so SurfaceFlinger can present game frames
             // directly without the ASR BGRA->RGBA compatibility blit.
             envVars.put("WRAPPER_SURFACE_FORMAT", "rgba8");
@@ -3370,14 +3376,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (graphicsDriver.startsWith("wrapper-gamenative")) {
             return "wrapper-gamenative";
         }
+        if (graphicsDriver.startsWith("wrapper-pipetto")) {
+            return "wrapper-pipetto";
+        }
         return "wrapper";
     }
 
-    private boolean isDefaultWrapperDirectRgbaMode() {
+    private boolean isPipettoDirectRgbaMode() {
         String rendererType = shortcut != null ? shortcut.getRenderer()
                 : (container != null ? container.getRenderer() : "vulkan");
         return "surfaceflinger".equalsIgnoreCase(rendererType)
-                && "wrapper".equals(resolveGraphicsDriverArchiveName());
+                && "wrapper-pipetto".equals(resolveGraphicsDriverArchiveName());
     }
 
     @Override

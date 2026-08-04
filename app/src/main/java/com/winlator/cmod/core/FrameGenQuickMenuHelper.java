@@ -32,7 +32,7 @@ public abstract class FrameGenQuickMenuHelper {
     }
 
     public static int sanitizeModel(int model) {
-        return Math.max(0, Math.min(4, model));
+        return Math.max(0, Math.min(1, model));
     }
 
     public static Settings readSettings(Container container) {

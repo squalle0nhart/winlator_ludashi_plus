@@ -455,7 +455,16 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inScaled = false;
         Bitmap bitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.cursor, options);
-        return Drawable.fromBitmap(bitmap);
+        Drawable drawable = new Drawable(0, bitmap.getWidth(), bitmap.getHeight(), null);
+        ByteBuffer pixels = ByteBuffer.allocateDirect(bitmap.getByteCount())
+                .order(ByteOrder.LITTLE_ENDIAN);
+        bitmap.copyPixelsToBuffer(pixels);
+        pixels.rewind();
+        drawable.drawImage((short) 0, (short) 0, (short) 0, (short) 0,
+                drawable.width, drawable.height, (byte) 32, pixels,
+                drawable.width, drawable.height);
+        bitmap.recycle();
+        return drawable;
     }
 
     private void updateScene() {
@@ -600,7 +609,6 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             int fence = image.unlock();
             scanout.present(ahbPtr, rx, ry, content.width, content.height, fence);
             image.lock();
-            content.refreshDataFromTexture();
             boolean delivered = scanout.isGameFrameDelivered();
 
             if (!xRenderingPausedForScanout && !wasDelivered && delivered) {
@@ -663,11 +671,16 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         } else {
             cursorDrawable = rootCursorDrawable;
         }
-        if (cursorDrawable != null && cursorDrawable.getBuffer() != null) {
+        if (cursorDrawable != null && cursorDrawable.backingAHB != 0) {
             synchronized (cursorDrawable.renderLock) {
-                ByteBuffer buffer = cursorDrawable.getBuffer();
-                short stride = (short) (buffer.capacity() / (cursorDrawable.height * 4));
-                scanout.setCursorImage(buffer, cursorDrawable.width, cursorDrawable.height, stride);
+                ByteBuffer buffer = cursorDrawable.lockBuffer();
+                if (buffer == null) return;
+                try {
+                    scanout.setCursorImage(buffer, cursorDrawable.width, cursorDrawable.height,
+                            cursorDrawable.getStride());
+                } finally {
+                    cursorDrawable.unlockBuffer();
+                }
             }
         }
     }
