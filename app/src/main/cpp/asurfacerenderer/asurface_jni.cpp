@@ -92,6 +92,22 @@ Java_com_winlator_cmod_renderer_ASurfaceRenderer_nativeScanoutSetDst(
     if (auto* r = g_ctx) r->scanoutSetDst(x, y, w, h);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_ASurfaceRenderer_nativeSetFilterMode(
+        JNIEnv*, jobject, jint mode)
+{
+    std::shared_lock lk(g_ctxMutex);
+    if (auto* r = g_ctx) r->setFilterMode((int)mode);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_renderer_ASurfaceRenderer_nativeSetSharpness(
+        JNIEnv*, jobject, jfloat value)
+{
+    std::shared_lock lk(g_ctxMutex);
+    if (auto* r = g_ctx) r->setSharpness((float)value);
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_winlator_cmod_renderer_ASurfaceRenderer_nativeReattachSurface(JNIEnv* env, jobject, jobject surface) {
     if (!surface) return JNI_FALSE;

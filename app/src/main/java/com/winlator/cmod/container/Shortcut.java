@@ -430,16 +430,16 @@ public class Shortcut {
     public int getBionicFgModel() {
         String value = getExtra("bionicFgModel", null);
         try {
-            return value != null && !value.isEmpty()
-                    ? Math.max(0, Math.min(1, Integer.parseInt(value)))
-                    : container.getBionicFgModel();
+            if (value == null || value.isEmpty()) return container.getBionicFgModel();
+            int model = Integer.parseInt(value);
+            return model == 1 || model == 3 ? model : 0;
         } catch (NumberFormatException e) {
             return container.getBionicFgModel();
         }
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+        putExtra("bionicFgModel", String.valueOf(model == 1 || model == 3 ? model : 0));
     }
 
     public int getNativeFgMultiplier() {
@@ -455,5 +455,21 @@ public class Shortcut {
 
     public void setNativeFgMultiplier(int multiplier) {
         putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getNativeFgSmoothing() {
+        String value = getExtra("nativeFgSmoothing", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.0f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getNativeFgSmoothing();
+        } catch (NumberFormatException e) {
+            return container.getNativeFgSmoothing();
+        }
+    }
+
+    public void setNativeFgSmoothing(float smoothing) {
+        putExtra("nativeFgSmoothing",
+                String.valueOf(Math.max(0.0f, Math.min(1.0f, smoothing))));
     }
 }

@@ -16,6 +16,7 @@
 #include "window_postfx_frag.h"
 #include "framegen_vert.h"
 #include "framegen_motion_comp.h"
+#include "framegen_flowfix_comp.h"
 #include "framegen_interpolate_frag.h"
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
@@ -59,6 +60,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     if (stretchPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, stretchPipeline, nullptr);
     if (postfxPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, postfxPipeline, nullptr);
     if (frameGenMotionPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenMotionPipeline, nullptr);
+    if (frameGenFlowFixPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenFlowFixPipeline, nullptr);
     if (frameGenInterpPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenInterpPipeline, nullptr);
     if (frameGenMotionPipeLayout != VK_NULL_HANDLE) vk_.DestroyPipelineLayout(device, frameGenMotionPipeLayout, nullptr);
     if (frameGenInterpPipeLayout != VK_NULL_HANDLE) vk_.DestroyPipelineLayout(device, frameGenInterpPipeLayout, nullptr);
@@ -528,7 +530,9 @@ void VulkanRendererContext::createPostFXPipeline() {
 }
 
 void VulkanRendererContext::createFrameGenPipelines() {
-    if (frameGenMotionPipeline != VK_NULL_HANDLE && frameGenInterpPipeline != VK_NULL_HANDLE) return;
+    if (frameGenMotionPipeline != VK_NULL_HANDLE &&
+        frameGenFlowFixPipeline != VK_NULL_HANDLE &&
+        frameGenInterpPipeline != VK_NULL_HANDLE) return;
 
     VkAttachmentDescription historyAttachment{};
     historyAttachment.format = swapchainFmt;
@@ -568,26 +572,26 @@ void VulkanRendererContext::createFrameGenPipelines() {
     if (vk_.CreateRenderPass(device, &historyPassInfo, nullptr, &frameGenHistoryPass) != VK_SUCCESS)
         throw std::runtime_error("framegen history renderpass");
 
-    VkDescriptorSetLayoutBinding motionBindings[3]{};
-    for (uint32_t i = 0; i < 2; i++) {
+    VkDescriptorSetLayoutBinding motionBindings[4]{};
+    for (uint32_t i = 0; i < 3; i++) {
         motionBindings[i].binding = i;
         motionBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         motionBindings[i].descriptorCount = 1;
         motionBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
-    motionBindings[2].binding = 2;
-    motionBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    motionBindings[2].descriptorCount = 1;
-    motionBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    motionBindings[3].binding = 3;
+    motionBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    motionBindings[3].descriptorCount = 1;
+    motionBindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     VkDescriptorSetLayoutCreateInfo motionLayoutInfo{};
     motionLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    motionLayoutInfo.bindingCount = 3;
+    motionLayoutInfo.bindingCount = 4;
     motionLayoutInfo.pBindings = motionBindings;
     if (vk_.CreateDescriptorSetLayout(device, &motionLayoutInfo, nullptr, &frameGenMotionLayout) != VK_SUCCESS)
         throw std::runtime_error("framegen motion layout");
 
-    VkDescriptorSetLayoutBinding interpBindings[3]{};
-    for (uint32_t i = 0; i < 3; i++) {
+    VkDescriptorSetLayoutBinding interpBindings[4]{};
+    for (uint32_t i = 0; i < 4; i++) {
         interpBindings[i].binding = i;
         interpBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         interpBindings[i].descriptorCount = 1;
@@ -595,7 +599,7 @@ void VulkanRendererContext::createFrameGenPipelines() {
     }
     VkDescriptorSetLayoutCreateInfo interpLayoutInfo{};
     interpLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    interpLayoutInfo.bindingCount = 3;
+    interpLayoutInfo.bindingCount = 4;
     interpLayoutInfo.pBindings = interpBindings;
     if (vk_.CreateDescriptorSetLayout(device, &interpLayoutInfo, nullptr, &frameGenInterpLayout) != VK_SUCCESS)
         throw std::runtime_error("framegen interp layout");
@@ -636,6 +640,24 @@ void VulkanRendererContext::createFrameGenPipelines() {
         throw std::runtime_error("framegen motion pipeline");
     }
     vk_.DestroyShaderModule(device, motionShader, nullptr);
+
+    VkShaderModule flowFixShader = makeShader(
+        framegen_flowfix_comp_code, sizeof(framegen_flowfix_comp_code));
+    VkPipelineShaderStageCreateInfo flowFixStage{};
+    flowFixStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    flowFixStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    flowFixStage.module = flowFixShader;
+    flowFixStage.pName = "main";
+    VkComputePipelineCreateInfo flowFixPipelineInfo{};
+    flowFixPipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    flowFixPipelineInfo.stage = flowFixStage;
+    flowFixPipelineInfo.layout = frameGenMotionPipeLayout;
+    if (vk_.CreateComputePipelines(device, VK_NULL_HANDLE, 1, &flowFixPipelineInfo, nullptr,
+                                   &frameGenFlowFixPipeline) != VK_SUCCESS) {
+        vk_.DestroyShaderModule(device, flowFixShader, nullptr);
+        throw std::runtime_error("framegen flow-fix pipeline");
+    }
+    vk_.DestroyShaderModule(device, flowFixShader, nullptr);
 
     VkShaderModule vertexShader = makeShader(framegen_vert_code, sizeof(framegen_vert_code));
     VkShaderModule interpShader = makeShader(framegen_interpolate_frag_code, sizeof(framegen_interpolate_frag_code));
@@ -767,7 +789,16 @@ bool VulkanRendererContext::createFrameGenResources() {
         !createFrameGenImage(frameGenHistory[1], swapchainExt.width, swapchainExt.height, swapchainFmt,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true) ||
+        !createFrameGenImage(frameGenHistory[2], swapchainExt.width, swapchainExt.height, swapchainFmt,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true) ||
         !createFrameGenImage(frameGenMotion, std::max(1u, swapchainExt.width / 2),
+            std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false) ||
+        !createFrameGenImage(frameGenFixed[0], std::max(1u, swapchainExt.width / 2),
+            std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false) ||
+        !createFrameGenImage(frameGenFixed[1], std::max(1u, swapchainExt.width / 2),
             std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false)) {
         destroyFrameGenResources();
@@ -795,54 +826,92 @@ bool VulkanRendererContext::createFrameGenResources() {
     transition(transitionCmd, frameGenMotion.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                0, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    for (FrameGenImage& fixed : frameGenFixed) {
+        transition(transitionCmd, fixed.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                   0, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+    }
     endOneTime(transitionCmd);
 
-    for (uint32_t parity = 0; parity < 2; parity++) {
-        VkDescriptorSetLayout layouts[] = {frameGenMotionLayout, frameGenInterpLayout};
-        VkDescriptorSet sets[2]{};
+    auto allocateSet = [&](VkDescriptorSetLayout layout, VkDescriptorSet& set) {
         VkDescriptorSetAllocateInfo allocationInfo{};
         allocationInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocationInfo.descriptorPool = winTexPool;
-        allocationInfo.descriptorSetCount = 2;
-        allocationInfo.pSetLayouts = layouts;
-        if (vk_.AllocateDescriptorSets(device, &allocationInfo, sets) != VK_SUCCESS) {
+        allocationInfo.descriptorSetCount = 1;
+        allocationInfo.pSetLayouts = &layout;
+        return vk_.AllocateDescriptorSets(device, &allocationInfo, &set) == VK_SUCCESS;
+    };
+
+    for (uint32_t current = 0; current < 3; current++) {
+        uint32_t previous = (current + 2u) % 3u;
+        if (!allocateSet(frameGenMotionLayout, frameGenMotionSets[current])) {
             destroyFrameGenResources();
             return false;
         }
-        frameGenMotionSets[parity] = sets[0];
-        frameGenInterpSets[parity] = sets[1];
-        VkDescriptorImageInfo prevInfo{frameGenSampler, frameGenHistory[parity ^ 1u].view,
+        VkDescriptorImageInfo prevInfo{frameGenSampler, frameGenHistory[previous].view,
                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-        VkDescriptorImageInfo currInfo{frameGenSampler, frameGenHistory[parity].view,
+        VkDescriptorImageInfo currInfo{frameGenSampler, frameGenHistory[current].view,
                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         VkDescriptorImageInfo motionStorage{VK_NULL_HANDLE, frameGenMotion.view, VK_IMAGE_LAYOUT_GENERAL};
         VkDescriptorImageInfo motionSample{frameGenSampler, frameGenMotion.view, VK_IMAGE_LAYOUT_GENERAL};
-        VkWriteDescriptorSet writes[6]{};
-        VkDescriptorImageInfo* motionInfos[] = {&prevInfo, &currInfo, &motionStorage};
-        for (uint32_t i = 0; i < 3; i++) {
-            writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[i].dstSet = frameGenMotionSets[parity];
-            writes[i].dstBinding = i;
-            writes[i].descriptorCount = 1;
-            writes[i].descriptorType = i == 2 ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
-                                              : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[i].pImageInfo = motionInfos[i];
+        VkDescriptorImageInfo fixedCoarse{frameGenSampler, frameGenFixed[0].view, VK_IMAGE_LAYOUT_GENERAL};
+        VkWriteDescriptorSet motionWrites[4]{};
+        VkDescriptorImageInfo* motionInfos[] = {
+            &prevInfo, &currInfo, &fixedCoarse, &motionStorage};
+        for (uint32_t i = 0; i < 4; i++) {
+            motionWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            motionWrites[i].dstSet = frameGenMotionSets[current];
+            motionWrites[i].dstBinding = i;
+            motionWrites[i].descriptorCount = 1;
+            motionWrites[i].descriptorType = i == 3 ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                                                    : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            motionWrites[i].pImageInfo = motionInfos[i];
         }
-        VkDescriptorImageInfo* interpInfos[] = {&prevInfo, &currInfo, &motionSample};
-        for (uint32_t i = 0; i < 3; i++) {
-            writes[3 + i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[3 + i].dstSet = frameGenInterpSets[parity];
-            writes[3 + i].dstBinding = i;
-            writes[3 + i].descriptorCount = 1;
-            writes[3 + i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[3 + i].pImageInfo = interpInfos[i];
+        vk_.UpdateDescriptorSets(device, 4, motionWrites, 0, nullptr);
+
+        for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++) {
+            if (!allocateSet(frameGenMotionLayout, frameGenFlowFixSets[current][frame]) ||
+                !allocateSet(frameGenInterpLayout, frameGenInterpSets[current][frame])) {
+                destroyFrameGenResources();
+                return false;
+            }
+            VkDescriptorImageInfo fixedStorage{
+                VK_NULL_HANDLE, frameGenFixed[frame].view, VK_IMAGE_LAYOUT_GENERAL};
+            VkDescriptorImageInfo fixedSample{
+                frameGenSampler, frameGenFixed[frame].view, VK_IMAGE_LAYOUT_GENERAL};
+            VkDescriptorImageInfo* fixInfos[] = {
+                &prevInfo, &currInfo, &motionSample, &fixedStorage};
+            VkWriteDescriptorSet fixWrites[4]{};
+            for (uint32_t i = 0; i < 4; i++) {
+                fixWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                fixWrites[i].dstSet = frameGenFlowFixSets[current][frame];
+                fixWrites[i].dstBinding = i;
+                fixWrites[i].descriptorCount = 1;
+                fixWrites[i].descriptorType = i == 3 ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                fixWrites[i].pImageInfo = fixInfos[i];
+            }
+            vk_.UpdateDescriptorSets(device, 4, fixWrites, 0, nullptr);
+
+            VkDescriptorImageInfo* interpInfos[] = {
+                &prevInfo, &currInfo, &fixedSample, &fixedSample};
+            VkWriteDescriptorSet interpWrites[4]{};
+            for (uint32_t i = 0; i < 4; i++) {
+                interpWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                interpWrites[i].dstSet = frameGenInterpSets[current][frame];
+                interpWrites[i].dstBinding = i;
+                interpWrites[i].descriptorCount = 1;
+                interpWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                interpWrites[i].pImageInfo = interpInfos[i];
+            }
+            vk_.UpdateDescriptorSets(device, 4, interpWrites, 0, nullptr);
         }
-        vk_.UpdateDescriptorSets(device, 6, writes, 0, nullptr);
     }
 
     frameGenHistoryCurrent = 0;
     frameGenHistoryCount = 0;
     frameGenMotionValid = false;
+    for (VkFence& fence : frameGenHistoryFences) fence = VK_NULL_HANDLE;
     frameGenResourcesBuilt = true;
     RLOG("Native Framegen resources created: %ux%u", swapchainExt.width, swapchainExt.height);
     return true;
@@ -861,13 +930,19 @@ void VulkanRendererContext::destroyFrameGenResources() {
         vk_.FreeCommandBuffers(device, cmdPool, 1, &frameGenStageCmd);
         frameGenStageCmd = VK_NULL_HANDLE;
     }
-    for (uint32_t i = 0; i < 2; i++) {
+    for (uint32_t i = 0; i < 3; i++) {
         if (frameGenMotionSets[i] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
             vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenMotionSets[i]);
-        if (frameGenInterpSets[i] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
-            vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenInterpSets[i]);
         frameGenMotionSets[i] = VK_NULL_HANDLE;
-        frameGenInterpSets[i] = VK_NULL_HANDLE;
+        frameGenHistoryFences[i] = VK_NULL_HANDLE;
+        for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++) {
+            if (frameGenFlowFixSets[i][frame] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
+                vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenFlowFixSets[i][frame]);
+            if (frameGenInterpSets[i][frame] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
+                vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenInterpSets[i][frame]);
+            frameGenFlowFixSets[i][frame] = VK_NULL_HANDLE;
+            frameGenInterpSets[i][frame] = VK_NULL_HANDLE;
+        }
     }
     auto destroyImage = [&](FrameGenImage& image) {
         if (image.framebuffer != VK_NULL_HANDLE) vk_.DestroyFramebuffer(device, image.framebuffer, nullptr);
@@ -878,7 +953,9 @@ void VulkanRendererContext::destroyFrameGenResources() {
     };
     destroyImage(frameGenHistory[0]);
     destroyImage(frameGenHistory[1]);
+    destroyImage(frameGenHistory[2]);
     destroyImage(frameGenMotion);
+    for (FrameGenImage& fixed : frameGenFixed) destroyImage(fixed);
     if (frameGenSampler != VK_NULL_HANDLE) {
         vk_.DestroySampler(device, frameGenSampler, nullptr);
         frameGenSampler = VK_NULL_HANDLE;
@@ -946,12 +1023,12 @@ void VulkanRendererContext::createSampler() {
 
 void VulkanRendererContext::createWinTexPool() {
     VkDescriptorPoolSize ps[2] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 160},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 8}
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 24}
     };
     VkDescriptorPoolCreateInfo ci{}; ci.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     ci.flags=VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    ci.poolSizeCount=2; ci.pPoolSizes=ps; ci.maxSets=160;
+    ci.poolSizeCount=2; ci.pPoolSizes=ps; ci.maxSets=192;
     if (vk_.CreateDescriptorPool(device,&ci,nullptr,&winTexPool)!=VK_SUCCESS) throw std::runtime_error("wintexpool");
 }
 
@@ -1471,6 +1548,16 @@ void VulkanRendererContext::setFrameGenerationMultiplier(int multiplier) {
     }
 }
 
+void VulkanRendererContext::setFrameGenerationSmoothing(float smoothing) {
+    float sanitized = std::clamp(smoothing, 0.0f, 1.0f);
+    float previous = frameGenSmoothing.exchange(sanitized);
+    if (previous != sanitized) {
+        needsRender.store(true, std::memory_order_relaxed);
+        dirtyCV.notify_one();
+        RLOG("Native Framegen smoothness: %.2f", sanitized);
+    }
+}
+
 void VulkanRendererContext::invalidateFrameGenHistory(bool contentDirty) {
     frameGenResetRequested.store(true, std::memory_order_release);
     if (contentDirty) frameGenContentDirty.store(true, std::memory_order_release);
@@ -1483,18 +1570,25 @@ bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& d
     short curW, short curH, bool curVis, VkRect2D scissorRect) {
     if (!createFrameGenResources()) return false;
     if (frameGenResetRequested.exchange(false)) {
+        for (VkFence fence : inFlightFences) {
+            if (fence != VK_NULL_HANDLE)
+                vk_.WaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+        }
+        for (VkFence& fence : frameGenHistoryFences) fence = VK_NULL_HANDLE;
         frameGenHistoryCount = 0;
         frameGenMotionValid = false;
     }
 
-    for (VkFence fence : inFlightFences) {
-        if (fence != VK_NULL_HANDLE) vk_.WaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-    }
     vk_.WaitForFences(device, 1, &frameGenStageFence, VK_TRUE, UINT64_MAX);
     vk_.ResetFences(device, 1, &frameGenStageFence);
     vk_.ResetCommandBuffer(frameGenStageCmd, 0);
 
-    uint32_t next = frameGenHistoryCount == 0 ? 1u : (frameGenHistoryCurrent ^ 1u);
+    uint32_t next = frameGenHistoryCount == 0 ? 1u : (frameGenHistoryCurrent + 1u) % 3u;
+    VkFence slotFence = frameGenHistoryFences[next];
+    if (slotFence != VK_NULL_HANDLE &&
+        (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, slotFence) == VK_NOT_READY)) {
+        vk_.WaitForFences(device, 1, &slotFence, VK_TRUE, UINT64_MAX);
+    }
     recordCmdBuf(frameGenStageCmd, frameGenHistoryPass, frameGenHistory[next].framebuffer, draws,
         frameAhbTransitions, framePreUpload, framePostUpload,
         cursorUpload, hasCursorUpload,
@@ -1511,7 +1605,7 @@ bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& d
     frameGenHistoryCurrent = next;
     frameGenMotionValid = false;
     if (frameGenHistoryCount == 0) {
-        uint32_t clone = next ^ 1u;
+        uint32_t clone = (next + 2u) % 3u;
         VkCommandBuffer copyCmd = beginOneTime();
         transition(copyCmd, frameGenHistory[next].image,
                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -1652,10 +1746,46 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase,
         motionReady.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         motionReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
                                0, nullptr, 0, nullptr, 1, &motionReady);
         frameGenMotionValid = true;
     }
+
+    uint32_t fixedWidth = std::max(1u, swapchainExt.width / 2);
+    uint32_t fixedHeight = std::max(1u, swapchainExt.height / 2);
+    VkImageMemoryBarrier prepareFixed{};
+    prepareFixed.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    prepareFixed.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    prepareFixed.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    prepareFixed.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prepareFixed.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prepareFixed.image = frameGenFixed[currentFrame].image;
+    prepareFixed.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    prepareFixed.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    prepareFixed.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    vk_.CmdPipelineBarrier(command,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
+        0, nullptr, 0, nullptr, 1, &prepareFixed);
+    vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, frameGenFlowFixPipeline);
+    vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
+                              frameGenMotionPipeLayout, 0, 1,
+                              &frameGenFlowFixSets[parity][currentFrame], 0, nullptr);
+    FrameGenMotionPush flowFixPush{
+        (int32_t)fixedWidth, (int32_t)fixedHeight,
+        1.0f / (float)fixedWidth, 1.0f / (float)fixedHeight,
+        1.0f, 2.0f, 0.0f, std::clamp(phase, 0.0f, 1.0f)
+    };
+    vk_.CmdPushConstants(command, frameGenMotionPipeLayout, VK_SHADER_STAGE_COMPUTE_BIT,
+                         0, sizeof(flowFixPush), &flowFixPush);
+    vk_.CmdDispatch(command, (fixedWidth + 7u) / 8u, (fixedHeight + 7u) / 8u, 1);
+    VkImageMemoryBarrier fixedReady = prepareFixed;
+    fixedReady.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    fixedReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                           0, nullptr, 0, nullptr, 1, &fixedReady);
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1673,10 +1803,11 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase,
     vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, frameGenInterpPipeline);
     vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
                               frameGenInterpPipeLayout, 0, 1,
-                              &frameGenInterpSets[parity], 0, nullptr);
+                              &frameGenInterpSets[parity][currentFrame], 0, nullptr);
     FrameGenInterpPush interpPush{
         (float)swapchainExt.width, (float)swapchainExt.height,
-        std::clamp(phase, 0.0f, 1.0f), 0.04f, 0.18f, 0.0f
+        std::clamp(phase, 0.0f, 1.0f),
+        frameGenSmoothing.load(std::memory_order_relaxed), 0.33f, 0.0f
     };
     vk_.CmdPushConstants(command, frameGenInterpPipeLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
                          0, sizeof(interpPush), &interpPush);
@@ -1725,11 +1856,19 @@ bool VulkanRendererContext::presentFrameGenPhase(float phase,
     submit.pCommandBuffers = &command;
     submit.signalSemaphoreCount = 1;
     submit.pSignalSemaphores = &renderDoneSems[currentFrame];
+    // Fence handles are recycled with the frame slot. Remove stale history
+    // ownership before resetting one, then attach it only to the pair sampled
+    // by this submission.
+    for (VkFence& historyFence : frameGenHistoryFences) {
+        if (historyFence == inFlightFences[currentFrame]) historyFence = VK_NULL_HANDLE;
+    }
     vk_.ResetFences(device, 1, &inFlightFences[currentFrame]);
     if (vk_.QueueSubmit(graphicsQueue, 1, &submit, inFlightFences[currentFrame]) != VK_SUCCESS) {
         frameGenMotionValid = false;
         return false;
     }
+    frameGenHistoryFences[parity] = inFlightFences[currentFrame];
+    frameGenHistoryFences[(parity + 2u) % 3u] = inFlightFences[currentFrame];
     VkPresentInfoKHR present{};
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;

@@ -303,6 +303,16 @@ void ASurfaceRendererContext::scanoutSetCursorVisibility(bool visible) {
     });
 }
 
+void ASurfaceRendererContext::setFilterMode(int mode) {
+    if (mode < 2 || mode > 5) mode = 0;
+    filterMode.store(mode, std::memory_order_release);
+}
+
+void ASurfaceRendererContext::setSharpness(float value) {
+    filterSharpness.store(std::max(0.0f, std::min(1.0f, value)),
+                          std::memory_order_release);
+}
+
 void ASurfaceRendererContext::returnSourceFence(JNIEnv* env, jobject ahbImage, int sourceSlot, int fenceFd) {
     if (!env || !ahbImage || sourceSlot < 0) {
         if (fenceFd >= 0) close(fenceFd);
@@ -343,22 +353,39 @@ void ASurfaceRendererContext::setWindowBuffer(JNIEnv* env, int64_t contentId, AH
 
     // Resolve the SurfaceControl under lock.
     void* surfaceControl = nullptr;
+    WindowGeometry geometry{};
+    bool hasGeometry = false;
     {
         std::lock_guard<std::mutex> lock(windowScMutex);
         const auto it = windowScMap.find(contentId);
         if (it != windowScMap.end()) surfaceControl = it->second;
+        const auto geometryIt = windowGeometryMap.find(contentId);
+        if (geometryIt != windowGeometryMap.end()) {
+            geometry = geometryIt->second;
+            hasGeometry = true;
+        }
     }
     if (!surfaceControl) {
         returnSourceFence(env, ahbImage, sourceSlot, sourceAcquireFenceFd);
         return;
     }
 
-    if (sfCompatMode) {
+    const int activeFilterMode = filterMode.load(std::memory_order_acquire);
+    const bool useUpscaler = activeFilterMode >= 2 && hasGeometry &&
+            geometry.dstR > geometry.dstL && geometry.dstB > geometry.dstT;
+    if (sfCompatMode || useUpscaler) {
         AHardwareBuffer_Desc sourceDescriptor{};
         AHardwareBuffer_describe(sourceAhb, &sourceDescriptor);
 
+        const uint32_t destinationWidth = useUpscaler
+                ? static_cast<uint32_t>(geometry.dstR - geometry.dstL)
+                : sourceDescriptor.width;
+        const uint32_t destinationHeight = useUpscaler
+                ? static_cast<uint32_t>(geometry.dstB - geometry.dstT)
+                : sourceDescriptor.height;
         int destinationAcquireFenceFd = -1;
-        ConvertedBufferSlot* destinationSlot = acquireConvertedBuffer(contentId, sourceDescriptor.width, sourceDescriptor.height, destinationAcquireFenceFd);
+        ConvertedBufferSlot* destinationSlot = acquireConvertedBuffer(
+                contentId, destinationWidth, destinationHeight, destinationAcquireFenceFd);
 
         if (!destinationSlot) {
             const int64_t nowNs = duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
@@ -372,7 +399,15 @@ void ASurfaceRendererContext::setWindowBuffer(JNIEnv* env, int64_t contentId, AH
         }
 
         // Post the conversion to BlitConverter's worker thread and block until the release fence is ready
-        int conversionFenceFd = convertBufferGPU(sourceAhb, destinationSlot->buffer, sourceAcquireFenceFd, destinationAcquireFenceFd);
+        int conversionFenceFd = convertBufferGPU(
+                sourceAhb,
+                destinationSlot->buffer,
+                sourceAcquireFenceFd,
+                destinationAcquireFenceFd,
+                geometry,
+                useUpscaler ? activeFilterMode : 0,
+                filterSharpness.load(std::memory_order_acquire),
+                sfCompatMode);
 
         // Both input FDs consumed by convertBufferGPU on every path.
         sourceAcquireFenceFd = -1;
@@ -431,6 +466,17 @@ void ASurfaceRendererContext::setWindowBuffer(JNIEnv* env, int64_t contentId, AH
 
         ST_SETBUF(transaction, surfaceControl, destinationSlot->buffer, conversionFenceFd);
         ST_SET_TRANSPARENCY(transaction, surfaceControl, 2);
+        if (useUpscaler) {
+            ARect scaledSource{0, 0,
+                    static_cast<int32_t>(destinationWidth),
+                    static_cast<int32_t>(destinationHeight)};
+            ARect destination{geometry.dstL, geometry.dstT, geometry.dstR, geometry.dstB};
+            ST_SETGEO(transaction, surfaceControl, &scaledSource, &destination, 0);
+        } else if (hasGeometry) {
+            ARect source{geometry.srcL, geometry.srcT, geometry.srcR, geometry.srcB};
+            ARect destination{geometry.dstL, geometry.dstT, geometry.dstR, geometry.dstB};
+            ST_SETGEO(transaction, surfaceControl, &source, &destination, 0);
+        }
 
         std::vector<PendingSurfaceRelease> releases;
         if (previousSlot) {
@@ -455,6 +501,11 @@ void ASurfaceRendererContext::setWindowBuffer(JNIEnv* env, int64_t contentId, AH
 
         ST_SETBUF(transaction, surfaceControl, sourceAhb, sourceAcquireFenceFd);
         ST_SET_TRANSPARENCY(transaction, surfaceControl, 2);
+        if (hasGeometry) {
+            ARect source{geometry.srcL, geometry.srcT, geometry.srcR, geometry.srcB};
+            ARect destination{geometry.dstL, geometry.dstT, geometry.dstR, geometry.dstB};
+            ST_SETGEO(transaction, surfaceControl, &source, &destination, 0);
+        }
 
         // No callback needed since we're not tracking converted buffers
         ST_APPLY(transaction);
@@ -590,8 +641,11 @@ void ASurfaceRendererContext::updateWindow(int64_t contentId, bool visible, int 
                                            int srcL, int srcT, int srcR, int srcB,
                                            int dstL, int dstT, int dstR, int dstB) {
     void* sc = nullptr;
+    WindowGeometry geometry{visible, zOrder, srcL, srcT, srcR, srcB,
+                            dstL, dstT, dstR, dstB};
     {
         std::lock_guard<std::mutex> lk(windowScMutex);
+        windowGeometryMap[contentId] = geometry;
         auto it = windowScMap.find(contentId);
         if (it != windowScMap.end()) sc = it->second;
     }
@@ -601,7 +655,10 @@ void ASurfaceRendererContext::updateWindow(int64_t contentId, bool visible, int 
 
     ST_SETVIS(tx, sc, visible ? 1 : 0);
     if (visible) {
-        ARect local_srcR{srcL, srcT, srcR, srcB};
+        const bool upscale = filterMode.load(std::memory_order_acquire) >= 2;
+        ARect local_srcR = upscale
+                ? ARect{0, 0, std::max(1, dstR - dstL), std::max(1, dstB - dstT)}
+                : ARect{srcL, srcT, srcR, srcB};
         ARect local_dstR{dstL, dstT, dstR, dstB};
         ST_SETGEO(tx, sc, &local_srcR, &local_dstR, 0);
         ST_SETZORDER(tx, sc, zOrder);
@@ -673,6 +730,7 @@ void ASurfaceRendererContext::unregisterWindowSC(int64_t contentId) {
             currentSlot = slotIt->second;
             currentConvertedSlotMap.erase(slotIt);
         }
+        windowGeometryMap.erase(contentId);
     }
     if (surfaceControl) retireSurfaceControl(surfaceControl, currentSlot);
 }
@@ -822,14 +880,33 @@ void ASurfaceRendererContext::destroyConvertedBufferPool() {
     }
 }
 
-int ASurfaceRendererContext::convertBufferGPU(AHardwareBuffer* source, AHardwareBuffer* destination, int sourceAcquireFenceFd, int destinationAcquireFenceFd) {
+int ASurfaceRendererContext::convertBufferGPU(
+        AHardwareBuffer* source,
+        AHardwareBuffer* destination,
+        int sourceAcquireFenceFd,
+        int destinationAcquireFenceFd,
+        const WindowGeometry& geometry,
+        int mode,
+        float sharpness,
+        bool swapRedBlue) {
     if (!blitConverter) {
         if (sourceAcquireFenceFd >= 0)      close(sourceAcquireFenceFd);
         if (destinationAcquireFenceFd >= 0) close(destinationAcquireFenceFd);
         return -1;
     }
     // Post and block until the worker thread has submitted the draw and produced the release fence
-    std::future<int> future = blitConverter->convertBGRAtoRGBA(source, destination, sourceAcquireFenceFd, destinationAcquireFenceFd);
+    std::future<int> future = blitConverter->convertBGRAtoRGBA(
+            source,
+            destination,
+            sourceAcquireFenceFd,
+            destinationAcquireFenceFd,
+            geometry.srcL,
+            geometry.srcT,
+            geometry.srcR,
+            geometry.srcB,
+            mode,
+            sharpness,
+            swapRedBlue);
     return future.get();
 }
 

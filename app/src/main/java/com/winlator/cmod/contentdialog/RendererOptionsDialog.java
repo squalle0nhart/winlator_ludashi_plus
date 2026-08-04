@@ -14,6 +14,7 @@ import android.widget.TextView;
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.FrameGenQuickMenuHelper;
 import com.winlator.cmod.core.UnitUtils;
 import com.winlator.cmod.renderer.ASurfaceRenderer;
 
@@ -89,6 +90,8 @@ public class RendererOptionsDialog extends ContentDialog {
 
         int getNativeFgMultiplier();
         void setNativeFgMultiplier(int v);
+        float getNativeFgSmoothing();
+        void setNativeFgSmoothing(float v);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
@@ -109,10 +112,11 @@ public class RendererOptionsDialog extends ContentDialog {
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
     private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
-    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1};
+    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1, 3};
     private static final String[] BIONIC_FG_MODEL_LABELS = {
         "Default",
-        "Traced graph (experimental)"
+        "Traced graph (v0.1.1)",
+        "FSR optical flow (stability)"
     };
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
@@ -270,6 +274,8 @@ public class RendererOptionsDialog extends ContentDialog {
             final float[] selectedBionicFlowScale = {sanitizeFlowScale(config.getBionicFgFlowScale())};
             final int[] selectedBionicModel = {config.getBionicFgModel()};
             final int[] selectedNativeMultiplier = {config.getNativeFgMultiplier()};
+            final float[] selectedNativeSmoothing = {
+                    Math.max(0.0f, Math.min(1.0f, config.getNativeFgSmoothing()))};
             final boolean[] syncingFrameGenUi = {false};
 
             int backendSelection = 0;
@@ -307,17 +313,21 @@ public class RendererOptionsDialog extends ContentDialog {
                     }
                 }
                 spLsfgMultiplier.setSelection(multiplierSelection);
-                sbLsfgFlowScale.setMax(75);
-                sbLsfgFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100.0f));
-                tvLsfgFlowScale.setText(String.format(Locale.US, "%.2f", flowScale));
+                sbLsfgFlowScale.setMax(useNativeFg ? 100 : 75);
+                sbLsfgFlowScale.setProgress(useNativeFg
+                        ? Math.round(selectedNativeSmoothing[0] * 100.0f)
+                        : Math.round((flowScale - 0.25f) * 100.0f));
+                tvLsfgFlowScale.setText(useNativeFg
+                        ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
+                        : String.format(Locale.US, "%.2f", flowScale));
                 cbLsfgPerformanceMode.setChecked(selectedLsfgPerformanceMode[0]);
                 groupBionicFgModel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-                spBionicFgModel.setSelection(Math.max(0, Math.min(BIONIC_FG_MODEL_VALUES.length - 1, selectedBionicModel[0])));
+                spBionicFgModel.setSelection(FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
                 cbLsfgPerformanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
                 spLsfgMultiplier.setEnabled(useBionicFg || useNativeFg || dllAvailable);
-                sbLsfgFlowScale.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
-                tvLsfgFlowScale.setVisibility(useNativeFg ? View.GONE : View.VISIBLE);
-                sbLsfgFlowScale.setEnabled(useBionicFg || dllAvailable);
+                sbLsfgFlowScale.setVisibility(View.VISIBLE);
+                tvLsfgFlowScale.setVisibility(View.VISIBLE);
+                sbLsfgFlowScale.setEnabled(useNativeFg || useBionicFg || dllAvailable);
                 cbLsfgPerformanceMode.setEnabled(dllAvailable);
                 spBionicFgModel.setEnabled(useBionicFg);
                 syncingFrameGenUi[0] = false;
@@ -350,6 +360,13 @@ public class RendererOptionsDialog extends ContentDialog {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                     if (syncingFrameGenUi[0]) return;
+                    boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
+                    if (useNativeFg) {
+                        selectedNativeSmoothing[0] = Math.max(0.0f, Math.min(1.0f, progress / 100.0f));
+                        tvLsfgFlowScale.setText("Smoothness: "
+                                + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%");
+                        return;
+                    }
                     float value = sanitizeFlowScale(0.25f + (progress / 100.0f));
                     boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
                     if (useBionicFg) selectedBionicFlowScale[0] = value;
@@ -404,6 +421,7 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                 config.setBionicFgModel(selectedBionicModel[0]);
                 config.setNativeFgMultiplier(selectedNativeMultiplier[0]);
+                config.setNativeFgSmoothing(selectedNativeSmoothing[0]);
             });
             return;
         }

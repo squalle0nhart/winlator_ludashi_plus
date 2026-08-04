@@ -50,12 +50,17 @@ public:
     bool registerBuffer(AHardwareBuffer* buffer);
     void unregisterBuffer(AHardwareBuffer* buffer);
 
-    // Posts a BGRA→RGBA conversion. Returns a future for the release-fence FD.
-    // Both acquire FDs are consumed by the posted task regardless of outcome.
+    // Posts a BGRA→RGBA conversion and optional destination-sized upscale.
+    // Returns a future for the release-fence FD. Both acquire FDs are consumed
+    // by the posted task regardless of outcome.
     std::future<int> convertBGRAtoRGBA(AHardwareBuffer* source,
                                        AHardwareBuffer* destinationRGBA,
                                        int sourceAcquireFenceFd,
-                                       int destinationAcquireFenceFd = -1);
+                                       int destinationAcquireFenceFd,
+                                       int srcL, int srcT, int srcR, int srcB,
+                                       int filterMode,
+                                       float sharpness,
+                                       bool swapRedBlue);
 
     // Drains the queue and shuts the worker thread down.
     // Subsequent posts are rejected and their futures resolve to -1.
@@ -98,7 +103,9 @@ private:
 
     // Actual per-frame work, called on the worker thread.
     int doConvert(AHardwareBuffer* source, AHardwareBuffer* destination,
-                  int sourceAcquireFenceFd, int destinationAcquireFenceFd);
+                  int sourceAcquireFenceFd, int destinationAcquireFenceFd,
+                  int srcL, int srcT, int srcR, int srcB,
+                  int filterMode, float sharpness, bool swapRedBlue);
 
     static bool checkGl(const char* operation);
     static bool checkEgl(const char* operation);
@@ -112,6 +119,11 @@ private:
     GLuint fbo_ = 0;
     GLint  sourceSamplerLocation_ = -1;
     GLint  swapRedBlueLocation_   = -1;
+    GLint  sourceSizeLocation_    = -1;
+    GLint  destinationSizeLocation_ = -1;
+    GLint  sourceRectLocation_    = -1;
+    GLint  filterModeLocation_    = -1;
+    GLint  sharpnessLocation_     = -1;
 
     GLuint  currentFramebufferTexture_ = 0;
     GLsizei currentViewportWidth_      = -1;

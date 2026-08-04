@@ -225,6 +225,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
                 public int getNativeFgMultiplier() { return shortcut.getNativeFgMultiplier(); }
                 public void setNativeFgMultiplier(int val) { shortcut.setNativeFgMultiplier(val); }
+                public float getNativeFgSmoothing() { return shortcut.getNativeFgSmoothing(); }
+                public void setNativeFgSmoothing(float val) { shortcut.setNativeFgSmoothing(val); }
             }, rendererNativeHolder[0]).show();
         if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
         if (rendererTrigger != null) rendererTrigger.setOnClickListener(openRendererOptions);

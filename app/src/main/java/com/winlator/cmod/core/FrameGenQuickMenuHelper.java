@@ -32,7 +32,15 @@ public abstract class FrameGenQuickMenuHelper {
     }
 
     public static int sanitizeModel(int model) {
-        return Math.max(0, Math.min(1, model));
+        return model == 1 || model == 3 ? model : 0;
+    }
+
+    public static int modelToPosition(int model) {
+        return sanitizeModel(model) == 3 ? 2 : sanitizeModel(model);
+    }
+
+    public static int modelFromPosition(int position) {
+        return position == 1 ? 1 : position == 2 ? 3 : 0;
     }
 
     public static Settings readSettings(Container container) {

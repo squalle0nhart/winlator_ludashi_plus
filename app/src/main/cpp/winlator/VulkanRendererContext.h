@@ -183,6 +183,7 @@ public:
     void setSwapRB(bool enabled);
     void setPresentMode(VkPresentModeKHR mode);
     void setFrameGenerationMultiplier(int multiplier);
+    void setFrameGenerationSmoothing(float smoothing);
     int getFrameGenerationMultiplier() const { return frameGenMultiplier.load(); }
     std::vector<int> getSupportedPresentModes() const;
     VkExtent2D getSwapchainExtent() const { return swapchainExt; }
@@ -206,7 +207,7 @@ private:
 
     struct FrameGenInterpPush {
         float width, height;
-        float phase, occlusionLo, occlusionHi, pad;
+        float phase, smoothing, confidenceScale, mode;
     };
 
     struct WinTex {
@@ -354,15 +355,22 @@ private:
     VkPipelineLayout      frameGenMotionPipeLayout = VK_NULL_HANDLE;
     VkPipelineLayout      frameGenInterpPipeLayout = VK_NULL_HANDLE;
     VkPipeline            frameGenMotionPipeline = VK_NULL_HANDLE;
+    VkPipeline            frameGenFlowFixPipeline = VK_NULL_HANDLE;
     VkPipeline            frameGenInterpPipeline = VK_NULL_HANDLE;
     VkSampler             frameGenSampler = VK_NULL_HANDLE;
-    FrameGenImage         frameGenHistory[2];
+    FrameGenImage         frameGenHistory[3];
     FrameGenImage         frameGenMotion;
-    VkDescriptorSet       frameGenMotionSets[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
-    VkDescriptorSet       frameGenInterpSets[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    FrameGenImage         frameGenFixed[MAX_FRAMES_IN_FLIGHT];
+    VkDescriptorSet       frameGenMotionSets[3] = {
+        VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
+    VkDescriptorSet       frameGenFlowFixSets[3][MAX_FRAMES_IN_FLIGHT]{};
+    VkDescriptorSet       frameGenInterpSets[3][MAX_FRAMES_IN_FLIGHT]{};
+    VkFence               frameGenHistoryFences[3] = {
+        VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
     VkCommandBuffer       frameGenStageCmd = VK_NULL_HANDLE;
     VkFence               frameGenStageFence = VK_NULL_HANDLE;
     std::atomic<int>      frameGenMultiplier{0};
+    std::atomic<float>    frameGenSmoothing{0.75f};
     std::atomic<bool>     frameGenResetRequested{false};
     std::atomic<bool>     frameGenContentDirty{true};
     uint32_t              frameGenHistoryCurrent = 0;

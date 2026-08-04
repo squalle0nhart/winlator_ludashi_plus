@@ -701,7 +701,6 @@
 
                             <Button
                                 android:id="@+id/BTFrameGenModelFsr3"
-                                android:visibility="gone"
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_marginHorizontal="2dp"
@@ -710,7 +709,7 @@
                                 android:maxLines="1"
                                 android:paddingStart="2dp"
                                 android:paddingEnd="2dp"
-                                android:text="FSR3"
+                                android:text="FSR"
                                 android:textAllCaps="false"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="9sp" />

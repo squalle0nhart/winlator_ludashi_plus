@@ -19,7 +19,9 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "v0.1.1-android-arm64";
+    // Upstream v0.1.1 pacing/swapchain runtime plus an isolated FSR optical-flow model 3.
+    // The unique stamp refreshes every cached container runtime.
+    private static final String RUNTIME_VERSION = "bionic-fg-v0.1.1-fsr-of-stable-20260804";
 
     private BionicFgManager() {}
 
@@ -195,9 +197,17 @@ public abstract class BionicFgManager {
 
     private static void appendImplicitLayerPath(EnvVars envVars, String layerPath) {
         if (layerPath == null || layerPath.isEmpty()) return;
-        String current = envVars.get("VK_ADD_IMPLICIT_LAYER_PATH");
-        envVars.put("VK_ADD_IMPLICIT_LAYER_PATH",
-                current == null || current.isEmpty() ? layerPath : current + ":" + layerPath);
+        // Bionic-FG upstream and the glibc Vulkan loader used by Winlator expect VK_LAYER_PATH.
+        // Preserve the rootfs layer directories already set by GuestProgramLauncherComponent.
+        String current = envVars.get("VK_LAYER_PATH");
+        if (current == null || current.isEmpty()) {
+            envVars.put("VK_LAYER_PATH", layerPath);
+            return;
+        }
+        for (String path : current.split(":")) {
+            if (layerPath.equals(path)) return;
+        }
+        envVars.put("VK_LAYER_PATH", current + ":" + layerPath);
     }
 
     private static File configFile(Container container) {
@@ -211,7 +221,11 @@ public abstract class BionicFgManager {
         builder.append("enabled = ").append(enabled ? "true" : "false").append('\n');
         builder.append("multiplier = ").append(enabled ? Math.max(2, Math.min(4, multiplier)) : 0).append('\n');
         builder.append("flow_scale = ").append(String.format(Locale.US, "%.2f", Math.max(0.2f, Math.min(1.0f, flowScale)))).append('\n');
-        builder.append("model = ").append(Math.max(0, Math.min(1, model))).append('\n');
+        builder.append("model = ").append(sanitizeModel(model)).append('\n');
         return builder.toString();
+    }
+
+    private static int sanitizeModel(int model) {
+        return model == 1 || model == 3 ? model : 0;
     }
 }

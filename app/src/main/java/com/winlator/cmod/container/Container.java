@@ -250,14 +250,15 @@ public class Container {
     public int getBionicFgModel() {
         String value = getExtra("bionicFgModel", "0");
         try {
-            return Math.max(0, Math.min(1, Integer.parseInt(value)));
+            int model = Integer.parseInt(value);
+            return model == 1 || model == 3 ? model : 0;
         } catch (NumberFormatException e) {
             return 0;
         }
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(1, model))));
+        putExtra("bionicFgModel", String.valueOf(model == 1 || model == 3 ? model : 0));
     }
 
     public int getNativeFgMultiplier() {
@@ -272,6 +273,20 @@ public class Container {
 
     public void setNativeFgMultiplier(int multiplier) {
         putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getNativeFgSmoothing() {
+        try {
+            return Math.max(0.0f, Math.min(1.0f,
+                    Float.parseFloat(getExtra("nativeFgSmoothing", "0.75"))));
+        } catch (NumberFormatException e) {
+            return 0.75f;
+        }
+    }
+
+    public void setNativeFgSmoothing(float smoothing) {
+        putExtra("nativeFgSmoothing",
+                String.valueOf(Math.max(0.0f, Math.min(1.0f, smoothing))));
     }
 
     public String getDXWrapper() {
