@@ -139,7 +139,7 @@ public:
     void updatePointerPosition(short x, short y);
     void updateWindowContent(int64_t id, void* pixels, short w, short h, short stride, int x, int y);
     void updateWindowContentAHB(int64_t id, AHardwareBuffer* ahb, short w, short h, int x, int y);
-    void updateCursorImage(void* pixels, short w, short h, short hotX, short hotY);
+    void updateCursorImage(void* pixels, short w, short h, short stride, short hotX, short hotY);
     void setCursorVisible(bool visible);
     void setRenderList(const int64_t* ids, const int* xs, const int* ys, int count);
     void removeWindow(int64_t id);

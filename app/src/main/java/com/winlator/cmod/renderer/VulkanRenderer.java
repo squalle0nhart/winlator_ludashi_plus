@@ -99,7 +99,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     private native void nativeSetPointerPos(long handle, short x, short y);
     private native void nativeSetCursorVisible(long handle, boolean visible);
     private native void nativeUpdateCursorImage(long handle, java.nio.ByteBuffer pixels,
-        short width, short height, short hotX, short hotY);
+        short width, short height, short stride, short hotX, short hotY);
     private native void nativeSetRenderList(long handle, long[] ids, int[] xs, int[] ys, int count);
     private native void nativeRemoveWindow(long handle, long id);
 
@@ -509,7 +509,8 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 java.nio.ByteBuffer buf = cd.lockBuffer();
                 if (buf == null) return;
                 try {
-                    nativeUpdateCursorImage(nativeHandle, buf, cd.width, cd.height, hotX, hotY);
+                    nativeUpdateCursorImage(nativeHandle, buf, cd.width, cd.height,
+                            cd.getStride(), hotX, hotY);
                     if (nativeMode) {
                         nativeScanoutSetCursorImage(nativeHandle, buf, cd.width, cd.height,
                                 cd.getStride());

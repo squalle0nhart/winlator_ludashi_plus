@@ -142,13 +142,16 @@ Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetCursorVisible(JNIEnv*, j
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeUpdateCursorImage(
-    JNIEnv* env, jobject, jlong handle, jobject buf, jshort w, jshort h, jshort hotX, jshort hotY)
+    JNIEnv* env, jobject, jlong handle, jobject buf, jshort w, jshort h, jshort stride,
+    jshort hotX, jshort hotY)
 {
     auto* r=reinterpret_cast<VulkanRendererContext*>(handle);
-    if (!r||!buf) return;
+    if (!r || !buf || w <= 0 || h <= 0) return;
     void* px=env->GetDirectBufferAddress(buf);
-    if (px && env->GetDirectBufferCapacity(buf)>=(jlong)w*h*4)
-        r->updateCursorImage(px,w,h,hotX,hotY);
+    if (stride <= 0) stride = w;
+    const jlong requiredCapacity = ((jlong)(h - 1) * stride + w) * 4;
+    if (px && env->GetDirectBufferCapacity(buf) >= requiredCapacity)
+        r->updateCursorImage(px,w,h,stride,hotX,hotY);
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_renderer_VulkanRenderer_nativeSetRenderList(

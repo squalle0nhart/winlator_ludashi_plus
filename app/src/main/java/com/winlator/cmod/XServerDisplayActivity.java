@@ -1354,8 +1354,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private void setupUI() {
         FrameLayout rootView = findViewById(R.id.FLXServerDisplay);
         xServerView = new XServerView(this, xServer);
-        String rendererType = shortcut != null ? shortcut.getRenderer()
-                : (container != null ? container.getRenderer() : "vulkan");
+        String rendererType = getLaunchRendererType();
         if ("surfaceflinger".equalsIgnoreCase(rendererType) && !ASurfaceRenderer.isSupported()) {
             rendererType = "vulkan";
         }
@@ -3439,10 +3438,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean isPipettoDirectRgbaMode() {
-        String rendererType = shortcut != null ? shortcut.getRenderer()
-                : (container != null ? container.getRenderer() : "vulkan");
+        String rendererType = getLaunchRendererType();
         return "surfaceflinger".equalsIgnoreCase(rendererType)
                 && "wrapper-pipetto".equals(resolveGraphicsDriverArchiveName());
+    }
+
+    private String getLaunchRendererType() {
+        // Opening a container starts the Wine desktop, which must use the stable Vulkan host
+        // renderer. The configured renderer is a game-launch option and is applied only when a
+        // shortcut is present (including a shortcut inheriting its container default).
+        return shortcut != null ? shortcut.getRenderer() : "vulkan";
     }
 
     @Override

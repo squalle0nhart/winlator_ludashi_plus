@@ -2139,11 +2139,19 @@ void VulkanRendererContext::setCursorVisible(bool v) {
     cursorVisible.store(v); cursorMoved.store(true); dirtyCV.notify_one();
 }
 
-void VulkanRendererContext::updateCursorImage(void* px, short w, short h, short hotX, short hotY) {
+void VulkanRendererContext::updateCursorImage(void* px, short w, short h, short stride,
+                                              short hotX, short hotY) {
     if (!px||w<=0||h<=0) return;
+    if (stride <= 0) stride = w;
     std::lock_guard<std::mutex> lk(renderMutex);
     ensureCursorTex(w,h);
-    cursorPixels.resize((size_t)w*h); memcpy(cursorPixels.data(),px,(size_t)w*h*4);
+    cursorPixels.resize((size_t)w*h);
+    const auto* src = static_cast<const uint32_t*>(px);
+    for (int row = 0; row < h; ++row) {
+        memcpy(cursorPixels.data() + (size_t)row * w,
+               src + (size_t)row * stride,
+               (size_t)w * sizeof(uint32_t));
+    }
     cursorHotX=hotX; cursorHotY=hotY;
     isCursorImageDirty.store(true); needsRender.store(true); dirtyCV.notify_one();
 }
