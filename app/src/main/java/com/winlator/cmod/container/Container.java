@@ -35,8 +35,9 @@ public class Container {
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
     public static final String DEFAULT_DXWRAPPERCONFIG = "version=" + DefaultVersion.DXVK + ",framerate=0,async=0,asyncCache=0,maxFrameLatency=0" + ",vkd3dVersion=" + DefaultVersion.VKD3D + ",vkd3dLevel=12_1" + ",ddrawrapper=" + Container.DEFAULT_DDRAWRAPPER + ",csmt=3" + ",gpuName=NVIDIA GeForce GTX 480" + ",videoMemorySize=2048" + ",strict_shader_math=1" + ",OffscreenRenderingMode=fbo" + ",renderer=gl";
+    public static final String DEFAULT_VULKAN_VERSION = "1.4";
     public static final String DEFAULT_GRAPHICSDRIVERCONFIG =
-            "vulkanVersion=1.3" + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=immediate" + ";syncFrame=0" + ";disablePresentWait=1" + ";timelineSemaphores=0" + ";tuDebugSysmem=1" + ";mesaGlthread=1" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
+            "vulkanVersion=" + DEFAULT_VULKAN_VERSION + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=immediate" + ";syncFrame=0" + ";disablePresentWait=1" + ";timelineSemaphores=0" + ";tuDebugSysmem=1" + ";mesaGlthread=1" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
     public static final String DEFAULT_DDRAWRAPPER = "none";
     public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1";
     public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1";
@@ -251,14 +252,14 @@ public class Container {
         String value = getExtra("bionicFgModel", "0");
         try {
             int model = Integer.parseInt(value);
-            return model == 1 || model == 3 ? model : 0;
+            return Math.max(0, Math.min(4, model));
         } catch (NumberFormatException e) {
             return 0;
         }
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(model == 1 || model == 3 ? model : 0));
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
     }
 
     public int getNativeFgMultiplier() {

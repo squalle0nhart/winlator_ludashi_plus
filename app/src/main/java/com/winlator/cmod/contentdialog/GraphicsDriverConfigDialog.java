@@ -258,7 +258,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
-        String vulkanVersion = config.get("vulkanVersion");
+        String vulkanVersion = config.getOrDefault("vulkanVersion", Container.DEFAULT_VULKAN_VERSION);
         String initialVersion = config.get("version");
         String blExtensions = config.get("blacklistedExtensions");
         String gpuName = config.get("gpuName");

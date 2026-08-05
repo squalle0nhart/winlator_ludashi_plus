@@ -432,14 +432,14 @@ public class Shortcut {
         try {
             if (value == null || value.isEmpty()) return container.getBionicFgModel();
             int model = Integer.parseInt(value);
-            return model == 1 || model == 3 ? model : 0;
+            return Math.max(0, Math.min(4, model));
         } catch (NumberFormatException e) {
             return container.getBionicFgModel();
         }
     }
 
     public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(model == 1 || model == 3 ? model : 0));
+        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
     }
 
     public int getNativeFgMultiplier() {

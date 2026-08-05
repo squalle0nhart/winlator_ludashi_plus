@@ -106,6 +106,10 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         boolean isDarkMode = prefs.getBoolean("dark_mode", false);
 
         applyDynamicStyles(findViewById(R.id.LLContent), isDarkMode);
+        View glossaryButton = findViewById(R.id.BTContainerGlossary);
+        if (glossaryButton != null) {
+            glossaryButton.setOnClickListener(v -> new ContainerGlossaryDialog(context).show());
+        }
         findViewById(R.id.BTPowerUserPerformance).setOnClickListener(
                 view -> PerformanceControlDialog.showForShortcut(context, shortcut));
         tvGraphicsDriverVersion = findViewById(R.id.TVGraphicsDriverVersion);

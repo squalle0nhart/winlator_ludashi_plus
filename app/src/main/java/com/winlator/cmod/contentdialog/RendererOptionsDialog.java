@@ -94,10 +94,11 @@ public class RendererOptionsDialog extends ContentDialog {
         void setNativeFgSmoothing(float v);
     }
 
-    private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
+    private static final String[] PRESENT_MODE_IDS    = {"fifo", "mailbox", "immediate"};
     private static final String[] PRESENT_MODE_LABELS = {
+        "FIFO",
         "Mailbox",
-        "Fifo"
+        "Immediate"
     };
 
     private static final String[] FILTER_LABELS = {
@@ -112,11 +113,13 @@ public class RendererOptionsDialog extends ContentDialog {
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
     private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
-    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1, 3};
+    private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1, 2, 3, 4};
     private static final String[] BIONIC_FG_MODEL_LABELS = {
         "Default",
-        "Traced graph (v0.1.1)",
-        "FSR optical flow (stability)"
+        "Traced graph (experimental)",
+        "V2 engine (experimental)",
+        "FidelityFX optical flow (experimental)",
+        "FidelityFX optical flow v2 (experimental)"
     };
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
@@ -137,6 +140,7 @@ public class RendererOptionsDialog extends ContentDialog {
 
         Spinner  spRenderer = findViewById(R.id.SPRendererType);
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
+        View presentModeNote = findViewById(R.id.TVRendererPresentModeNote);
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbNativeRendering = findViewById(R.id.CBRendererNative);
@@ -158,6 +162,12 @@ public class RendererOptionsDialog extends ContentDialog {
         View groupBionicFgModel = findViewById(R.id.GroupBionicFgModel);
         Spinner spBionicFgModel = findViewById(R.id.SPBionicFgModel);
         CheckBox cbLsfgPerformanceMode = findViewById(R.id.CBLsfgPerformanceMode);
+
+        View presentModeHelp = findViewById(R.id.BTHelpRendererPresentMode);
+        if (presentModeHelp != null) {
+            presentModeHelp.setOnClickListener(v ->
+                    AppUtils.showHelpBox(ctx, v, R.string.renderer_present_mode_help_content));
+        }
 
         List<String> rendererIds = new ArrayList<>();
         List<String> rendererLabels = new ArrayList<>();
@@ -181,21 +191,29 @@ public class RendererOptionsDialog extends ContentDialog {
         }
         spRenderer.setSelection(rendererSel);
 
+        final boolean[] isVulkanRendererSelected = {true};
+        final boolean[] isExternalFrameGenRendererSelected = {true};
+        final Runnable[] syncFrameGenUiRef = new Runnable[1];
         Runnable syncRendererUi = () -> {
             int rendererPosition = spRenderer.getSelectedItemPosition();
             boolean isVulkanRenderer = rendererPosition == 1;
+            isVulkanRendererSelected[0] = isVulkanRenderer;
             boolean isGlRenderer = rendererPosition == 0;
             boolean isSurfaceFlingerRenderer = rendererPosition >= 0
                     && rendererPosition < rendererIds.size()
                     && "surfaceflinger".equalsIgnoreCase(rendererIds.get(rendererPosition));
+            isExternalFrameGenRendererSelected[0] = isVulkanRenderer || isSurfaceFlingerRenderer;
             setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
             setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
             if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
+            if (groupLsfg != null) groupLsfg.setAlpha(isExternalFrameGenRendererSelected[0] ? 1.0f : 0.5f);
+            if (spFrameGenBackend != null) spFrameGenBackend.setEnabled(isExternalFrameGenRendererSelected[0]);
             if (cbNativeRendering != null) cbNativeRendering.setVisibility(isGlRenderer ? View.VISIBLE : View.GONE);
             if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
             if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(isSurfaceFlingerRenderer ? View.VISIBLE : View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
+            if (syncFrameGenUiRef[0] != null) syncFrameGenUiRef[0].run();
         };
         spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -290,20 +308,33 @@ public class RendererOptionsDialog extends ContentDialog {
 
             Runnable syncFrameGenUi = () -> {
                 syncingFrameGenUi[0] = true;
-                boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
-                boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
+                int backendPosition = spFrameGenBackend.getSelectedItemPosition();
+                boolean useNativeFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("native_fg");
+                if (useNativeFg && !isVulkanRendererSelected[0]
+                        && isExternalFrameGenRendererSelected[0]) {
+                    backendPosition = 1;
+                    spFrameGenBackend.setSelection(backendPosition);
+                }
+                boolean useBionicFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("bionic_fg");
+                useNativeFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("native_fg");
+                boolean frameGenAvailable = useNativeFg
+                        ? isVulkanRendererSelected[0] : isExternalFrameGenRendererSelected[0];
                 boolean dllAvailable = !useBionicFg && !useNativeFg && config.isLsfgDllAvailable();
                 int multiplier = useNativeFg ? selectedNativeMultiplier[0]
                         : (useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0]);
                 float flowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
 
-                tvLsfgStatus.setText(useNativeFg
-                        ? "Open optical-flow interpolation in the native Vulkan compositor."
-                        : (useBionicFg
-                        ? "Bundled Vulkan frame generation layer. No DLL import required."
-                        : (dllAvailable
-                                ? "LSFG-VK runtime will use the imported Lossless.dll at launch."
-                                : "Import Lossless.dll in app settings before enabling LSFG-VK.")));
+                tvLsfgStatus.setText(!frameGenAvailable
+                        ? ctx.getString(useNativeFg
+                                ? R.string.frame_generation_requires_vulkan
+                                : R.string.frame_generation_requires_vulkan_or_surfaceflinger)
+                        : (useNativeFg
+                                ? "Open optical-flow interpolation in the native Vulkan compositor."
+                                : (useBionicFg
+                                        ? "Experimental bundled Vulkan frame generation layer. No DLL import required."
+                                        : (dllAvailable
+                                                ? "Experimental LSFG-VK will use the imported Lossless.dll at launch."
+                                                : "Import Lossless.dll in app settings before enabling LSFG-VK."))));
 
                 int multiplierSelection = 0;
                 for (int i = 0; i < LSFG_MULTIPLIER_VALUES.length; i++) {
@@ -324,14 +355,22 @@ public class RendererOptionsDialog extends ContentDialog {
                 groupBionicFgModel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
                 spBionicFgModel.setSelection(FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
                 cbLsfgPerformanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
-                spLsfgMultiplier.setEnabled(useBionicFg || useNativeFg || dllAvailable);
+                spFrameGenBackend.setEnabled(isExternalFrameGenRendererSelected[0]);
+                spLsfgMultiplier.setEnabled(frameGenAvailable && (useBionicFg || useNativeFg || dllAvailable));
                 sbLsfgFlowScale.setVisibility(View.VISIBLE);
                 tvLsfgFlowScale.setVisibility(View.VISIBLE);
-                sbLsfgFlowScale.setEnabled(useNativeFg || useBionicFg || dllAvailable);
-                cbLsfgPerformanceMode.setEnabled(dllAvailable);
-                spBionicFgModel.setEnabled(useBionicFg);
+                sbLsfgFlowScale.setEnabled(frameGenAvailable && (useNativeFg || useBionicFg || dllAvailable));
+                cbLsfgPerformanceMode.setEnabled(frameGenAvailable && dllAvailable);
+                spBionicFgModel.setEnabled(frameGenAvailable && useBionicFg);
+                boolean externalFgMultiplying = !useNativeFg && multiplier >= 2
+                        && (useBionicFg || dllAvailable);
+                if (presentModeNote != null) {
+                    presentModeNote.setVisibility(isVulkanRendererSelected[0] && externalFgMultiplying
+                            ? View.VISIBLE : View.GONE);
+                }
                 syncingFrameGenUi[0] = false;
             };
+            syncFrameGenUiRef[0] = syncFrameGenUi;
 
             spFrameGenBackend.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
@@ -478,6 +517,7 @@ public class RendererOptionsDialog extends ContentDialog {
     public static int toVkPresentMode(String mode) {
         if (mode == null) return 2;
         switch (mode) {
+            case "immediate":     return 0;
             case "mailbox":       return 1;
             default:              return 2;
         }

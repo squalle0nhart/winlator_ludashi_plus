@@ -46,6 +46,7 @@ import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.contentdialog.AddEnvVarDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
+import com.winlator.cmod.contentdialog.ContainerGlossaryDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.ShortcutSettingsDialog;
@@ -411,6 +412,10 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         view.findViewById(R.id.BTHelpDXWrapper)
                 .setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
+        View glossaryButton = view.findViewById(R.id.BTContainerGlossary);
+        if (glossaryButton != null) {
+            glossaryButton.setOnClickListener(v -> new ContainerGlossaryDialog(context).show());
+        }
 
         final com.winlator.cmod.container.Container rendererCfgHolder = isEditMode() ? container
                 : new com.winlator.cmod.container.Container(-1);

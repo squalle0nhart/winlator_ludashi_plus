@@ -19,9 +19,10 @@ public abstract class BionicFgManager {
     private static final String LIB_FILENAME = "libbionic_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_BIONIC_framegen.json";
     private static final String VERSION_FILENAME = ".bionic_fg_runtime_version";
-    // Upstream v0.1.1 pacing/swapchain runtime plus an isolated FSR optical-flow model 3.
-    // The unique stamp refreshes every cached container runtime.
-    private static final String RUNTIME_VERSION = "bionic-fg-v0.1.1-fsr-of-stable-20260804";
+    // Bannerlator 2.9.5 runtime: bounded post-dispatch fence waits, FIFO acquire guard,
+    // hot-reloadable multiplier/model config, and models 0-4. The unique stamp refreshes
+    // every cached container so the older full-queue-wait runtime cannot remain installed.
+    private static final String RUNTIME_VERSION = "bannerlator-2.9.5-bounded-dispatch-20260805";
 
     private BionicFgManager() {}
 
@@ -226,6 +227,6 @@ public abstract class BionicFgManager {
     }
 
     private static int sanitizeModel(int model) {
-        return model == 1 || model == 3 ? model : 0;
+        return Math.max(0, Math.min(4, model));
     }
 }
