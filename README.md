@@ -8,32 +8,16 @@
 
 Winlator is an Android application that lets you run Windows (x86\_64) applications with Wine. It supports standard `x86_64` containers using Box86/Box64, as well as `Arm64EC` containers which utilize FEXCore (for 64/32-bit) or an optional WowBox64 (for 32-bit).
 
-This is a fork of the **Winlator Bionic** project by [Pipetto-crypto](https://github.com/Pipetto-crypto/winlator).
-
-and backup [Ludashi-backup](https://github.com/StevenMX-backup/Ludashi-Backup).
-## APK Build Explanations
-
-### what is Ludashi?
-
-The Ludashi Build is functionally identical to the standard Bionic app, but the package name has been renamed to mimic Ludashi, a popular benchmark app. Some Android phones — especially Xiaomi devices — may automatically enable performance mode when such apps are detected, potentially reducing throttling and boosting performance slightly.
-
-### Dev-Vanilla Build
-
-This is the standard, unmodified build. It uses the original package name, which allows it to be installed alongside other popular Winlator forks (like the coffincolors version) without any package conflicts.
-
-### RedMagic Build
-
-This build mimics the package name of Genshin Impact. This is specifically designed for RedMagic devices, as the phone's software may detect this package name to enable hardware-specific gaming enhancements, such as built-in frame generation (framegen). Using this build may unlock these features and improve performance on supported RedMagic phones.
+This is a fork of the **Winlator Bionic** project by [Pipetto-crypto](https://github.com/Pipetto-crypto/winlator) and - **Winlator Ludashi** by [StevenMXZ](https://github.com/StevenMXZ/Winlator-Ludashi)
 
 # Installation
 
-1.  Download and install the latest APK from this repository's [Releases section](https://github.com/StevenMXZ/Winlator-Ludashi/releases) (choose your preferred build: `dev-vanilla`, `ludashi`, or `redmagic`).
+1.  Download and install the latest APK from this repository's [Releases section](https://github.com/squalle0nhart/winlator_ludashi_plus/releases).
 2.  Launch the app and wait for the installation process to finish.
 
 # Useful Tips
 
-  - Here is a tutorial from ZeroKimchi channel on how to use Winlator Bionic:
-    https://youtu.be/EJDWZUGF9sk?si=e3Z-DdmMJSYKduWz
+  - Use Proton 11.0-b5-arm64ec-steam-unix or Proton 11.1GE-arm64ec-steam at first. If not work try using proton 10 or 9
   - If you are using an `x86_64` container and experiencing performance issues, try changing the Box86/Box64 preset to **Performance** in Container Settings -\> Advanced Tab.
   - If you are using an `Arm64EC` container, try swapping between different FEXCore versions (2505,2507 etc) in the container settings for better compatibility or performance.
   - For applications that use .NET Framework, try installing Wine Mono found in Start Menu -\> System Tools.
