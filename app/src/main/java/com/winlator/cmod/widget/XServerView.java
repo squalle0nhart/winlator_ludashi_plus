@@ -11,8 +11,14 @@ import android.widget.FrameLayout;
 import com.winlator.cmod.renderer.ASurfaceRenderer;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.HostRenderer;
+import com.winlator.cmod.renderer.DisplayXRenderer;
 import com.winlator.cmod.renderer.VulkanRenderer;
+import com.winlator.cmod.xserver.Cursor;
+import com.winlator.cmod.xserver.Drawable;
+import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.XServer;
+
+import dalvik.annotation.optimization.FastNative;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,8 +47,15 @@ public class XServerView extends FrameLayout {
     public void initRenderer(String rendererType) {
         boolean vulkan = "vulkan".equalsIgnoreCase(rendererType);
         boolean surfaceFlinger = "surfaceflinger".equalsIgnoreCase(rendererType);
+        boolean displayX = "displayx".equalsIgnoreCase(rendererType);
 
-        if (surfaceFlinger) {
+        if (displayX) {
+            vulkanSurfaceView = new SurfaceView(getContext());
+            vulkanSurfaceView.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            addView(vulkanSurfaceView);
+            renderer = new DisplayXRenderer(this, xServer, vulkanSurfaceView);
+        } else if (surfaceFlinger) {
             vulkanSurfaceView = new SurfaceView(getContext());
             vulkanSurfaceView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -134,10 +147,12 @@ public class XServerView extends FrameLayout {
 
     public void onPause() {
         if (glSurfaceView != null) glSurfaceView.onPause();
+        else if (renderer instanceof DisplayXRenderer) ((DisplayXRenderer) renderer).onPause();
     }
 
     public void onResume() {
         if (glSurfaceView != null) glSurfaceView.onResume();
+        else if (renderer instanceof DisplayXRenderer) ((DisplayXRenderer) renderer).onResume();
     }
 
     public Object getSurfaceControl() {
@@ -151,4 +166,37 @@ public class XServerView extends FrameLayout {
         }
         return null;
     }
+
+    static { System.loadLibrary("winlator"); }
+
+    @FastNative public native void nativeCreateSurface(android.view.Surface surface);
+    @FastNative public native void nativeDestroySurface();
+    @FastNative public native void nativeInit(Context context, XServer xServer);
+    @FastNative public native void nativeChangeSurface(int width, int height);
+    @FastNative public native void nativeCreateWindow(Window window, int parentId);
+    @FastNative public native void nativeDestroyWindow(int id);
+    @FastNative public native void nativeCreateCursor(Cursor cursor);
+    @FastNative public native void nativeFreeCursor(int id);
+    @FastNative public native void nativeBindCursor(int windowId, int cursorId, boolean visible);
+    @FastNative public native void nativeMapWindow(int id);
+    @FastNative public native void nativeUnmapWindow(int id);
+    @FastNative public native void nativeChangeWindowZOrder(int stackMode, int id, int siblingId);
+    @FastNative public native void nativeUpdateWindowGeometry(int id, int width, int height, int x, int y, boolean resized);
+    @FastNative public native void nativePointerMove(int x, int y);
+    @FastNative public native void nativeToggleFullscreen();
+    @FastNative public native void nativeSetCursorVisible(boolean visible);
+    @FastNative public native void nativeSetScreenOffsetYRelativeToCursor(boolean enabled);
+    @FastNative public native void nativeSetMagnifierZoom(float zoom);
+    @FastNative public native void nativeSetUnviewableWMClass(String name);
+    @FastNative public native void nativeSetWindowClassName(int id, String className);
+    @FastNative public native void nativeUpdatePointWindow(int id);
+    @FastNative public native void nativeUpdateWindowContent(int id);
+    @FastNative public native void nativeReparentWindow(int id, int parentId);
+    @FastNative public native void nativePause();
+    @FastNative public native void nativeResume();
+    @FastNative public native void nativeStop();
+    @FastNative public native void nativeAddDirectContent(int windowId, Drawable drawable);
+    @FastNative public native void nativeUpdateDirectContent(int windowId, int drawableId);
+    @FastNative public native void nativeRemoveDirectContent(int windowId, int pixmapId);
+    @FastNative public native void nativeSetPerformanceMode(boolean enabled);
 }

@@ -35,6 +35,14 @@ add_library(winlator SHARED
         winlator/xconnector_epoll.c
         winlator/alsa_client.c
         winlator/vulkan.c
+        winlator/renderer/egl.cpp
+        winlator/renderer/renderer_jni.cpp
+        winlator/renderer/shader.cpp
+        winlator/renderer/window.cpp
+        winlator/renderer/cursor.cpp
+        winlator/renderer/xform.cpp
+        winlator/renderer/view_transformation.cpp
+        winlator/renderer/displayx.cpp
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)

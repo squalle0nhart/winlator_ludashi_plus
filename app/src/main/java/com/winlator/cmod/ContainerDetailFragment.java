@@ -423,7 +423,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "OpenGL"
                     : "surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "SurfaceFlinger"
-                    : "Vulkan");
+                    : "displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "DisplayX" : "Vulkan");
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
         View rendererTrigger = view.findViewById(R.id.TVRendererMode);
@@ -438,7 +438,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setRenderer(val);
                                 if (tvRendererMode != null) {
                                     tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger"
+                                            : "displayx".equalsIgnoreCase(val) ? "DisplayX" : "Vulkan");
                                 }
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
@@ -510,6 +511,33 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setRendererLegacyScanout(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
+                            }
+
+                            public boolean getDisplayXTrue() {
+                                return "1".equals(rendererCfgHolder.getExtra("displayxTrue", "0"));
+                            }
+
+                            public void setDisplayXTrue(boolean val) {
+                                rendererCfgHolder.putExtra("displayxTrue", val ? "1" : "0");
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public boolean getDisplayXPerformanceMode() {
+                                return !"0".equals(rendererCfgHolder.getExtra("displayxPerformanceMode", "1"));
+                            }
+
+                            public void setDisplayXPerformanceMode(boolean val) {
+                                rendererCfgHolder.putExtra("displayxPerformanceMode", val ? "1" : "0");
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public String getDisplayXSurfaceFormat() {
+                                return rendererCfgHolder.getExtra("displayxSurfaceFormat", "rgba8");
+                            }
+
+                            public void setDisplayXSurfaceFormat(String val) {
+                                rendererCfgHolder.putExtra("displayxSurfaceFormat", val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
                             public int getGraphicsFilterMode() {

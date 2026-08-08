@@ -93,6 +93,7 @@ import com.winlator.cmod.math.XForm;
 import com.winlator.cmod.midi.MidiHandler;
 import com.winlator.cmod.midi.MidiManager;
 import com.winlator.cmod.renderer.ASurfaceRenderer;
+import com.winlator.cmod.renderer.DisplayXRenderer;
 import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.HostRenderer;
 import com.winlator.cmod.renderer.VulkanRenderer;
@@ -126,6 +127,7 @@ import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
 import com.winlator.cmod.xenvironment.components.XServerComponent;
 import com.winlator.cmod.xserver.Pointer;
 import com.winlator.cmod.xserver.Property;
+import com.winlator.cmod.xserver.Drawable;
 import com.winlator.cmod.xserver.ScreenInfo;
 import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.WindowManager;
@@ -711,7 +713,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!removeLoadingBarWhenBootingGames) preloaderDialog.show(R.string.starting_up);
 
         inputControlsManager = new InputControlsManager(this);
-        xServer = new XServer(new ScreenInfo(screenSize));
+        String launchRenderer = getLaunchRendererType();
+        if ("displayx".equalsIgnoreCase(launchRenderer) && android.os.Build.VERSION.SDK_INT < 29) {
+            launchRenderer = "vulkan";
+        }
+        int displaySurfaceFormat = "bgra8".equalsIgnoreCase(
+                getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8"))
+                ? Drawable.HAL_PIXEL_FORMAT_BGRA_8888 : Drawable.HAL_PIXEL_FORMAT_RGBA_8888;
+        xServer = new XServer(new ScreenInfo(screenSize), launchRenderer, displaySurfaceFormat);
         xServer.setWinHandler(winHandler);
 
         boolean[] winStarted = { false };
@@ -1378,11 +1387,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if ("surfaceflinger".equalsIgnoreCase(rendererType) && !ASurfaceRenderer.isSupported()) {
             rendererType = "vulkan";
         }
+        if ("displayx".equalsIgnoreCase(rendererType) && android.os.Build.VERSION.SDK_INT < 29) {
+            rendererType = "vulkan";
+        }
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
         renderer.setCursorVisible(false);
         final String rendererLabel = "gl".equalsIgnoreCase(rendererType) ? "OpenGL"
-                : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger" : "Vulkan";
+                : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger"
+                : "displayx".equalsIgnoreCase(rendererType) ? "DisplayX" : "Vulkan";
 
         if (renderer instanceof VulkanRenderer) {
             VulkanRenderer vkRenderer = (VulkanRenderer) renderer;
@@ -1433,6 +1446,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 asrRenderer.setFilterMode(0);
             }
             asrRenderer.setSharpness(getLaunchGraphicsSharpnessPercent() / 100f);
+        } else if (renderer instanceof DisplayXRenderer) {
+            ((DisplayXRenderer) renderer).setPerformanceMode(
+                    getLaunchGraphicsBoolean("displayxPerformanceMode", true));
         }
 
         if (shortcut != null) {
@@ -3615,6 +3631,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("WRAPPER_SURFACE_FORMAT", "rgba8");
         }
 
+        if ("displayx".equalsIgnoreCase(getLaunchRendererType())) {
+            String surfaceFormat = getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8");
+            if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
+            envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
+            envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
+            if (getLaunchGraphicsBoolean("displayxTrue", false)) {
+                envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
+            }
+        }
+
         if (!vkbasaltConfig.isEmpty()) {
             envVars.put("ENABLE_VKBASALT", "1");
             envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
@@ -3657,6 +3683,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
         // renderer. The configured renderer is a game-launch option and is applied only when a
         // shortcut is present (including a shortcut inheriting its container default).
         return shortcut != null ? shortcut.getRenderer() : "vulkan";
+    }
+
+    public float getRefreshRate() {
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        return display != null ? display.getRefreshRate() : 60.0f;
+    }
+
+    public void updateFrameRating(Window window) {
+        if (window == null || frameRatingWindowId != window.id) return;
+        if (classicHud != null) classicHud.update();
+        if (modernHud != null) modernHud.onFrame();
     }
 
     @Override

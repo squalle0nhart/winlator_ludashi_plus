@@ -35,6 +35,8 @@ public class XServer {
     public final InputDeviceManager inputDeviceManager;
     public final GrabManager grabManager;
     public final CursorLocker cursorLocker;
+    private final String displayDriver;
+    private final int surfaceFormat;
     private SHMSegmentManager shmSegmentManager;
     private HostRenderer renderer;
     private WinHandler winHandler;
@@ -45,7 +47,14 @@ public class XServer {
     private XClient grabbingClient = null;
 
     public XServer(ScreenInfo screenInfo) {
+        this(screenInfo, "vulkan", Drawable.HAL_PIXEL_FORMAT_BGRA_8888);
+    }
+
+    public XServer(ScreenInfo screenInfo, String displayDriver, int surfaceFormat) {
         this.screenInfo = screenInfo;
+        this.displayDriver = displayDriver != null ? displayDriver.toLowerCase() : "vulkan";
+        this.surfaceFormat = isDisplayX()
+                ? surfaceFormat : Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
         cursorLocker = new CursorLocker(this);
         for (Lockable lockable : Lockable.values()) locks.put(lockable, new ReentrantLock());
 
@@ -59,6 +68,18 @@ public class XServer {
 
         DesktopHelper.attachTo(this);
         setupExtensions();
+    }
+
+    public String getDisplayDriver() {
+        return displayDriver;
+    }
+
+    public int getSurfaceFormat() {
+        return surfaceFormat;
+    }
+
+    public boolean isDisplayX() {
+        return "displayx".equals(displayDriver);
     }
 
     public boolean isRelativeMouseMovement() {
@@ -215,4 +236,3 @@ public class XServer {
         return isGrabbed && grabbingClient == client;
     }
 }
-

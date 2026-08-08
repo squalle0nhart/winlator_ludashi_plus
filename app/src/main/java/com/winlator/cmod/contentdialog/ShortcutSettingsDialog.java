@@ -157,7 +157,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererTypeHolder[0]) ? "OpenGL"
-                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger" : "Vulkan");
+                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger"
+                    : "displayx".equalsIgnoreCase(rendererTypeHolder[0]) ? "DisplayX" : "Vulkan");
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
         View rendererTrigger = findViewById(R.id.TVRendererMode);
@@ -167,7 +168,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                     rendererTypeHolder[0] = val;
                     if (tvRendererMode != null) {
                         tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger"
+                                : "displayx".equalsIgnoreCase(val) ? "DisplayX" : "Vulkan");
                     }
                 }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
@@ -184,6 +186,25 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererSfCompatMode(boolean val) { rendererSfCompatModeHolder[0] = val; }
                 public boolean getRendererLegacyScanout() { return rendererLegacyScanoutHolder[0]; }
                 public void setRendererLegacyScanout(boolean val) { rendererLegacyScanoutHolder[0] = val; }
+                public boolean getDisplayXTrue() {
+                    return "1".equals(shortcut.getExtra("displayxTrue",
+                            shortcut.container.getExtra("displayxTrue", "0")));
+                }
+                public void setDisplayXTrue(boolean val) { shortcut.putExtra("displayxTrue", val ? "1" : "0"); }
+                public boolean getDisplayXPerformanceMode() {
+                    return !"0".equals(shortcut.getExtra("displayxPerformanceMode",
+                            shortcut.container.getExtra("displayxPerformanceMode", "1")));
+                }
+                public void setDisplayXPerformanceMode(boolean val) {
+                    shortcut.putExtra("displayxPerformanceMode", val ? "1" : "0");
+                }
+                public String getDisplayXSurfaceFormat() {
+                    return shortcut.getExtra("displayxSurfaceFormat",
+                            shortcut.container.getExtra("displayxSurfaceFormat", "rgba8"));
+                }
+                public void setDisplayXSurfaceFormat(String val) {
+                    shortcut.putExtra("displayxSurfaceFormat", val);
+                }
                 public int getGraphicsFilterMode() {
                     String v = shortcut.getExtra("graphicsFilterMode", shortcut.container.getExtra("graphicsFilterMode", "0"));
                     try { return Integer.parseInt(v); } catch (NumberFormatException e) { return 0; }

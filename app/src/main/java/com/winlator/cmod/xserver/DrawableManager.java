@@ -29,14 +29,14 @@ public class DrawableManager extends XResourceManager implements XResourceManage
 
     public Drawable createDrawable(int id, short width, short height, Visual visual) {
         if (id == 0) {
-            Drawable drawable = new Drawable(id, width, height, visual);
+            Drawable drawable = new Drawable(id, width, height, visual, xServer.getSurfaceFormat());
             if (drawable.backingAHB == 0) {
                 throw new IllegalStateException("Drawable with id 0 has null data at creation.");
             }
             return drawable;
         }
         if (drawables.indexOfKey(id) >= 0) return null;
-        Drawable drawable = new Drawable(id, width, height, visual);
+        Drawable drawable = new Drawable(id, width, height, visual, xServer.getSurfaceFormat());
         if (drawable.backingAHB == 0) {
             throw new IllegalStateException("Drawable with id " + id + " has null data at creation.");
         }

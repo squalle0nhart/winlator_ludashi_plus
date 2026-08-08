@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 
 public class GPUImage extends NativeTexture {
     private long hardwareBufferPtr;
+    // Read by the optional native DisplayX mirror through JNI.
+    public int format = Drawable.HAL_PIXEL_FORMAT_RGBA_8888;
     private long imageKHRPtr;
     private ByteBuffer virtualData;
     private short stride;

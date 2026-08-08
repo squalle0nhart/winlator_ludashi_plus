@@ -30,6 +30,8 @@ public class WindowManager extends XResourceManager {
     private volatile boolean renderingEnabled = true;
 
     public interface OnWindowModificationListener {
+        default void onCreateWindow(Window window, Window parent) {}
+
         default void onMapWindow(Window window) {}
 
         default void onUnmapWindow(Window window) {}
@@ -38,6 +40,10 @@ public class WindowManager extends XResourceManager {
 
         default void onChangeWindowZOrder(Window window) {}
 
+        default void onChangeWindowZOrder(Window.StackMode stackMode, Window window, Window sibling) {
+            onChangeWindowZOrder(window);
+        }
+
         default void onUpdateWindowContent(Window window) {}
 
         default void onUpdateWindowGeometry(Window window, boolean resized) {}
@@ -45,6 +51,8 @@ public class WindowManager extends XResourceManager {
         default void onUpdateWindowAttributes(Window window, Bitmask mask) {}
 
         default void onModifyWindowProperty(Window window, Property property) {}
+
+        default void onReparentWindow(Window window, Window newParent) {}
     }
 
     public WindowManager(ScreenInfo screenInfo, DrawableManager drawableManager) {
@@ -190,6 +198,7 @@ public class WindowManager extends XResourceManager {
         if (drawable != null) drawable.setOnDrawListener(() -> triggerOnUpdateWindowContent(window));
         windows.put(id, window);
         parent.addChild(window);
+        triggerOnCreateWindow(window, parent);
         triggerOnCreateResourceListener(window);
         return window;
     }
@@ -234,7 +243,7 @@ public class WindowManager extends XResourceManager {
                 parent.moveChildBelow(window, sibling);
                 break;
         }
-        triggerOnChangeWindowZOrder(window);
+        triggerOnChangeWindowZOrder(stackMode, window, sibling);
     }
 
     public void configureWindow(Window window, Bitmask valueMask, XInputStream inputStream) {
@@ -297,6 +306,7 @@ public class WindowManager extends XResourceManager {
         Window oldParent = window.getParent();
         if (oldParent != null) oldParent.removeChild(window);
         newParent.addChild(window);
+        triggerOnReparentWindow(window, newParent);
     }
 
     public Window findPointWindow(short rootX, short rootY) {
@@ -321,6 +331,12 @@ public class WindowManager extends XResourceManager {
         onWindowModificationListeners.remove(onWindowModificationListener);
     }
 
+    private void triggerOnCreateWindow(Window window, Window parent) {
+        for (int i = onWindowModificationListeners.size() - 1; i >= 0; i--) {
+            onWindowModificationListeners.get(i).onCreateWindow(window, parent);
+        }
+    }
+
     private void triggerOnMapWindow(Window window) {
         for (int i = onWindowModificationListeners.size()-1; i >= 0; i--) {
             onWindowModificationListeners.get(i).onMapWindow(window);
@@ -339,9 +355,15 @@ public class WindowManager extends XResourceManager {
         }
     }
 
-    private void triggerOnChangeWindowZOrder(Window window) {
+    private void triggerOnChangeWindowZOrder(Window.StackMode stackMode, Window window, Window sibling) {
         for (int i = onWindowModificationListeners.size()-1; i >= 0; i--) {
-            onWindowModificationListeners.get(i).onChangeWindowZOrder(window);
+            onWindowModificationListeners.get(i).onChangeWindowZOrder(stackMode, window, sibling);
+        }
+    }
+
+    private void triggerOnReparentWindow(Window window, Window newParent) {
+        for (int i = onWindowModificationListeners.size() - 1; i >= 0; i--) {
+            onWindowModificationListeners.get(i).onReparentWindow(window, newParent);
         }
     }
 

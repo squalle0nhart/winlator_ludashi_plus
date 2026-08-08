@@ -10,6 +10,7 @@ import com.winlator.cmod.renderer.GLRenderer;
 import com.winlator.cmod.renderer.Texture;
 import com.winlator.cmod.renderer.VulkanRenderer;
 import com.winlator.cmod.renderer.ASurfaceRenderer;
+import com.winlator.cmod.renderer.DisplayXRenderer;
 import com.winlator.cmod.xconnector.XInputStream;
 import com.winlator.cmod.xconnector.XOutputStream;
 import com.winlator.cmod.xconnector.XStreamLock;
@@ -260,7 +261,20 @@ public class PresentExtension implements Extension {
         long msc = ust / (targetFps > 0 ? (1_000_000L / targetFps) : (1_000_000L / 60));
 
         synchronized (content.renderLock) {
-            if (xr instanceof ASurfaceRenderer) {
+            if (xr instanceof DisplayXRenderer) {
+                DisplayXRenderer displayX = (DisplayXRenderer) xr;
+                if (window.attributes.isMapped()
+                        && pixmap.drawable.getTexture() instanceof GPUImage
+                        && ((GPUImage) pixmap.drawable.getTexture()).getHardwareBufferPtr() != 0) {
+                    sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.FLIP, ust, msc);
+                    displayX.presentWindow(window, pixmap.drawable);
+                } else {
+                    content.copyArea((short) 0, (short) 0, xOff, yOff,
+                            pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);
+                    sendCompleteNotify(window, serial, Kind.PIXMAP, Mode.COPY, ust, msc);
+                }
+                scheduleIdleNotify(window, pixmap, serial, idleFence, targetFps, null);
+            } else if (xr instanceof ASurfaceRenderer) {
                 ASurfaceRenderer asr = (ASurfaceRenderer) xr;
                 if (window.attributes.isMapped()
                         && pixmap.drawable.getTexture() instanceof GPUImage
