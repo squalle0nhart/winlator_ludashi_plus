@@ -468,7 +468,7 @@ void DisplayX::presentThreadLoop() {
             continue;
         }
 
-        if (!window->enabled) {
+        if (!window->enabled || (window == windowManager->getRootWindow() && !rootContentVisible)) {
             pfnASurfaceTransactionSetBuffer(presentTransaction, window->control, nullptr, presentRequest->sync_fence);
         }
         else {
@@ -661,7 +661,9 @@ void DisplayX::changeGeometry(Window *window, bool resized) {
 
     if (resized) {
         window->drawable->sizeChanged = false;
-        pfnASurfaceTransactionSetBuffer(windowTransaction, window->control, window->drawable->ahb, -1);
+        pfnASurfaceTransactionSetBuffer(windowTransaction, window->control,
+                window == windowManager->getRootWindow() && !rootContentVisible
+                        ? nullptr : window->drawable->ahb, -1);
     }
 
     if (pfnASurfaceTransactionSetPosition) {
@@ -853,7 +855,8 @@ void DisplayX::resizeRootWindow() {
     }
 
     pfnASurfaceTransactionSetGeometry(windowTransaction, rootWindow->control, src, dst, 0);
-    pfnASurfaceTransactionSetBuffer(windowTransaction, rootWindow->control, rootWindow->drawable->ahb, -1);
+    pfnASurfaceTransactionSetBuffer(windowTransaction, rootWindow->control,
+            rootContentVisible ? rootWindow->drawable->ahb : nullptr, -1);
     pfnASurfaceTransactionApply(windowTransaction);
 }
 
@@ -928,4 +931,16 @@ void DisplayX::toggleFullscreen() {
 
 void DisplayX::setPerformanceMode(bool perfMode) {
     this->perfMode = perfMode;
+}
+
+void DisplayX::setRootContentVisible(bool visible) {
+    rootContentVisible = visible;
+    queueEvent([this, visible] {
+        auto rootWindow = windowManager->getRootWindow();
+        if (!rootWindow || !rootWindow->control || !windowTransaction) return;
+
+        pfnASurfaceTransactionSetBuffer(windowTransaction, rootWindow->control,
+                visible ? rootWindow->drawable->ahb : nullptr, -1);
+        pfnASurfaceTransactionApply(windowTransaction);
+    });
 }

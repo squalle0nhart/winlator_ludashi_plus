@@ -480,10 +480,19 @@ Java_com_winlator_cmod_widget_XServerView_nativeSetMagnifierZoom(JNIEnv *env, jo
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_XServerView_nativeSetUnviewableWMClass(JNIEnv *env, jobject thiz, jstring unviewableWMName) {
+    if (!unviewableWMName) {
+        windowManager.setUnviewableWMClass("");
+        return;
+    }
     const char *chars = env->GetStringUTFChars(unviewableWMName, nullptr);
     std::string str(chars);
     env->ReleaseStringUTFChars(unviewableWMName, chars);
     windowManager.setUnviewableWMClass(str);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_XServerView_nativeSetRootContentVisible(JNIEnv *env, jobject thiz, jboolean visible) {
+    if (xserver.isDisplayX()) displayX.setRootContentVisible(visible);
 }
 
 extern "C" JNIEXPORT void JNICALL

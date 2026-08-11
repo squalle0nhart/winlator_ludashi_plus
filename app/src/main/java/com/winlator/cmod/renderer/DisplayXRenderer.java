@@ -101,9 +101,10 @@ public final class DisplayXRenderer implements HostRenderer,
     }
 
     @Override public void onMapWindow(Window window) {
-        if (unviewableWMClass != null && window.getClassName().contains(unviewableWMClass)
-                && window.attributes.isEnabled()) {
-            window.disableAllDescendants();
+        if (isUnviewable(window.getClassName())) {
+            if (window.attributes.isEnabled()) window.disableAllDescendants();
+            xServerView.nativeUnmapWindow(window.id);
+            return;
         }
         xServerView.nativeMapWindow(window.id);
     }
@@ -140,8 +141,20 @@ public final class DisplayXRenderer implements HostRenderer,
 
     @Override public void onModifyWindowProperty(Window window, Property property) {
         if ("WM_CLASS".equals(property.nameAsString())) {
-            xServerView.nativeSetWindowClassName(window.id, property.toString());
+            String className = property.toString();
+            xServerView.nativeSetWindowClassName(window.id, className);
+            // Wine commonly maps explorer.exe before setting WM_CLASS. Hide it
+            // here as well so the desktop cannot flash before a shortcut's game.
+            if (isUnviewable(className)) {
+                if (window.attributes.isEnabled()) window.disableAllDescendants();
+                xServerView.nativeUnmapWindow(window.id);
+            }
         }
+    }
+
+    private boolean isUnviewable(String className) {
+        return unviewableWMClass != null && className != null
+                && className.toLowerCase().contains(unviewableWMClass.toLowerCase());
     }
 
     @Override public void onReparentWindow(Window window, Window newParent) {
@@ -181,6 +194,10 @@ public final class DisplayXRenderer implements HostRenderer,
     @Override public void setUnviewableWMClasses(String classes) {
         unviewableWMClass = classes == null ? null : classes.split(",")[0].trim();
         xServerView.nativeSetUnviewableWMClass(unviewableWMClass);
+        // Shortcut launches use explorer /desktop as a process host. Keep the
+        // root layer itself, because game windows are parented to it, but do not
+        // attach its Wine desktop buffer.
+        xServerView.nativeSetRootContentVisible(unviewableWMClass == null);
     }
     @Override public void setFilterMode(int mode) {}
     @Override public void setMagnifierZoom(float zoom) {

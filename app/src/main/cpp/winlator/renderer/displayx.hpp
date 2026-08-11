@@ -89,6 +89,7 @@ class DisplayX {
         std::atomic_bool hasSurface{false};
         std::atomic_bool surfaceChanged{false};
         std::atomic_bool perfMode{true};
+        std::atomic_bool rootContentVisible{true};
 
         bool cursorUpdate = false;
         bool repostCursor = false;
@@ -143,4 +144,5 @@ class DisplayX {
         void drawRootCursor();
         void toggleFullscreen();
         void setPerformanceMode(bool perfMode);
+        void setRootContentVisible(bool visible);
 };

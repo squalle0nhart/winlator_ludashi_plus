@@ -188,6 +188,7 @@ public class XServerView extends FrameLayout {
     @FastNative public native void nativeSetScreenOffsetYRelativeToCursor(boolean enabled);
     @FastNative public native void nativeSetMagnifierZoom(float zoom);
     @FastNative public native void nativeSetUnviewableWMClass(String name);
+    @FastNative public native void nativeSetRootContentVisible(boolean visible);
     @FastNative public native void nativeSetWindowClassName(int id, String className);
     @FastNative public native void nativeUpdatePointWindow(int id);
     @FastNative public native void nativeUpdateWindowContent(int id);
