@@ -31,6 +31,21 @@
                 android:spinnerMode="dropdown"
                 android:layout_marginBottom="8dp"/>
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Display Driver"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:paddingBottom="8dp"/>
+            <Spinner
+                android:id="@+id/SPDisplayDriver"
+                style="@style/ComboBoxCompact"
+                android:background="@drawable/combo_box_no_arrow_dark"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dropdown"
+                android:layout_marginBottom="8dp"/>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

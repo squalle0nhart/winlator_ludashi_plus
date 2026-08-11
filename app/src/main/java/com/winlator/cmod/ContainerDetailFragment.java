@@ -422,8 +422,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         final android.widget.TextView tvRendererMode = view.findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "OpenGL"
-                    : "surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "SurfaceFlinger"
-                    : "displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "DisplayX" : "Vulkan");
+                    : "surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "SurfaceFlinger" : "Vulkan");
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
         View rendererTrigger = view.findViewById(R.id.TVRendererMode);
@@ -431,16 +430,26 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 new com.winlator.cmod.contentdialog.RendererOptionsDialog(btRendererOptions != null ? btRendererOptions : v,
                         new com.winlator.cmod.contentdialog.RendererOptionsDialog.Config() {
                             public String getRenderer() {
-                                return rendererCfgHolder.getRenderer();
+                                return "displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer())
+                                        ? "vulkan" : rendererCfgHolder.getRenderer();
                             }
 
                             public void setRenderer(String val) {
                                 rendererCfgHolder.setRenderer(val);
                                 if (tvRendererMode != null) {
                                     tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger"
-                                            : "displayx".equalsIgnoreCase(val) ? "DisplayX" : "Vulkan");
+                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
                                 }
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public String getDisplayDriver() {
+                                if ("displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer())) return "displayx";
+                                return rendererCfgHolder.getDisplayDriver();
+                            }
+
+                            public void setDisplayDriver(String val) {
+                                rendererCfgHolder.setDisplayDriver(val);
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
 

@@ -146,7 +146,12 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         findViewById(R.id.BTHelpDXWrapper).setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
 
-        final String[] rendererTypeHolder = new String[] { shortcut.getRenderer() };
+        String configuredRenderer = shortcut.getRenderer();
+        boolean legacyDisplayXRenderer = "displayx".equalsIgnoreCase(configuredRenderer);
+        final String[] rendererTypeHolder = new String[] {
+                legacyDisplayXRenderer ? "vulkan" : configuredRenderer };
+        final String[] displayDriverHolder = new String[] {legacyDisplayXRenderer
+                ? "displayx" : shortcut.getDisplayDriver()};
         final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
@@ -157,8 +162,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererTypeHolder[0]) ? "OpenGL"
-                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger"
-                    : "displayx".equalsIgnoreCase(rendererTypeHolder[0]) ? "DisplayX" : "Vulkan");
+                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger" : "Vulkan");
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
         View rendererTrigger = findViewById(R.id.TVRendererMode);
@@ -168,10 +172,11 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                     rendererTypeHolder[0] = val;
                     if (tvRendererMode != null) {
                         tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger"
-                                : "displayx".equalsIgnoreCase(val) ? "DisplayX" : "Vulkan");
+                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
                     }
                 }
+                public String getDisplayDriver() { return displayDriverHolder[0]; }
+                public void setDisplayDriver(String val) { displayDriverHolder[0] = val; }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
                 public void setRendererNative(boolean val) { rendererNativeHolder[0] = val; }
                 public String getRendererPresentMode() { return rendererPresentModeHolder[0]; }
@@ -577,6 +582,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("dxwrapperConfig", dxwrapperConfig);
                 shortcut.putExtra("audioDriver", audioDriver);
                 shortcut.setRenderer(rendererTypeHolder[0]);
+                shortcut.setDisplayDriver(displayDriverHolder[0]);
                 shortcut.setRendererNative(rendererNativeHolder[0]);
                 shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);

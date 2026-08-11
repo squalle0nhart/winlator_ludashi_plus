@@ -716,14 +716,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!removeLoadingBarWhenBootingGames) preloaderDialog.show(R.string.starting_up);
 
         inputControlsManager = new InputControlsManager(this);
-        String launchRenderer = getLaunchRendererType();
-        if ("displayx".equalsIgnoreCase(launchRenderer) && android.os.Build.VERSION.SDK_INT < 29) {
-            launchRenderer = "vulkan";
+        String launchDisplayDriver = getLaunchDisplayDriver();
+        if ("displayx".equalsIgnoreCase(launchDisplayDriver) && android.os.Build.VERSION.SDK_INT < 29) {
+            launchDisplayDriver = "egl";
         }
         int displaySurfaceFormat = "bgra8".equalsIgnoreCase(
                 getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8"))
                 ? Drawable.HAL_PIXEL_FORMAT_BGRA_8888 : Drawable.HAL_PIXEL_FORMAT_RGBA_8888;
-        xServer = new XServer(new ScreenInfo(screenSize), launchRenderer, displaySurfaceFormat);
+        xServer = new XServer(new ScreenInfo(screenSize), launchDisplayDriver, displaySurfaceFormat);
         xServer.setWinHandler(winHandler);
 
         boolean[] winStarted = { false };
@@ -1390,10 +1390,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if ("surfaceflinger".equalsIgnoreCase(rendererType) && !ASurfaceRenderer.isSupported()) {
             rendererType = "vulkan";
         }
-        if ("displayx".equalsIgnoreCase(rendererType) && android.os.Build.VERSION.SDK_INT < 29) {
-            rendererType = "vulkan";
+        if (xServer.isDisplayX()) {
+            rendererType = android.os.Build.VERSION.SDK_INT >= 29 ? "displayx" : "vulkan";
         }
-        performanceMode = getLaunchGraphicsBoolean("displayxPerformanceMode", true);
+        performanceMode = xServer.isDisplayX()
+                && getLaunchGraphicsBoolean("displayxPerformanceMode", true);
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
         renderer.setCursorVisible(false);
@@ -3632,7 +3633,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("WRAPPER_SURFACE_FORMAT", "rgba8");
         }
 
-        if ("displayx".equalsIgnoreCase(getLaunchRendererType())) {
+        if ("displayx".equalsIgnoreCase(getLaunchDisplayDriver())) {
             String surfaceFormat = getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8");
             if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
             envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
@@ -3683,7 +3684,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         // Opening a container starts the Wine desktop, which must use the stable Vulkan host
         // renderer. The configured renderer is a game-launch option and is applied only when a
         // shortcut is present (including a shortcut inheriting its container default).
-        return shortcut != null ? shortcut.getRenderer() : "vulkan";
+        if (shortcut == null) return "vulkan";
+        String renderer = shortcut.getRenderer();
+        // Migrate the short-lived incorrect integration where DisplayX was
+        // persisted as a renderer rather than as the displayDriver.
+        return "displayx".equalsIgnoreCase(renderer) ? "vulkan" : renderer;
+    }
+
+    private String getLaunchDisplayDriver() {
+        if (shortcut == null) return Container.DEFAULT_DISPLAY_DRIVER;
+        String displayDriver = "displayx".equalsIgnoreCase(shortcut.getRenderer())
+                ? "displayx" : shortcut.getDisplayDriver();
+        return "displayx".equalsIgnoreCase(displayDriver)
+                && android.os.Build.VERSION.SDK_INT < 29
+                ? Container.DEFAULT_DISPLAY_DRIVER : displayDriver;
     }
 
     public float getRefreshRate() {

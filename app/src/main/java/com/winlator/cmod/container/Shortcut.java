@@ -297,6 +297,14 @@ public class Shortcut {
     }
     public void setRenderer(String v) { putExtra("renderer", v != null ? v : "vulkan"); }
 
+    public String getDisplayDriver() {
+        String value = getExtra("displayDriver", null);
+        return value != null && !value.isEmpty() ? value : container.getDisplayDriver();
+    }
+    public void setDisplayDriver(String value) {
+        putExtra("displayDriver", value != null ? value : Container.DEFAULT_DISPLAY_DRIVER);
+    }
+
     public String getRendererPresentMode() {
         String v = getExtra("rendererPresentMode", null);
         return v != null && !v.isEmpty() ? v : container.getRendererPresentMode();

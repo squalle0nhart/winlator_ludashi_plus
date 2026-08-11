@@ -47,12 +47,12 @@ public class XServer {
     private XClient grabbingClient = null;
 
     public XServer(ScreenInfo screenInfo) {
-        this(screenInfo, "vulkan", Drawable.HAL_PIXEL_FORMAT_BGRA_8888);
+        this(screenInfo, "egl", Drawable.HAL_PIXEL_FORMAT_BGRA_8888);
     }
 
     public XServer(ScreenInfo screenInfo, String displayDriver, int surfaceFormat) {
         this.screenInfo = screenInfo;
-        this.displayDriver = displayDriver != null ? displayDriver.toLowerCase() : "vulkan";
+        this.displayDriver = displayDriver != null ? displayDriver.toLowerCase() : "egl";
         this.surfaceFormat = isDisplayX()
                 ? surfaceFormat : Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
         cursorLocker = new CursorLocker(this);
