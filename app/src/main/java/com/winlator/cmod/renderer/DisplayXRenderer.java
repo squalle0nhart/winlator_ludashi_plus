@@ -53,12 +53,28 @@ public final class DisplayXRenderer implements HostRenderer,
 
     public void presentWindow(Window window, Drawable drawable) {
         if (renderingEnabled && window != null && drawable != null) {
-            long key = ((long) window.id << 32) | (drawable.id & 0xffffffffL);
-            if (registeredDirectContents.add(key)) {
-                xServerView.nativeAddDirectContent(window.id, drawable);
-            }
+            addDirectContent(window, drawable);
             xServerView.nativeUpdateDirectContent(window.id, drawable.id);
         }
+    }
+
+    public void addDirectContent(Window window, Drawable drawable) {
+        if (window == null || drawable == null) return;
+        long key = directContentKey(window.id, drawable.id);
+        if (registeredDirectContents.add(key)) {
+            xServerView.nativeAddDirectContent(window.id, drawable);
+        }
+    }
+
+    public void removeDirectContent(Window window, int drawableId) {
+        if (window == null) return;
+        if (registeredDirectContents.remove(directContentKey(window.id, drawableId))) {
+            xServerView.nativeRemoveDirectContent(window.id, drawableId);
+        }
+    }
+
+    private static long directContentKey(int windowId, int drawableId) {
+        return ((long) windowId << 32) | (drawableId & 0xffffffffL);
     }
 
     @Override public void surfaceCreated(SurfaceHolder holder) {
@@ -104,6 +120,10 @@ public final class DisplayXRenderer implements HostRenderer,
 
     @Override public void onUpdateWindowContent(Window window) {
         if (renderingEnabled) xServerView.nativeUpdateWindowContent(window.id);
+    }
+
+    @Override public void onUpdateWindowContentDirect(Window window, Drawable drawable) {
+        presentWindow(window, drawable);
     }
 
     @Override public void onUpdateWindowGeometry(Window window, boolean resized) {

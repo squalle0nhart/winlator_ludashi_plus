@@ -218,7 +218,7 @@ public class XServer {
     private void setupExtensions() {
         extensions.put(BigReqExtension.MAJOR_OPCODE, new BigReqExtension());
         extensions.put(MITSHMExtension.MAJOR_OPCODE, new MITSHMExtension());
-        extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension());
+        extensions.put(DRI3Extension.MAJOR_OPCODE, new DRI3Extension(this));
         extensions.put(PresentExtension.MAJOR_OPCODE, new PresentExtension());
         extensions.put(SyncExtension.MAJOR_OPCODE, new SyncExtension());
     }

@@ -46,6 +46,8 @@ public class WindowManager extends XResourceManager {
 
         default void onUpdateWindowContent(Window window) {}
 
+        default void onUpdateWindowContentDirect(Window window, Drawable drawable) {}
+
         default void onUpdateWindowGeometry(Window window, boolean resized) {}
 
         default void onUpdateWindowAttributes(Window window, Bitmask mask) {}
@@ -371,6 +373,13 @@ public class WindowManager extends XResourceManager {
         if (!renderingEnabled) return;
         for (int i = onWindowModificationListeners.size()-1; i >= 0; i--) {
             onWindowModificationListeners.get(i).onUpdateWindowContent(window);
+        }
+    }
+
+    public void triggerOnUpdateWindowContentDirect(Window window, Drawable drawable) {
+        if (!renderingEnabled) return;
+        for (int i = onWindowModificationListeners.size()-1; i >= 0; i--) {
+            onWindowModificationListeners.get(i).onUpdateWindowContentDirect(window, drawable);
         }
     }
 

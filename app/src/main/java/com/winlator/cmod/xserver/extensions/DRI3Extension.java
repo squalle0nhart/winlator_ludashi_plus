@@ -1,5 +1,8 @@
 package com.winlator.cmod.xserver.extensions;
 
+import android.util.SparseArray;
+
+import com.winlator.cmod.renderer.DisplayXRenderer;
 import com.winlator.cmod.renderer.GPUImage;
 
 import static com.winlator.cmod.xserver.XClientRequestHandler.RESPONSE_CODE_SUCCESS;
@@ -13,6 +16,8 @@ import com.winlator.cmod.xserver.Pixmap;
 import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.XClient;
 import com.winlator.cmod.xserver.XLock;
+import com.winlator.cmod.xserver.XResource;
+import com.winlator.cmod.xserver.XResourceManager;
 import com.winlator.cmod.xserver.XServer;
 import com.winlator.cmod.xserver.errors.BadDrawable;
 import com.winlator.cmod.xserver.errors.BadIdChoice;
@@ -22,8 +27,25 @@ import com.winlator.cmod.xserver.errors.XRequestError;
 
 import java.io.IOException;
 
-public class DRI3Extension implements Extension {
+public class DRI3Extension implements Extension, XResourceManager.OnResourceLifecycleListener {
     public static final byte MAJOR_OPCODE = -102;
+    private final XServer xServer;
+    private final SparseArray<DirectContent> directContents = new SparseArray<>();
+
+    private static final class DirectContent {
+        final Window window;
+        final Pixmap pixmap;
+
+        DirectContent(Window window, Pixmap pixmap) {
+            this.window = window;
+            this.pixmap = pixmap;
+        }
+    }
+
+    public DRI3Extension(XServer xServer) {
+        this.xServer = xServer;
+        xServer.pixmapManager.addOnResourceLifecycleListener(this);
+    }
 
     private static abstract class ClientOpcodes {
         private static final byte QUERY_VERSION = 0;
@@ -78,7 +100,7 @@ public class DRI3Extension implements Extension {
         Pixmap pixmap = client.xServer.pixmapManager.getPixmap(pixmapId);
         if (pixmap != null) throw new BadIdChoice(pixmapId);
         int fd = inputStream.getAncillaryFd();
-        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
+        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd, window);
     }
 
     private void pixmapFromBuffers(XClient client, XInputStream inputStream, XOutputStream outputStream) throws IOException, XRequestError {
@@ -98,10 +120,11 @@ public class DRI3Extension implements Extension {
         if (pixmap != null) throw new BadIdChoice(pixmapId);
 
         int fd = inputStream.getAncillaryFd();
-        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd);
+        pixmapFromHardwareBuffer(client, pixmapId, width, height, depth, fd, window);
     }
 
-    private void pixmapFromHardwareBuffer(XClient client, int pixmapId, short width, short height, byte depth, int fd) throws IOException, XRequestError {
+    private void pixmapFromHardwareBuffer(XClient client, int pixmapId, short width, short height,
+            byte depth, int fd, Window window) throws IOException, XRequestError {
         GPUImage gpuImage = new GPUImage(fd);
         Drawable drawable = null;
         boolean created = false;
@@ -111,8 +134,17 @@ public class DRI3Extension implements Extension {
             if (drawable == null) throw new BadIdChoice(pixmapId);
             drawable.setTexture(gpuImage);
             drawable.setDirectScanout(true);
-            if (client.xServer.pixmapManager.createPixmap(drawable) == null) {
+            Pixmap pixmap = client.xServer.pixmapManager.createPixmap(drawable);
+            if (pixmap == null) {
                 throw new BadIdChoice(pixmapId);
+            }
+            client.registerAsOwnerOfResource(pixmap);
+            final Drawable directDrawable = drawable;
+            drawable.setOnDrawListener(() -> client.xServer.windowManager
+                    .triggerOnUpdateWindowContentDirect(window, directDrawable));
+            directContents.put(pixmap.id, new DirectContent(window, pixmap));
+            if (client.xServer.getRenderer() instanceof DisplayXRenderer) {
+                ((DisplayXRenderer) client.xServer.getRenderer()).addDirectContent(window, drawable);
             }
             created = true;
         } finally {
@@ -125,6 +157,18 @@ public class DRI3Extension implements Extension {
             }
             XConnectorEpoll.closeFd(fd);
         }
+    }
+
+    @Override
+    public void onFreeResource(XResource resource) {
+        if (!(resource instanceof Pixmap)) return;
+        DirectContent directContent = directContents.get(resource.id);
+        if (directContent == null) return;
+        if (xServer.getRenderer() instanceof DisplayXRenderer) {
+            ((DisplayXRenderer) xServer.getRenderer()).removeDirectContent(
+                    directContent.window, directContent.pixmap.drawable.id);
+        }
+        directContents.remove(resource.id);
     }
 
     @Override
