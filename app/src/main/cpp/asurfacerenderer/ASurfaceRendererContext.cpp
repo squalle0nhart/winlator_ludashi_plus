@@ -47,6 +47,7 @@ typedef void  (*pfn_STSetVisibility)(void*, void*, int8_t);
 typedef void  (*pfn_STSetGeometry)(void*, void*, const ARect*, const ARect*, int32_t);
 typedef void  (*pfn_STSetBufferTransparency)(void*, void*, int8_t);
 typedef void  (*pfn_STSetBufferTransform)(void*, void*, int32_t);
+typedef void  (*pfn_STSetEnableBackPressure)(void*, void*, bool);
 typedef void  (*pfn_STSetOnComplete)(void* transaction, void* context,
                                      void (*callback)(void* context, void* stats));
 typedef int   (*pfn_STStatsGetPreviousReleaseFenceFd)(void* stats, void* surface_control);
@@ -62,6 +63,7 @@ typedef void  (*pfn_STReparent)(void*, void*, void*);
 #define ST_SETVIS(t,sc,v)      ((pfn_STSetVisibility)fnSTSetVisibility)((t),(sc),(v))
 #define ST_SETGEO(t,sc,s,d,r)  ((pfn_STSetGeometry)fnSTSetGeometry)((t),(sc),(s),(d),(r))
 #define ST_SET_TRANSPARENCY(t,sc,tr) if(fnSTSetBufferTransparency) ((pfn_STSetBufferTransparency)fnSTSetBufferTransparency)((t),(sc),(tr))
+#define ST_SET_BACKPRESSURE(t,sc,en) if(fnSTSetEnableBackPressure) ((pfn_STSetEnableBackPressure)fnSTSetEnableBackPressure)((t),(sc),(en))
 #define ST_REPARENT(t,sc,p)    if(fnSTReparent) ((pfn_STReparent)fnSTReparent)((t),(sc),(p))
 
 #define AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM 5
@@ -152,6 +154,7 @@ bool ASurfaceRendererContext::loadScanoutApi() {
     fnSTSetOnComplete = dlsym(lib, "ASurfaceTransaction_setOnComplete");
     fnSTSetBufferTransparency = dlsym(lib, "ASurfaceTransaction_setBufferTransparency");
     fnSTSetBufferTransform = dlsym(lib, "ASurfaceTransaction_setBufferTransform");
+    fnSTSetEnableBackPressure = dlsym(lib, "ASurfaceTransaction_setEnableBackPressure");
     fnSTReparent      = dlsym(lib, "ASurfaceTransaction_reparent");
     fnSTStatsGetPreviousReleaseFenceFd = dlsym(lib, "ASurfaceTransactionStats_getPreviousReleaseFenceFd");
 
@@ -179,6 +182,7 @@ void ASurfaceRendererContext::initScanout() {
     }
     oneShot([&](void* tx) {
         ST_SETZORDER(tx, scanoutCursorSC, INT_MAX);
+        ST_SET_BACKPRESSURE(tx, scanoutCursorSC, false);
         ST_SETVIS   (tx, scanoutCursorSC, 1);
     });
     scanoutCursorFence   = -1;
@@ -698,6 +702,13 @@ void ASurfaceRendererContext::registerWindowSC(int64_t contentId, const char* de
     if (!loadScanoutApi() || !window) return;
     void* surfaceControl = SC_CREATE(window, debugName ? debugName : "(x11_window)");
     if (!surfaceControl) return;
+
+    // Pipetto 9a6c238c: this direct-composition path owns its synchronization and
+    // release-fence lifecycle, so SurfaceFlinger must not add producer backpressure.
+    // Keep the call optional for devices whose libandroid does not expose the API.
+    oneShot([&](void* transaction) {
+        ST_SET_BACKPRESSURE(transaction, surfaceControl, false);
+    });
 
     void*                oldSurfaceControl = nullptr;
     ConvertedBufferSlot* oldCurrentSlot    = nullptr;

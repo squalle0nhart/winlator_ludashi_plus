@@ -153,7 +153,8 @@ import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
-    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "e91223d-20260721";
+    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "fefdb8ee-20260808";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "fefdb8ee-20260808";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -1154,6 +1155,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } else if ("wrapper-pipetto".equals(graphicsDriverArchive)) {
             graphicsDriverState += ";bundle=" + WRAPPER_PIPETTO_BUNDLE_VERSION;
         }
+        // extra_libs is extracted with every wrapper. Version it independently so the
+        // refreshed renderer/BCN layer reaches existing containers even when their
+        // selected wrapper archive itself did not change.
+        graphicsDriverState += ";extraLibs=" + EXTRA_LIBS_BUNDLE_VERSION;
 
         forceGraphicsDriverExtraction = !graphicsDriverState.equals(container.getExtra("graphicsDriver"));
         if (forceGraphicsDriverExtraction) {

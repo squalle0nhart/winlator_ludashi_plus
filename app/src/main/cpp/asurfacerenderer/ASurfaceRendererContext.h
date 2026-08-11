@@ -178,6 +178,7 @@ private:
     void* fnSTSetGeometry      = nullptr;
     void* fnSTSetBufferTransparency = nullptr;
     void* fnSTSetBufferTransform    = nullptr;
+    void* fnSTSetEnableBackPressure = nullptr;
     void* fnSTReparent         = nullptr;
     void* fnSTSetOnComplete    = nullptr;
     void* fnSTStatsGetPreviousReleaseFenceFd = nullptr;
