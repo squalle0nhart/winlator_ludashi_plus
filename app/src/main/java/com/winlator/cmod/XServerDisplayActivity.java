@@ -418,6 +418,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private GuestProgramLauncherComponent guestProgramLauncherComponent;
     private EnvVars overrideEnvVars;
+    // Read by the native DisplayX cache during nativeInit(). Keep this public
+    // because JNI resolves it directly from XServerDisplayActivity.
+    public boolean performanceMode = true;
 
     private void createNotifcationChannel() {
         String name = "Winlator";
@@ -1390,6 +1393,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if ("displayx".equalsIgnoreCase(rendererType) && android.os.Build.VERSION.SDK_INT < 29) {
             rendererType = "vulkan";
         }
+        performanceMode = getLaunchGraphicsBoolean("displayxPerformanceMode", true);
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
         renderer.setCursorVisible(false);
@@ -1446,9 +1450,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 asrRenderer.setFilterMode(0);
             }
             asrRenderer.setSharpness(getLaunchGraphicsSharpnessPercent() / 100f);
-        } else if (renderer instanceof DisplayXRenderer) {
-            ((DisplayXRenderer) renderer).setPerformanceMode(
-                    getLaunchGraphicsBoolean("displayxPerformanceMode", true));
         }
 
         if (shortcut != null) {

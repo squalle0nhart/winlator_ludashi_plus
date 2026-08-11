@@ -198,5 +198,4 @@ public class XServerView extends FrameLayout {
     @FastNative public native void nativeAddDirectContent(int windowId, Drawable drawable);
     @FastNative public native void nativeUpdateDirectContent(int windowId, int drawableId);
     @FastNative public native void nativeRemoveDirectContent(int windowId, int pixmapId);
-    @FastNative public native void nativeSetPerformanceMode(boolean enabled);
 }

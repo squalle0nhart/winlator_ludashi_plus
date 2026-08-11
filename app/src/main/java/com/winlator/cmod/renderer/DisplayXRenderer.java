@@ -51,10 +51,6 @@ public final class DisplayXRenderer implements HostRenderer,
         xServerView.nativeInit(xServerView.getContext(), xServer);
     }
 
-    public void setPerformanceMode(boolean enabled) {
-        xServerView.nativeSetPerformanceMode(enabled);
-    }
-
     public void presentWindow(Window window, Drawable drawable) {
         if (renderingEnabled && window != null && drawable != null) {
             long key = ((long) window.id << 32) | (drawable.id & 0xffffffffL);
