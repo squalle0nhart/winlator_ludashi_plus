@@ -1156,8 +1156,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         String dxwrapper = this.dxwrapper;
-        String graphicsDriverState = graphicsDriver + ";" + graphicsDriverConfigData;
         String graphicsDriverArchive = resolveGraphicsDriverArchiveName();
+        String graphicsDriverState = graphicsDriver + ";" + graphicsDriverConfigData
+                + ";archive=" + graphicsDriverArchive;
         if ("wrapper".equals(graphicsDriverArchive)) {
             graphicsDriverState += ";bundle=" + WRAPPER_DEFAULT_BUNDLE_VERSION;
         } else if ("wrapper-gamenative".equals(graphicsDriverArchive)) {
@@ -1286,6 +1287,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             if (shortcut != null)
                 envVars.putAll(shortcut.getExtra("envVars"));
+
+            // Container/shortcut environment overrides are merged after graphics setup. Apply
+            // DisplayX's required values last, matching Pipetto's guest-launcher behavior.
+            applyDisplayXEnvironment();
 
             if (!wineCpuTopologyValue.isEmpty()) {
                 envVars.put("WINE_CPU_TOPOLOGY", wineCpuTopologyValue);
@@ -3584,7 +3589,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String disablePresentWait = graphicsDriverConfig.get("disablePresentWait");
         envVars.put("WRAPPER_DISABLE_PRESENT_WAIT", disablePresentWait);
 
-        boolean isWrapperGamenative = "wrapper-gamenative".equalsIgnoreCase(graphicsDriver);
+        boolean isWrapperGamenative = "wrapper-gamenative".equalsIgnoreCase(
+                resolveGraphicsDriverArchiveName());
         int vendorId = GPUInformation.getVendorID(null, null);
         boolean isAdreno = vendorId == 0x5143;
         boolean isXclipse = vendorId == 0x144D;
@@ -3633,15 +3639,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("WRAPPER_SURFACE_FORMAT", "rgba8");
         }
 
-        if ("displayx".equalsIgnoreCase(getLaunchDisplayDriver())) {
-            String surfaceFormat = getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8");
-            if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
-            envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
-            envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
-            if (getLaunchGraphicsBoolean("displayxTrue", false)) {
-                envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
-            }
-        }
+        applyDisplayXEnvironment();
 
         if (!vkbasaltConfig.isEmpty()) {
             envVars.put("ENABLE_VKBASALT", "1");
@@ -3650,6 +3648,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private String resolveGraphicsDriverArchiveName() {
+        // DisplayX's swapchain implementation and DRI3 buffer contract require Pipetto's
+        // matching wrapper. Using another Ludashi wrapper makes vkGetSwapchainImagesKHR fail
+        // inside Wine's Vulkan loader before the game can create its first frame.
+        if ("displayx".equalsIgnoreCase(getLaunchDisplayDriver())) {
+            return "wrapper-pipetto";
+        }
         if (graphicsDriver == null || graphicsDriver.isEmpty() || graphicsDriver.equals("wrapper")) {
             return "wrapper";
         }
@@ -3672,6 +3676,27 @@ public class XServerDisplayActivity extends AppCompatActivity {
             return "wrapper-pipetto";
         }
         return "wrapper";
+    }
+
+    private void applyDisplayXEnvironment() {
+        if (!"displayx".equalsIgnoreCase(getLaunchDisplayDriver())) return;
+        String surfaceFormat = getLaunchGraphicsExtra("displayxSurfaceFormat", "rgba8");
+        if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
+        envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
+        envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
+        boolean trueDisplayXRequested = getLaunchGraphicsBoolean("displayxTrue", false);
+        boolean trueDisplayXSupported = wineInfo == null || !wineInfo.isArm64EC();
+        if (trueDisplayXRequested && trueDisplayXSupported) {
+            envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
+        } else if (trueDisplayXRequested) {
+            // Pipetto's True DisplayX Vulkan layer currently makes ARM64EC Wine assert in
+            // vkGetSwapchainImagesKHR. Retain the DisplayX driver and use its DRI3 path.
+            if ("VK_LAYER_DISPLAYX_display_x".equals(envVars.get("VK_INSTANCE_LAYERS"))) {
+                envVars.remove("VK_INSTANCE_LAYERS");
+            }
+            Log.i("XServerDisplayActivity",
+                    "True DisplayX disabled for ARM64EC; using DisplayX DRI3 compatibility mode");
+        }
     }
 
     private boolean isPipettoDirectRgbaMode() {

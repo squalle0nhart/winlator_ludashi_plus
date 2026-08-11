@@ -1,11 +1,13 @@
 package com.winlator.cmod.core;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
 
 public abstract class FrameGenManager {
+    private static final String TAG = "FrameGenManager";
     public static final String BACKEND_LSFG_VK = "lsfg_vk";
     public static final String BACKEND_BIONIC_FG = "bionic_fg";
     public static final String BACKEND_NATIVE_FG = "native_fg";
@@ -61,6 +63,7 @@ public abstract class FrameGenManager {
     public static boolean applyLaunchEnv(Container container, EnvVars envVars) {
         LsfgVkManager.clearLaunchEnv(envVars);
         BionicFgManager.clearLaunchEnv(envVars);
+        if (disableExternalFrameGenForTrueDisplayX(envVars)) return false;
         if (BACKEND_NATIVE_FG.equals(getBackend(container))) {
             envVars.put("DISABLE_LSFG", "1");
             envVars.put("BIONIC_FG_DISABLE", "1");
@@ -77,6 +80,7 @@ public abstract class FrameGenManager {
     public static boolean applyLaunchEnv(Shortcut shortcut, EnvVars envVars) {
         LsfgVkManager.clearLaunchEnv(envVars);
         BionicFgManager.clearLaunchEnv(envVars);
+        if (disableExternalFrameGenForTrueDisplayX(envVars)) return false;
         if (BACKEND_NATIVE_FG.equals(getBackend(shortcut))) {
             envVars.put("DISABLE_LSFG", "1");
             envVars.put("BIONIC_FG_DISABLE", "1");
@@ -88,5 +92,17 @@ public abstract class FrameGenManager {
         }
         envVars.put("BIONIC_FG_DISABLE", "1");
         return LsfgVkManager.applyLaunchEnv(shortcut, envVars);
+    }
+
+    private static boolean disableExternalFrameGenForTrueDisplayX(EnvVars envVars) {
+        if (!envVars.get("VK_INSTANCE_LAYERS").contains("VK_LAYER_DISPLAYX_display_x")) {
+            return false;
+        }
+        // True DisplayX already owns and exports the Vulkan swapchain. Stacking LSFG or
+        // Bionic-FG on it makes Wine's vkGetSwapchainImagesKHR call fail during startup.
+        envVars.put("DISABLE_LSFG", "1");
+        envVars.put("BIONIC_FG_DISABLE", "1");
+        Log.i(TAG, "External frame generation disabled for True DisplayX compatibility");
+        return true;
     }
 }
