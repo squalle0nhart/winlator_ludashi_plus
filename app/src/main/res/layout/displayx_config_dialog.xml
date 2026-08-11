@@ -18,7 +18,7 @@
         <Spinner
             style="@style/ComboBox"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="42dp"
             android:entries="@array/surface_format_entries"
             android:id="@+id/SSurfaceFormat"
             android:spinnerMode="dialog"/>
