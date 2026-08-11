@@ -31,21 +31,6 @@
                 android:spinnerMode="dropdown"
                 android:layout_marginBottom="8dp"/>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Display Driver"
-                android:textAppearance="?android:attr/textAppearanceMedium"
-                android:paddingBottom="8dp"/>
-            <Spinner
-                android:id="@+id/SPDisplayDriver"
-                style="@style/ComboBoxCompact"
-                android:background="@drawable/combo_box_no_arrow_dark"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:spinnerMode="dropdown"
-                android:layout_marginBottom="8dp"/>
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -146,48 +131,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Use legacy 3.0 scanout behavior" />
-
-            <LinearLayout
-                android:id="@+id/GroupDisplayX"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="8dp"
-                    android:text="DisplayX"
-                    android:textAppearance="?android:attr/textAppearanceMedium" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="8dp"
-                    android:text="Surface format" />
-
-                <Spinner
-                    android:id="@+id/SPDisplayXSurfaceFormat"
-                    style="@style/ComboBoxCompact"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/combo_box_no_arrow_dark"
-                    android:spinnerMode="dropdown" />
-
-                <CheckBox
-                    android:id="@+id/CBDisplayXTrue"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Bypass X11 protocol (True DisplayX)" />
-
-                <CheckBox
-                    android:id="@+id/CBDisplayXPerformanceMode"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Enable DisplayX performance mode" />
-            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/GroupGraphicsDefaults"

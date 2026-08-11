@@ -35,9 +35,6 @@ public class RendererOptionsDialog extends ContentDialog {
         String getRenderer();
         void setRenderer(String v);
 
-        String getDisplayDriver();
-        void setDisplayDriver(String v);
-
         boolean getRendererNative();
         void setRendererNative(boolean v);
 
@@ -58,13 +55,6 @@ public class RendererOptionsDialog extends ContentDialog {
 
         boolean getRendererLegacyScanout();
         void setRendererLegacyScanout(boolean v);
-
-        boolean getDisplayXTrue();
-        void setDisplayXTrue(boolean v);
-        boolean getDisplayXPerformanceMode();
-        void setDisplayXPerformanceMode(boolean v);
-        String getDisplayXSurfaceFormat();
-        void setDisplayXSurfaceFormat(String v);
 
         int getGraphicsFilterMode();
         void setGraphicsFilterMode(int v);
@@ -116,7 +106,6 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
-    private static final String[] DISPLAYX_SURFACE_FORMATS = {"rgba8", "bgra8"};
     private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg", "native_fg"};
     private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG", "Native Framegen"};
     private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
@@ -150,7 +139,6 @@ public class RendererOptionsDialog extends ContentDialog {
         }
 
         Spinner  spRenderer = findViewById(R.id.SPRendererType);
-        Spinner  spDisplayDriver = findViewById(R.id.SPDisplayDriver);
         Spinner  spPresent = findViewById(R.id.SPRendererPresentMode);
         View presentModeNote = findViewById(R.id.TVRendererPresentModeNote);
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
@@ -159,10 +147,6 @@ public class RendererOptionsDialog extends ContentDialog {
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
         CheckBox cbSfCompatMode = findViewById(R.id.CBRendererSfCompatMode);
         CheckBox cbLegacyScanout = findViewById(R.id.CBRendererLegacyScanout);
-        View groupDisplayX = findViewById(R.id.GroupDisplayX);
-        CheckBox cbDisplayXTrue = findViewById(R.id.CBDisplayXTrue);
-        CheckBox cbDisplayXPerformanceMode = findViewById(R.id.CBDisplayXPerformanceMode);
-        Spinner spDisplayXSurfaceFormat = findViewById(R.id.SPDisplayXSurfaceFormat);
         CheckBox cbDefaultUpscaler = findViewById(R.id.CBDefaultUpscaler);
         CheckBox cbDefaultSupersampling = findViewById(R.id.CBDefaultSupersampling);
         Spinner spDefaultUpscaler = findViewById(R.id.SPDefaultUpscalerMode);
@@ -207,19 +191,6 @@ public class RendererOptionsDialog extends ContentDialog {
         }
         spRenderer.setSelection(rendererSel);
 
-        List<String> displayDriverIds = new ArrayList<>();
-        List<String> displayDriverLabels = new ArrayList<>();
-        displayDriverIds.add("egl");
-        displayDriverLabels.add("EGL");
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
-            displayDriverIds.add("displayx");
-            displayDriverLabels.add("DisplayX");
-        }
-        setAmoledAdapter(ctx, spDisplayDriver, displayDriverLabels);
-        int displayDriverSel = "displayx".equalsIgnoreCase(config.getDisplayDriver())
-                && displayDriverIds.size() > 1 ? 1 : 0;
-        spDisplayDriver.setSelection(displayDriverSel);
-
         final boolean[] isVulkanRendererSelected = {true};
         final boolean[] isExternalFrameGenRendererSelected = {true};
         final Runnable[] syncFrameGenUiRef = new Runnable[1];
@@ -231,10 +202,6 @@ public class RendererOptionsDialog extends ContentDialog {
             boolean isSurfaceFlingerRenderer = rendererPosition >= 0
                     && rendererPosition < rendererIds.size()
                     && "surfaceflinger".equalsIgnoreCase(rendererIds.get(rendererPosition));
-            int displayDriverPosition = spDisplayDriver.getSelectedItemPosition();
-            boolean isDisplayXDriver = displayDriverPosition >= 0
-                    && displayDriverPosition < displayDriverIds.size()
-                    && "displayx".equalsIgnoreCase(displayDriverIds.get(displayDriverPosition));
             isExternalFrameGenRendererSelected[0] = isVulkanRenderer || isSurfaceFlingerRenderer;
             setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
             setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
@@ -246,19 +213,9 @@ public class RendererOptionsDialog extends ContentDialog {
             if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
             if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(isSurfaceFlingerRenderer ? View.VISIBLE : View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
-            if (groupDisplayX != null) groupDisplayX.setVisibility(isDisplayXDriver ? View.VISIBLE : View.GONE);
             if (syncFrameGenUiRef[0] != null) syncFrameGenUiRef[0].run();
         };
         spRenderer.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                syncRendererUi.run();
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
-        spDisplayDriver.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 syncRendererUi.run();
@@ -302,11 +259,6 @@ public class RendererOptionsDialog extends ContentDialog {
         cbSwapRB.setChecked(config.getRendererSwapRB());
         cbSfCompatMode.setChecked(config.getRendererSfCompatMode());
         cbLegacyScanout.setChecked(config.getRendererLegacyScanout());
-        cbDisplayXTrue.setChecked(config.getDisplayXTrue());
-        cbDisplayXPerformanceMode.setChecked(config.getDisplayXPerformanceMode());
-        setAmoledAdapter(ctx, spDisplayXSurfaceFormat, DISPLAYX_SURFACE_FORMATS);
-        spDisplayXSurfaceFormat.setSelection("bgra8".equalsIgnoreCase(config.getDisplayXSurfaceFormat()) ? 1 : 0);
-
         setAmoledAdapter(ctx, spDefaultUpscaler, UPSCALER_LABELS);
         setAmoledAdapter(ctx, spDefaultPostFX, POSTFX_LABELS);
         int currentGraphicsFilter = config.getGraphicsFilterMode();
@@ -484,7 +436,6 @@ public class RendererOptionsDialog extends ContentDialog {
             // Save on confirm
             setOnConfirmCallback(() -> {
                 config.setRenderer(rendererIds.get(spRenderer.getSelectedItemPosition()));
-                config.setDisplayDriver(displayDriverIds.get(spDisplayDriver.getSelectedItemPosition()));
                 config.setGraphicsFilterMode(cbDefaultUpscaler.isChecked()
                         ? getSelectedUpscalerFilterMode(spDefaultUpscaler) : 0);
                 config.setGraphicsSupersamplingEnabled(cbDefaultSupersampling.isChecked());
@@ -497,10 +448,6 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setRendererSwapRB(cbSwapRB.isChecked());
                 config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
                 config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
-                config.setDisplayXTrue(cbDisplayXTrue.isChecked());
-                config.setDisplayXPerformanceMode(cbDisplayXPerformanceMode.isChecked());
-                config.setDisplayXSurfaceFormat(DISPLAYX_SURFACE_FORMATS[
-                        spDisplayXSurfaceFormat.getSelectedItemPosition()]);
 
                 String backend = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()];
                 config.setFrameGenBackend(backend);
@@ -520,7 +467,6 @@ public class RendererOptionsDialog extends ContentDialog {
         // Save on confirm
         setOnConfirmCallback(() -> {
             config.setRenderer(rendererIds.get(spRenderer.getSelectedItemPosition()));
-            config.setDisplayDriver(displayDriverIds.get(spDisplayDriver.getSelectedItemPosition()));
             config.setGraphicsFilterMode(cbDefaultUpscaler.isChecked()
                     ? getSelectedUpscalerFilterMode(spDefaultUpscaler) : 0);
             config.setGraphicsSupersamplingEnabled(cbDefaultSupersampling.isChecked());
@@ -533,10 +479,6 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererSwapRB(cbSwapRB.isChecked());
             config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
             config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
-            config.setDisplayXTrue(cbDisplayXTrue.isChecked());
-            config.setDisplayXPerformanceMode(cbDisplayXPerformanceMode.isChecked());
-            config.setDisplayXSurfaceFormat(DISPLAYX_SURFACE_FORMATS[
-                    spDisplayXSurfaceFormat.getSelectedItemPosition()]);
         });
     }
 

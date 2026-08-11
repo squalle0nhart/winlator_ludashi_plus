@@ -43,4 +43,12 @@ public class DisplayXConfigDialog extends ContentDialog {
         String data = config != null && !config.toString().isEmpty() ? config.toString() :  DEFAULT_CONFIG;
         return new KeyValueSet(data);
     }
+
+    public static String createConfig(String trueDisplayX, String performanceMode, String surfaceFormat) {
+        KeyValueSet config = new KeyValueSet();
+        config.put("trueDisplayX", "1".equals(trueDisplayX) ? "1" : "0");
+        config.put("performanceMode", "0".equals(performanceMode) ? "0" : "1");
+        config.put("surfaceFormat", "bgra8".equalsIgnoreCase(surfaceFormat) ? "bgra8" : "rgba8");
+        return config.toString();
+    }
 }

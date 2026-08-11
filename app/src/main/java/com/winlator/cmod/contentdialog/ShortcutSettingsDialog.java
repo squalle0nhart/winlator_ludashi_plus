@@ -45,6 +45,7 @@ import com.winlator.cmod.contents.Downloader;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.StringUtils;
@@ -150,8 +151,33 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         boolean legacyDisplayXRenderer = "displayx".equalsIgnoreCase(configuredRenderer);
         final String[] rendererTypeHolder = new String[] {
                 legacyDisplayXRenderer ? "vulkan" : configuredRenderer };
-        final String[] displayDriverHolder = new String[] {legacyDisplayXRenderer
-                ? "displayx" : shortcut.getDisplayDriver()};
+        final Spinner sDisplayDriver = findViewById(R.id.SDisplayDriver);
+        final View vDisplayDriverConfig = findViewById(R.id.BTDisplayDriverConfig);
+        String currentDisplayDriver = legacyDisplayXRenderer ? "displayx" : shortcut.getDisplayDriver();
+        AppUtils.setSpinnerSelectionFromIdentifier(sDisplayDriver, currentDisplayDriver);
+        String savedDisplayXConfig = shortcut.getExtra("displayxConfig", "");
+        if (savedDisplayXConfig.isEmpty()) {
+            savedDisplayXConfig = DisplayXConfigDialog.createConfig(
+                    shortcut.getExtra("displayxTrue", shortcut.container.getExtra("displayxTrue", "0")),
+                    shortcut.getExtra("displayxPerformanceMode",
+                            shortcut.container.getExtra("displayxPerformanceMode", "1")),
+                    shortcut.getExtra("displayxSurfaceFormat",
+                            shortcut.container.getExtra("displayxSurfaceFormat", "rgba8")));
+        }
+        vDisplayDriverConfig.setTag(savedDisplayXConfig);
+        Runnable syncDisplayDriverUi = () -> {
+            boolean displayX = "displayx".equalsIgnoreCase(
+                    StringUtils.parseIdentifier(sDisplayDriver.getSelectedItem()));
+            vDisplayDriverConfig.setVisibility(displayX ? View.VISIBLE : View.GONE);
+        };
+        vDisplayDriverConfig.setOnClickListener(v -> new DisplayXConfigDialog(vDisplayDriverConfig).show());
+        sDisplayDriver.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                syncDisplayDriverUi.run();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        syncDisplayDriverUi.run();
         final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
@@ -175,8 +201,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                                 : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
                     }
                 }
-                public String getDisplayDriver() { return displayDriverHolder[0]; }
-                public void setDisplayDriver(String val) { displayDriverHolder[0] = val; }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
                 public void setRendererNative(boolean val) { rendererNativeHolder[0] = val; }
                 public String getRendererPresentMode() { return rendererPresentModeHolder[0]; }
@@ -191,25 +215,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setRendererSfCompatMode(boolean val) { rendererSfCompatModeHolder[0] = val; }
                 public boolean getRendererLegacyScanout() { return rendererLegacyScanoutHolder[0]; }
                 public void setRendererLegacyScanout(boolean val) { rendererLegacyScanoutHolder[0] = val; }
-                public boolean getDisplayXTrue() {
-                    return "1".equals(shortcut.getExtra("displayxTrue",
-                            shortcut.container.getExtra("displayxTrue", "0")));
-                }
-                public void setDisplayXTrue(boolean val) { shortcut.putExtra("displayxTrue", val ? "1" : "0"); }
-                public boolean getDisplayXPerformanceMode() {
-                    return !"0".equals(shortcut.getExtra("displayxPerformanceMode",
-                            shortcut.container.getExtra("displayxPerformanceMode", "1")));
-                }
-                public void setDisplayXPerformanceMode(boolean val) {
-                    shortcut.putExtra("displayxPerformanceMode", val ? "1" : "0");
-                }
-                public String getDisplayXSurfaceFormat() {
-                    return shortcut.getExtra("displayxSurfaceFormat",
-                            shortcut.container.getExtra("displayxSurfaceFormat", "rgba8"));
-                }
-                public void setDisplayXSurfaceFormat(String val) {
-                    shortcut.putExtra("displayxSurfaceFormat", val);
-                }
                 public int getGraphicsFilterMode() {
                     String v = shortcut.getExtra("graphicsFilterMode", shortcut.container.getExtra("graphicsFilterMode", "0"));
                     try { return Integer.parseInt(v); } catch (NumberFormatException e) { return 0; }
@@ -582,7 +587,13 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("dxwrapperConfig", dxwrapperConfig);
                 shortcut.putExtra("audioDriver", audioDriver);
                 shortcut.setRenderer(rendererTypeHolder[0]);
-                shortcut.setDisplayDriver(displayDriverHolder[0]);
+                String displayDriver = StringUtils.parseIdentifier(sDisplayDriver.getSelectedItem());
+                shortcut.setDisplayDriver(displayDriver);
+                KeyValueSet displayXConfig = DisplayXConfigDialog.parseConfig(vDisplayDriverConfig.getTag());
+                shortcut.putExtra("displayxConfig", displayXConfig.toString());
+                shortcut.putExtra("displayxTrue", displayXConfig.get("trueDisplayX", "0"));
+                shortcut.putExtra("displayxPerformanceMode", displayXConfig.get("performanceMode", "1"));
+                shortcut.putExtra("displayxSurfaceFormat", displayXConfig.get("surfaceFormat", "rgba8"));
                 shortcut.setRendererNative(rendererNativeHolder[0]);
                 shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);
@@ -711,6 +722,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         applyDarkThemeToFormFields(view, isDarkMode);
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
+        Spinner sDisplayDriver = view.findViewById(R.id.SDisplayDriver);
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
         Spinner sAudioDriver = view.findViewById(R.id.SAudioDriver);
         Spinner sEmulatorSpinner = view.findViewById(R.id.SEmulator);
@@ -724,6 +736,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         Spinner sStartupSelection = findViewById(R.id.SStartupSelection);
         sScreenSize.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         sGraphicsDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+        sDisplayDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         sDXWrapper.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         sAudioDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
         sEmulatorSpinner.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());

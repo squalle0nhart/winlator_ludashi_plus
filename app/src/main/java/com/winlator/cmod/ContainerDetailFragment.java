@@ -48,6 +48,7 @@ import com.winlator.cmod.contentdialog.AddEnvVarDialog;
 import com.winlator.cmod.contentdialog.ContentDialog;
 import com.winlator.cmod.contentdialog.ContainerGlossaryDialog;
 import com.winlator.cmod.contentdialog.DXVKConfigDialog;
+import com.winlator.cmod.contentdialog.DisplayXConfigDialog;
 import com.winlator.cmod.contentdialog.GraphicsDriverConfigDialog;
 import com.winlator.cmod.contentdialog.ShortcutSettingsDialog;
 import com.winlator.cmod.contentdialog.WineD3DConfigDialog;
@@ -155,6 +156,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
         sGraphicsDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
+
+        Spinner sDisplayDriver = view.findViewById(R.id.SDisplayDriver);
+        sDisplayDriver.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
 
         Spinner sDXWrapper = view.findViewById(R.id.SDXWrapper);
         sDXWrapper.setPopupBackgroundResource(ThemeUtils.getPopupBackgroundRes());
@@ -410,6 +414,37 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 isEditMode() ? container.getGraphicsDriver() : Container.DEFAULT_GRAPHICS_DRIVER,
                 isEditMode() ? container.getDXWrapper() : Container.DEFAULT_DXWRAPPER);
 
+        final com.winlator.cmod.container.Container rendererCfgHolder = isEditMode() ? container
+                : new com.winlator.cmod.container.Container(-1);
+        boolean legacyDisplayXRenderer = "displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer());
+        if (legacyDisplayXRenderer) rendererCfgHolder.setRenderer("vulkan");
+        final Spinner sDisplayDriver = view.findViewById(R.id.SDisplayDriver);
+        final View vDisplayDriverConfig = view.findViewById(R.id.BTDisplayDriverConfig);
+        String currentDisplayDriver = legacyDisplayXRenderer
+                ? "displayx" : rendererCfgHolder.getDisplayDriver();
+        AppUtils.setSpinnerSelectionFromIdentifier(sDisplayDriver, currentDisplayDriver);
+        String savedDisplayXConfig = rendererCfgHolder.getExtra("displayxConfig", "");
+        if (savedDisplayXConfig.isEmpty()) {
+            savedDisplayXConfig = DisplayXConfigDialog.createConfig(
+                    rendererCfgHolder.getExtra("displayxTrue", "0"),
+                    rendererCfgHolder.getExtra("displayxPerformanceMode", "1"),
+                    rendererCfgHolder.getExtra("displayxSurfaceFormat", "rgba8"));
+        }
+        vDisplayDriverConfig.setTag(savedDisplayXConfig);
+        Runnable syncDisplayDriverUi = () -> {
+            boolean displayX = "displayx".equalsIgnoreCase(
+                    StringUtils.parseIdentifier(sDisplayDriver.getSelectedItem()));
+            vDisplayDriverConfig.setVisibility(displayX ? View.VISIBLE : View.GONE);
+        };
+        vDisplayDriverConfig.setOnClickListener(v -> new DisplayXConfigDialog(vDisplayDriverConfig).show());
+        sDisplayDriver.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View selectedView, int position, long id) {
+                syncDisplayDriverUi.run();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        syncDisplayDriverUi.run();
+
         view.findViewById(R.id.BTHelpDXWrapper)
                 .setOnClickListener((v) -> AppUtils.showHelpBox(context, v, R.string.dxwrapper_help_content));
         View glossaryButton = view.findViewById(R.id.BTContainerGlossary);
@@ -417,8 +452,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             glossaryButton.setOnClickListener(v -> new ContainerGlossaryDialog(context).show());
         }
 
-        final com.winlator.cmod.container.Container rendererCfgHolder = isEditMode() ? container
-                : new com.winlator.cmod.container.Container(-1);
         final android.widget.TextView tvRendererMode = view.findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "OpenGL"
@@ -440,16 +473,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
                                             : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
                                 }
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-
-                            public String getDisplayDriver() {
-                                if ("displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer())) return "displayx";
-                                return rendererCfgHolder.getDisplayDriver();
-                            }
-
-                            public void setDisplayDriver(String val) {
-                                rendererCfgHolder.setDisplayDriver(val);
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
@@ -520,33 +543,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setRendererLegacyScanout(val);
                                 if (isEditMode())
                                     rendererCfgHolder.saveData();
-                            }
-
-                            public boolean getDisplayXTrue() {
-                                return "1".equals(rendererCfgHolder.getExtra("displayxTrue", "0"));
-                            }
-
-                            public void setDisplayXTrue(boolean val) {
-                                rendererCfgHolder.putExtra("displayxTrue", val ? "1" : "0");
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-
-                            public boolean getDisplayXPerformanceMode() {
-                                return !"0".equals(rendererCfgHolder.getExtra("displayxPerformanceMode", "1"));
-                            }
-
-                            public void setDisplayXPerformanceMode(boolean val) {
-                                rendererCfgHolder.putExtra("displayxPerformanceMode", val ? "1" : "0");
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-
-                            public String getDisplayXSurfaceFormat() {
-                                return rendererCfgHolder.getExtra("displayxSurfaceFormat", "rgba8");
-                            }
-
-                            public void setDisplayXSurfaceFormat(String val) {
-                                rendererCfgHolder.putExtra("displayxSurfaceFormat", val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
                             public int getGraphicsFilterMode() {
@@ -985,6 +981,16 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 int finalInputType = 0;
                 finalInputType |= cbEnableXInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_XINPUT : 0;
                 finalInputType |= cbEnableDInput.isChecked() ? WinHandler.FLAG_INPUT_TYPE_DINPUT : 0;
+
+                String displayDriver = StringUtils.parseIdentifier(sDisplayDriver.getSelectedItem());
+                rendererCfgHolder.setDisplayDriver(displayDriver);
+                KeyValueSet displayXConfig = DisplayXConfigDialog.parseConfig(vDisplayDriverConfig.getTag());
+                rendererCfgHolder.putExtra("displayxConfig", displayXConfig.toString());
+                rendererCfgHolder.putExtra("displayxTrue", displayXConfig.get("trueDisplayX", "0"));
+                rendererCfgHolder.putExtra("displayxPerformanceMode",
+                        displayXConfig.get("performanceMode", "1"));
+                rendererCfgHolder.putExtra("displayxSurfaceFormat",
+                        displayXConfig.get("surfaceFormat", "rgba8"));
 
                 if (isEditMode()) {
                     // Update existing container properties
