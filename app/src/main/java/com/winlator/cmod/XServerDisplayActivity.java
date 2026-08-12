@@ -156,7 +156,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
     private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "fefdb8ee-20260808";
-    private static final String EXTRA_LIBS_BUNDLE_VERSION = "0e8b8107-20260811";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-swapchain-20260812";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;

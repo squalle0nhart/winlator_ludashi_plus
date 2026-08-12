@@ -1,0 +1,49 @@
+From: Winlator Ludashi
+Subject: [PATCH] displayx: construct and destroy fake swapchains
+
+Based on Pipetto DisplayX commit 1d0c11a5bec937ac92d086752d9128c4ae048395.
+
+fake_swapchain has non-trivial C++ members. Allocating it with malloc leaves its
+vector, shared_ptr, mutex, and condition_variable unconstructed. Construct the
+object with new and destroy it with delete. Also follow the Vulkan two-call
+enumeration contract and avoid reading past the swapchain image vector.
+
+diff --git a/src/displayx_layer.cpp b/src/displayx_layer.cpp
+index ae04728..63d84db 100644
+--- a/src/displayx_layer.cpp
++++ b/src/displayx_layer.cpp
+@@ -687,4 +687,4 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
+-	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
++	auto *swapchain = new struct fake_swapchain();
+ 	swapchain->imageCount = pCreateInfo->minImageCount;
+ 	swapchain->format = pCreateInfo->imageFormat;
+ 	swapchain->extent = pCreateInfo->imageExtent;
+@@ -830,4 +830,5 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
++	const uint32_t availableImageCount = static_cast<uint32_t>(fake_swapchain->images.size());
+ 	if (pSwapchainImages == nullptr) {
+-		*pSwapchainImageCount = fake_swapchain->images.size();
++		*pSwapchainImageCount = availableImageCount;
+ 		return VK_SUCCESS;
+ 	}
+@@ -835,6 +836,10 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
+-	for (uint32_t i = 0; i < *pSwapchainImageCount; i++) {
++	const uint32_t requestedImageCount = *pSwapchainImageCount;
++	const uint32_t returnedImageCount = requestedImageCount < availableImageCount
++		? requestedImageCount : availableImageCount;
++	for (uint32_t i = 0; i < returnedImageCount; i++) {
+ 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
+ 	}
++	*pSwapchainImageCount = returnedImageCount;
+ 
+-	return VK_SUCCESS;
++	return returnedImageCount < availableImageCount ? VK_INCOMPLETE : VK_SUCCESS;
+ }
+@@ -936,7 +941,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
+ 
+ 	id.destroy(fake_swapchain->id);
+ 
+-	free(fake_swapchain);
++	delete fake_swapchain;
+ }
+ 
+ void sendFD(int& socket, int fd) {
