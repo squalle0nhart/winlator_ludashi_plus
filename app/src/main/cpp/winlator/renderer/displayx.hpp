@@ -55,10 +55,46 @@ class DisplayX {
             Window *window;
         };
 
+        class PresentQueue {
+            private:
+                std::queue<std::unique_ptr<PresentRequest>> mQueue;
+                std::unordered_set<PresentRequest*> mSet;
+
+            public:
+                void push(std::unique_ptr<PresentRequest> request) {
+                    if (!request)
+                        return;
+
+                    PresentRequest* ptr = request.get();
+
+                    if (mSet.insert(ptr).second) {
+                        mQueue.push(std::move(request));
+                    }
+                }
+
+                std::unique_ptr<PresentRequest> pop() {
+                    if (mQueue.empty())
+                        return nullptr;
+
+                    auto val = std::move(mQueue.front());
+                    mQueue.pop();
+                    mSet.erase(val.get());
+                    return val;
+                }
+
+                bool empty() const {
+                    return mQueue.empty();
+                }
+        };
+
         struct DisplayXSwapchain {
             uint8_t id;
             Window *window;
             std::vector<std::unique_ptr<Drawable>> images;
+        };
+
+        struct OnCompleteContext {
+            std::vector<std::unique_ptr<PresentRequest>> requests;
         };
 
         JNIEnv *env;
@@ -76,7 +112,7 @@ class DisplayX {
 
         ASurfaceTransaction *windowTransaction;
         ASurfaceTransaction *cursorTransaction;
-        std::queue<std::unique_ptr<PresentRequest>> presentRequests;
+        PresentQueue presentRequests;
         std::queue<std::function<void()>> eventQueue;
 
         std::thread eventThread;
@@ -87,12 +123,12 @@ class DisplayX {
         std::atomic_bool paused{false};
         std::atomic_bool stopped{false};
         std::atomic_bool hasSurface{false};
+        std::atomic_bool cursorUpdate{false};
         std::atomic_bool surfaceChanged{false};
         std::atomic_bool perfMode{true};
-        std::atomic_bool rootContentVisible{true};
 
-        bool cursorUpdate = false;
-        bool repostCursor = false;
+        bool requestUpdate = false;
+
         bool fullscreen = false;
         int eventsPending = 0;
         int64_t previousReportedWorkTime = 0;
@@ -139,10 +175,10 @@ class DisplayX {
         void mapWindow(Window *window);
         void unmapWindow(Window *window);
         void changeGeometry(Window *window, bool resized);
+        void changeZOrder(Window *window, Window *sibling, int stackMode);
         void reparentWindow(Window *window, Window *parent);
         void updateCursor(Window *window);
         void drawRootCursor();
         void toggleFullscreen();
         void setPerformanceMode(bool perfMode);
-        void setRootContentVisible(bool visible);
 };

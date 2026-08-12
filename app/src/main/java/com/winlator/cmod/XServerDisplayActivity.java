@@ -156,7 +156,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
     private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "fefdb8ee-20260808";
-    private static final String EXTRA_LIBS_BUNDLE_VERSION = "fefdb8ee-20260808";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "0e8b8107-20260811";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -3684,18 +3684,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
         envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
         envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
-        boolean trueDisplayXRequested = getLaunchGraphicsBoolean("displayxTrue", false);
-        boolean trueDisplayXSupported = wineInfo == null || !wineInfo.isArm64EC();
-        if (trueDisplayXRequested && trueDisplayXSupported) {
+        if (getLaunchGraphicsBoolean("displayxTrue", false)) {
             envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
-        } else if (trueDisplayXRequested) {
-            // Pipetto's True DisplayX Vulkan layer currently makes ARM64EC Wine assert in
-            // vkGetSwapchainImagesKHR. Retain the DisplayX driver and use its DRI3 path.
-            if ("VK_LAYER_DISPLAYX_display_x".equals(envVars.get("VK_INSTANCE_LAYERS"))) {
-                envVars.remove("VK_INSTANCE_LAYERS");
-            }
-            Log.i("XServerDisplayActivity",
-                    "True DisplayX disabled for ARM64EC; using DisplayX DRI3 compatibility mode");
         }
     }
 

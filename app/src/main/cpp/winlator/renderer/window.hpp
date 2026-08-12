@@ -14,6 +14,7 @@ struct Window {
     int height;
     int x;
     int y;
+    int z_order;
     std::string className;
     bool mapped;
     bool inputOutput;
@@ -28,11 +29,11 @@ struct Window {
     std::unordered_map<int, std::unique_ptr<struct Drawable>> directContents;
     Drawable *currentDirectContent;
     ASurfaceControl *control;
-        
+
     bool hasDirectContents() {
         return !directContents.empty();
     }
-    
+
     int getRootX() {
         int rootX = x;
         auto window = parent;
@@ -42,7 +43,7 @@ struct Window {
         }
         return rootX;
     }
-    
+
     int getRootY() {
         int rootY = y;
         auto window = parent;
@@ -56,7 +57,7 @@ struct Window {
 
 struct WindowLock {
     std::mutex mutex;
-   
+
    std::unique_lock<std::mutex> lock() {
        return std::unique_lock<std::mutex>(mutex);
    }
@@ -67,10 +68,10 @@ class WindowManager {
         std::unordered_map<int, std::unique_ptr<struct Window>> windows;
         Window *rootWindow = nullptr;
         std::string unviewableWMClass;
-    
+
     public:
         WindowLock windowLock;
-        
+
         WindowManager() {}
         void changeZOrder(int stackMode, Window *window, Window *sibling);
         void disableAllDescendants(Window *window);
@@ -78,7 +79,7 @@ class WindowManager {
         void addWindow(int id, std::unique_ptr<struct Window> window);
         void deleteWindow(Window *window);
         Window* getRootWindow();
-        void setRootWindow(Window *window); 
+        void setRootWindow(Window *window);
         void reparentWindow(Window *window, Window *parent);
         void setUnviewableWMClass(std::string className);
         std::string getUnviewableWMClass();

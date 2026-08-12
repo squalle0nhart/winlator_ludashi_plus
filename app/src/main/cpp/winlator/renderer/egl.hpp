@@ -33,37 +33,34 @@ class EGLRenderer {
             int rootY;
             Window *window;
         };
-        
+
         enum class State {
             NONE,
-            STOP,
             PAUSE,
             RESUME,
             CREATE_SURFACE,
             DESTROY_SURFACE,
-            CHANGE_SURFACE,
-            REQUEST_RENDERER,
-            RENDER_COMPLETE
+            CHANGE_SURFACE
         };
-        
+
         struct RenderLock {
            std::condition_variable cv;
            std::mutex mutex;
-           
+
            std::unique_lock<std::mutex> lock() {
                return std::unique_lock<std::mutex>(mutex);
            }
-           
+
            template<typename Predicate>
            void wait(std::unique_lock<std::mutex>& lock, Predicate pred) {
                cv.wait(lock, pred);
            }
-           
+
            void notify() {
                cv.notify_all();
            }
         };
-        
+
         EGLDisplay display;
         JNIEnv *env;
         EGLConfig config;
@@ -74,22 +71,26 @@ class EGLRenderer {
         std::vector<std::unique_ptr<struct RenderableWindow>> renderableWindows;
         std::thread renderingThread;
         ViewTransformation viewTransformation;
-        RenderLock renderLock;
-        State state = State::NONE;
-        std::queue<std::function<void()>> eventQueue;
         int surfaceWidth;
         int surfaceHeight;
         bool fullscreen = false;
         bool viewportNeedsUpdate = true;
         float tmpXForm1[6] = {1, 0, 0, 1, 0, 0};
         float tmpXForm2[6] = {1, 0, 0, 1, 0, 0};
-        
-        
+
+        RenderLock renderLock;
+        State state = State::NONE;
+        std::queue<std::function<void()>> eventQueue;
+
+        std::atomic_bool stopped{false};
+        std::atomic_bool requestUpdate{false};
+
         void renderingThreadLoop();
         void renderDrawable(Drawable *drawable, int x, int y, bool isWindow);
-        void drawFrame();
+        EGLBoolean drawFrame();
         void renderWindows();
         void destroyEGLSurface();
+        void destroyEGLContext();
         void renderCursor();
         void renderDrawable(int textureId, int length, float xform[], bool isFromWindow);
         void updateTextureDrawable(int textureId, int width, int height, void *data);
@@ -99,7 +100,7 @@ class EGLRenderer {
         void init();
         void createEGLSurface(ANativeWindow *window);
         void collectRenderableWindows(Window *window, int x, int y);
-    
+
     public:
         bool screenOffsetYRelativeToCursor = false;
         bool toggleFullscreen = false;
@@ -110,10 +111,10 @@ class EGLRenderer {
         CursorManager *cursorManager;
         JNICache *cache;
         JNIXServer *xServer;
-        
+
         EGLRenderer() {}
         EGLRenderer(WindowManager *manager, CursorManager *cm, JNICache *c) : windowManager(manager), cursorManager(cm), cache(c) {}
-        
+
         void updateScene();
         void start();
         void stop();
