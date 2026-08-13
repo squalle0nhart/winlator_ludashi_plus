@@ -550,6 +550,7 @@ public class ASurfaceRenderer implements HostRenderer,
     // Ticked once per presented game frame (the activity wires this, gating on its FPS window),
     // mirroring VulkanRenderer.setHudFrameTick — the perf HUD is otherwise never driven under ASR.
     private java.util.function.IntConsumer hudFrameTick = null;
+    @Override
     public void setHudFrameTick(java.util.function.IntConsumer c) { hudFrameTick = c; }
 
     // -------------------------------------------------------------------------

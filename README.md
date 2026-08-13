@@ -34,12 +34,18 @@ You can find updated components (known as `wcps`) to improve compatibility and p
   - **Adreno GPU Drivers (Turnip):**
       - [Kimchi's AdrenoToolsDrivers Releases](https://www.google.com/search?q=https://github.com/K11MCH1/AdrenoToolsDrivers/releases)
 
+# Frame Generation
+
+The app provides separately selectable **Bionic-FG**, **win-fg**, and **LSFG-VK** backends. **win-fg** is Bannerlator's clean-room Vulkan frame-generation layer: its motion estimation adapts AMD FidelityFX FSR3 optical flow under the MIT license, while its synthesis was written from first principles and bundles no proprietary model weights. It needs no external DLL. In the current device-proven runtime, win-fg uses an Off/On control (On = 2x) with live Optical flow/Bidirectional model and flow-scale updates.
+
 # Credits and Third-party apps
 
   - **Original Winlator** by [brunodev85](https://github.com/brunodev85/winlator)
   - **Original Winlator Bionic** by [Pipetto-crypto](https://github.com/Pipetto-crypto/winlator)
   - **Winlator (coffincolors fork)** by [coffincolors](https://github.com/coffincolors/winlator)
   - **Winlator Ludashi** by [StevenMXZ](https://github.com/StevenMXZ/Winlator-Ludashi)
+  - **win-fg** by [The412Banner/Bannerlator](https://github.com/The412Banner/Bannerlator) — clean-room frame generation using an MIT-licensed adaptation of AMD FidelityFX FSR3 optical flow
+  - **FusionHUD © The412Banner** — [github.com/The412Banner/FusionHUD](https://github.com/The412Banner/FusionHUD), GPL-3.0 with the upstream attribution requirement preserved in-app and in this documentation
   - Ubuntu RootFs (Bionic Beaver): [releases.ubuntu.com/bionic](https://www.google.com/search?q=https://releases.ubuntu.com/bionic)
   - Wine: [winehq.org](https://www.winehq.org/)
   - Box86/Box64 by [ptitseb](https://github.com/ptitSeb)

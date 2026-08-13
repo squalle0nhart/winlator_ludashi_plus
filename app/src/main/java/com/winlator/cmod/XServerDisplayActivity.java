@@ -112,6 +112,8 @@ import com.winlator.cmod.widget.LogView;
 import com.winlator.cmod.widget.MagnifierView;
 import com.winlator.cmod.widget.TouchpadView;
 import com.winlator.cmod.widget.XServerView;
+import com.winlator.star.widget.FpsCounter;
+import com.winlator.star.widget.fusionhud.FusionHudView;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.OnGetProcessInfoListener;
 import com.winlator.cmod.winhandler.ProcessInfo;
@@ -153,10 +155,17 @@ import java.util.regex.Pattern;
 import cn.sherlock.com.sun.media.sound.SF2Soundbank;
 
 public class XServerDisplayActivity extends AppCompatActivity {
+    private static final String DEFAULT_FUSION_HUD_CONFIG =
+            "hudSize=pill,showFPS=1,showEngine=1,showGpuModel=1,showCPULoad=1," +
+            "showGPULoad=1,showTemp=1,showGpuTemp=0,showVram=1,showRAM=1," +
+            "showBattery=1,showPower=1,showBatteryTemp=0,showFPSGraph=0," +
+            "showLow001=1,fpsDecimal=1,showClock=1,showPerCore=1,showSwap=1," +
+            "showNet=1,showResolution=1,showProton=1,showWrapper=1,showDxVer=1," +
+            "showSession=1,hudLocked=0,hudScale=100,hudOpacity=80";
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
-    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "fefdb8ee-20260808";
-    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-swapchain-20260812";
+    private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "2d9f62bf-20260813";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-implicit-pacing-20260813";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -185,6 +194,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private ImageFs imageFs;
     private FrameRating classicHud = null;   
     private WinlatorHUD modernHud = null;     
+    private FusionHudView fusionHud = null;
+    private final FpsCounter fusionFpsCounter = new FpsCounter();
+    private volatile boolean fusionHudEnabled = false;
     private Runnable editInputControlsCallback;
     private Shortcut shortcut;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
@@ -421,6 +433,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     // Read by the native DisplayX cache during nativeInit(). Keep this public
     // because JNI resolves it directly from XServerDisplayActivity.
     public boolean performanceMode = true;
+    public boolean presentRR = false;
 
     private void createNotifcationChannel() {
         String name = "Winlator";
@@ -742,15 +755,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (frameRatingWindowId == window.id) {
                     if (classicHud != null) classicHud.update();
                     if (modernHud != null) modernHud.onFrame();
+                    if (fusionHud != null && xServerView != null
+                            && xServerView.getRenderer() instanceof DisplayXRenderer) {
+                        driveFusionHudFrameTick(window.id);
+                    }
                 } else if (frameRatingWindowId == -1 && window.isApplicationWindow()
                         && ((modernHud != null && modernHud.isUserEnabled())
-                         || (classicHud != null && classicHud.isUserEnabled()))) {
+                         || (classicHud != null && classicHud.isUserEnabled())
+                         || fusionHud != null)) {
 
                     frameRatingWindowId = window.id;
                     activeRendererWindowId = window.id;
                     if (xServerView != null) xServerView.getRenderer().setFpsWindowId(window.id);
                     if (classicHud != null) classicHud.update();
                     if (modernHud != null) modernHud.onFrame();
+                    if (fusionHud != null && xServerView.getRenderer() instanceof DisplayXRenderer) {
+                        driveFusionHudFrameTick(window.id);
+                    }
                 }
             }
 
@@ -1388,7 +1409,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container);
             activeFrameGenMultiplier = getFrameGenMultiplier(activeFrameGenBackend);
             activeExternalFrameGenLayerLoaded = isExternalFrameGenBackend(activeFrameGenBackend)
-                    && activeFrameGenMultiplier >= 2
+                    && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                            || activeFrameGenMultiplier >= 2)
                     && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
         }
         String rendererType = getLaunchRendererType();
@@ -1400,8 +1422,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
         performanceMode = xServer.isDisplayX()
                 && getLaunchGraphicsBoolean("displayxPerformanceMode", true);
+        presentRR = xServer.isDisplayX()
+                && getLaunchGraphicsBoolean("displayxPresentRR", false);
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
+        renderer.setHudFrameTick(this::driveFusionHudFrameTick);
         renderer.setCursorVisible(false);
         final String rendererLabel = "gl".equalsIgnoreCase(rendererType) ? "OpenGL"
                 : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger"
@@ -1520,6 +1545,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 modernHud.enableByUser();
                 renderer.setFrameRating(modernHud);
                 modernHud.setRenderer(rendererLabel);
+            } else if (hudMode == 3) {
+                buildFusionHud(rootView, rendererLabel);
             }
         }
 
@@ -1970,7 +1997,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View         btResetHud      = findViewById(R.id.BTResetHud);
 
         int currentMode = 0;
-        if      (modernHud  != null) currentMode = 2;
+        if      (fusionHud  != null) currentMode = 3;
+        else if (modernHud  != null) currentMode = 2;
         else if (classicHud != null) currentMode = 1;
         else if (container  != null) {
             String extra = container.getExtra("hudMode");
@@ -1979,29 +2007,39 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         boolean hudOn    = currentMode != 0;
-        boolean isModern = currentMode == 2;
+        boolean hasOptions = currentMode == 2 || currentMode == 3;
 
         if (spHudStyle != null) {
-            ArrayAdapter<String> styleAdapter = createSidebarSpinnerAdapter(new String[]{"Classic", "Modern"});
+            ArrayAdapter<String> styleAdapter = createSidebarSpinnerAdapter(
+                    new String[]{"Classic", "Modern", "Fusion"});
             spHudStyle.setAdapter(styleAdapter);
-            spHudStyle.setSelection(isModern ? 1 : 0, false);
+            spHudStyle.setSelection(Math.max(0, Math.min(2, currentMode - 1)), false);
         }
         if (llHudStyleRow  != null) llHudStyleRow.setVisibility(hudOn ? View.VISIBLE : View.GONE);
-        if (llModernOptions != null) llModernOptions.setVisibility(isModern ? View.VISIBLE : View.GONE);
+        if (llModernOptions != null) llModernOptions.setVisibility(hasOptions ? View.VISIBLE : View.GONE);
+        if (cbGraph != null) cbGraph.setVisibility(currentMode == 3 ? View.VISIBLE : View.GONE);
 
         if (modernHud != null) {
+            clearHudCheckboxListeners(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbGraph, cbRenderer);
             modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
             if (cbRam != null) cbRam.setChecked(true);
             bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
         }
+        if (currentMode == 3) syncAndBindFusionHudControls(
+                cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbGraph, cbRenderer, sbScale, sbAlpha);
         if (sbScale != null) sbScale.setOnValueChangeListener((sb, v) -> {
-            if (modernHud != null) modernHud.setHudScale(1f + (v - 50f) / 50f);
+            int style = resolveSelectedStyle(spHudStyle);
+            if (style == 3) persistFusionHudConfigKey("hudScale", String.valueOf(Math.round(50f + v * 1.5f)));
+            else if (modernHud != null) modernHud.setHudScale(1f + (v - 50f) / 50f);
         });
         if (sbAlpha != null) sbAlpha.setOnValueChangeListener((sb, v) -> {
-            if (modernHud != null) modernHud.setHudAlpha(v / 100f);
+            int style = resolveSelectedStyle(spHudStyle);
+            if (style == 3) persistFusionHudConfigKey("hudOpacity", String.valueOf(Math.round(v)));
+            else if (modernHud != null) modernHud.setHudAlpha(v / 100f);
         });
         if (btResetHud != null) btResetHud.setOnClickListener(v -> {
-            if (modernHud != null) modernHud.forceReset();
+            if (resolveSelectedStyle(spHudStyle) == 3) resetFusionHud();
+            else if (modernHud != null) modernHud.forceReset();
         });
 
         if (swHudMaster != null) {
@@ -2012,16 +2050,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     enableHudLazily(style);
                     if (llHudStyleRow  != null) llHudStyleRow.setVisibility(View.VISIBLE);
                     if (llModernOptions != null)
-                        llModernOptions.setVisibility(style == 2 ? View.VISIBLE : View.GONE);
+                        llModernOptions.setVisibility(style >= 2 ? View.VISIBLE : View.GONE);
+                    if (cbGraph != null) cbGraph.setVisibility(style == 3 ? View.VISIBLE : View.GONE);
                     if (style == 2 && modernHud != null) {
+                        clearHudCheckboxListeners(cbFps, cbGpu, cbCpuRam, cbRam,
+                                cbBattTemp, cbGraph, cbRenderer);
                         modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
                         if (cbRam != null) cbRam.setChecked(true);
                         bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
+                    } else if (style == 3) {
+                        syncAndBindFusionHudControls(cbFps, cbGpu, cbCpuRam, cbRam,
+                                cbBattTemp, cbGraph, cbRenderer, sbScale, sbAlpha);
                     }
                     saveHudModeToContainer(style);
                 } else {
                     if (classicHud != null) classicHud.disableByUser();
                     if (modernHud  != null) modernHud.disableByUser();
+                    if (fusionHud  != null) fusionHud.setVisibility(View.GONE);
+                    fusionHudEnabled = false;
                     if (llHudStyleRow  != null) llHudStyleRow.setVisibility(View.GONE);
                     if (llModernOptions != null) llModernOptions.setVisibility(View.GONE);
                     saveHudModeToContainer(0);
@@ -2035,16 +2081,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     @Override
                     public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                         if (swHudMaster == null || !swHudMaster.isChecked()) return;
-                        int newStyle = (pos == 1) ? 2 : 1;
+                        int newStyle = pos + 1;
                         if (classicHud != null) classicHud.disableByUser(false);
                         if (modernHud  != null) modernHud.disableByUser(false);
+                        if (fusionHud  != null) fusionHud.setVisibility(View.GONE);
                         enableHudLazily(newStyle);
                         if (llModernOptions != null)
-                            llModernOptions.setVisibility(newStyle == 2 ? View.VISIBLE : View.GONE);
+                            llModernOptions.setVisibility(newStyle >= 2 ? View.VISIBLE : View.GONE);
+                        if (cbGraph != null) cbGraph.setVisibility(newStyle == 3 ? View.VISIBLE : View.GONE);
                         if (newStyle == 2 && modernHud != null) {
+                            clearHudCheckboxListeners(cbFps, cbGpu, cbCpuRam, cbRam,
+                                    cbBattTemp, cbGraph, cbRenderer);
                             modernHud.syncCheckboxes(cbFps, cbGpu, cbCpuRam, cbBattTemp, cbGraph, cbRenderer);
                             if (cbRam != null) cbRam.setChecked(true);
                             bindModernHudCheckboxes(cbFps, cbGpu, cbCpuRam, cbRam, cbBattTemp, cbRenderer);
+                        } else if (newStyle == 3) {
+                            syncAndBindFusionHudControls(cbFps, cbGpu, cbCpuRam, cbRam,
+                                    cbBattTemp, cbGraph, cbRenderer, sbScale, sbAlpha);
                         }
                         saveHudModeToContainer(newStyle);
                     }
@@ -2060,8 +2113,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final HostRenderer renderer = xServerView.getRenderer();
 
         boolean rendererAlreadyActive = (activeRendererWindowId != -1);
+        fusionHudEnabled = style == 3;
 
-        if (style == 2) {
+        if (style == 3) {
+            if (fusionHud == null) buildFusionHud(rootView, lastRendererName);
+            if (fusionHud != null) {
+                fusionHud.setVisibility(rendererAlreadyActive ? View.VISIBLE : View.GONE);
+                if (rendererAlreadyActive) {
+                    frameRatingWindowId = activeRendererWindowId;
+                    if (renderer != null) renderer.setFpsWindowId(frameRatingWindowId);
+                }
+            }
+        } else if (style == 2) {
             if (modernHud == null) {
                 modernHud = new WinlatorHUD(this);
                 modernHud.setVisibility(View.GONE);
@@ -2104,9 +2167,188 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (cbRenderer != null) cbRenderer.setOnCheckedChangeListener((b, v) -> modernHud.toggleElement(6, v));
     }
 
+    private void clearHudCheckboxListeners(CheckBox... boxes) {
+        for (CheckBox box : boxes) if (box != null) box.setOnCheckedChangeListener(null);
+    }
+
+    private void syncAndBindFusionHudControls(CheckBox cbFps, CheckBox cbGpu, CheckBox cbCpu,
+            CheckBox cbRam, CheckBox cbBattTemp, CheckBox cbGraph, CheckBox cbRenderer,
+            SeekBar sbScale, SeekBar sbAlpha) {
+        KeyValueSet cfg = new KeyValueSet(getFusionHudConfig());
+        clearHudCheckboxListeners(cbFps, cbGpu, cbCpu, cbRam, cbBattTemp, cbGraph, cbRenderer);
+
+        if (cbFps != null) cbFps.setChecked(cfg.getBoolean("showFPS", true));
+        if (cbGpu != null) cbGpu.setChecked(cfg.getBoolean("showGPULoad", true));
+        if (cbCpu != null) cbCpu.setChecked(cfg.getBoolean("showCPULoad", true));
+        if (cbRam != null) cbRam.setChecked(cfg.getBoolean("showRAM", true));
+        if (cbBattTemp != null) cbBattTemp.setChecked(cfg.getBoolean("showBattery", true));
+        if (cbGraph != null) {
+            cbGraph.setEnabled(true);
+            cbGraph.setChecked(cfg.getBoolean("showFPSGraph", false));
+        }
+        if (cbRenderer != null) cbRenderer.setChecked(cfg.getBoolean("showEngine", true));
+
+        int scale = parseIntOrDefault(cfg.get("hudScale", "100"), 100);
+        if (sbScale != null) sbScale.setValue((Math.max(50, Math.min(200, scale)) - 50f) / 1.5f);
+        if (sbAlpha != null) sbAlpha.setValue(
+                Math.max(0, Math.min(100, parseIntOrDefault(cfg.get("hudOpacity", "80"), 80))));
+
+        if (cbFps != null) cbFps.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showFPS", v ? "1" : "0"));
+        if (cbGpu != null) cbGpu.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showGPULoad", v ? "1" : "0"));
+        if (cbCpu != null) cbCpu.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showCPULoad", v ? "1" : "0"));
+        if (cbRam != null) cbRam.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showRAM", v ? "1" : "0"));
+        if (cbBattTemp != null) cbBattTemp.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showBattery", v ? "1" : "0"));
+        if (cbGraph != null) cbGraph.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showFPSGraph", v ? "1" : "0"));
+        if (cbRenderer != null) cbRenderer.setOnCheckedChangeListener(
+                (b, v) -> persistFusionHudConfigKey("showEngine", v ? "1" : "0"));
+    }
+
+    private int parseIntOrDefault(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private String getFusionHudConfig() {
+        if (shortcut != null) {
+            String config = shortcut.getExtra("fusionHudConfig");
+            if (config != null && !config.isEmpty()) return config;
+        }
+        return container != null
+                ? container.getExtra("fusionHudConfig", DEFAULT_FUSION_HUD_CONFIG)
+                : DEFAULT_FUSION_HUD_CONFIG;
+    }
+
+    private void persistFusionHudConfigKey(String key, String value) {
+        KeyValueSet cfg = new KeyValueSet(getFusionHudConfig());
+        cfg.put(key, value);
+        persistFusionHudConfig(cfg.toString());
+        if (fusionHud != null) fusionHud.applyConfig(cfg.toString());
+    }
+
+    private void persistFusionHudConfig(String config) {
+        if (shortcut != null) {
+            shortcut.putExtra("fusionHudConfig", config);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("fusionHudConfig", config);
+            container.saveData();
+        }
+    }
+
+    private void resetFusionHud() {
+        persistFusionHudConfig(DEFAULT_FUSION_HUD_CONFIG);
+        if (fusionHud != null) {
+            fusionHud.applyConfig(DEFAULT_FUSION_HUD_CONFIG);
+            fusionHud.setX(10f);
+            fusionHud.setY(10f);
+        }
+        if (shortcut != null) {
+            shortcut.putExtra("hudPosFusionX", null);
+            shortcut.putExtra("hudPosFusionY", null);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("hudPosFusionX", null);
+            container.putExtra("hudPosFusionY", null);
+            container.saveData();
+        }
+    }
+
+    private void buildFusionHud(FrameLayout rootView, String rendererLabel) {
+        if (rootView == null || fusionHud != null) return;
+        fusionHud = new FusionHudView(this);
+        fusionHud.setFpsCounter(fusionFpsCounter);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.TOP | android.view.Gravity.START);
+        params.leftMargin = 10;
+        params.topMargin = 10;
+        fusionHud.setLayoutParams(params);
+        fusionHud.applyConfig(getFusionHudConfig());
+        fusionHud.setEngineLabel(rendererLabel);
+        if (wineInfo != null) fusionHud.setWineVersion(wineInfo.toString());
+        fusionHud.setGraphicsWrapper(graphicsDriver);
+        if (dxwrapperConfig != null) {
+            fusionHud.setDxWrapper(dxwrapperConfig.get("version"), dxwrapperConfig.get("vkd3dVersion"));
+        }
+        fusionHud.setOnSizeCycledListener(token -> persistFusionHudConfigKey("hudSize", token));
+        fusionHud.setOnLockChangedListener(
+                locked -> persistFusionHudConfigKey("hudLocked", locked ? "1" : "0"));
+        fusionHud.setOnMovedListener((x, y) -> persistFusionHudPosition(x, y));
+        fusionHud.setVisibility(frameRatingWindowId != -1 ? View.VISIBLE : View.GONE);
+        rootView.addView(fusionHud);
+        restoreFusionHudPosition(fusionHud);
+        fusionHudEnabled = true;
+    }
+
+    private void driveFusionHudFrameTick(int windowId) {
+        if (fusionHudEnabled && fusionHud != null && frameRatingWindowId != -1
+                && windowId == frameRatingWindowId) {
+            fusionFpsCounter.tick();
+        }
+    }
+
+    private void persistFusionHudPosition(float x, float y) {
+        String px = String.valueOf(Math.round(x));
+        String py = String.valueOf(Math.round(y));
+        if (shortcut != null) {
+            shortcut.putExtra("hudPosFusionX", px);
+            shortcut.putExtra("hudPosFusionY", py);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("hudPosFusionX", px);
+            container.putExtra("hudPosFusionY", py);
+            container.saveData();
+        }
+    }
+
+    private String getFusionHudExtra(String key) {
+        if (shortcut != null) {
+            String value = shortcut.getExtra(key);
+            if (value != null && !value.isEmpty()) return value;
+        }
+        return container != null ? container.getExtra(key) : null;
+    }
+
+    private void restoreFusionHudPosition(View view) {
+        String sx = getFusionHudExtra("hudPosFusionX");
+        String sy = getFusionHudExtra("hudPosFusionY");
+        if (sx == null || sx.isEmpty() || sy == null || sy.isEmpty()) return;
+        final float savedX;
+        final float savedY;
+        try {
+            savedX = Float.parseFloat(sx);
+            savedY = Float.parseFloat(sy);
+        } catch (NumberFormatException ignored) {
+            return;
+        }
+        view.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom,
+                    int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (v.getWidth() == 0 || v.getHeight() == 0) return;
+                v.removeOnLayoutChangeListener(this);
+                View parent = (View) v.getParent();
+                float maxX = parent != null ? Math.max(0, parent.getWidth() - v.getWidth()) : savedX;
+                float maxY = parent != null ? Math.max(0, parent.getHeight() - v.getHeight()) : savedY;
+                v.setX(Math.max(0, Math.min(savedX, maxX)));
+                v.setY(Math.max(0, Math.min(savedY, maxY)));
+            }
+        });
+    }
+
     private int resolveSelectedStyle(Spinner spHudStyle) {
         if (spHudStyle == null) return 1;
-        return spHudStyle.getSelectedItemPosition() == 1 ? 2 : 1;
+        return spHudStyle.getSelectedItemPosition() + 1;
     }
 
     private void saveHudModeToContainer(int mode) {
@@ -2605,25 +2847,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final String[] selectedBackend = {shortcut != null
                 ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container)};
         final int[] selectedMultiplier = {getFrameGenMultiplier(selectedBackend[0])};
-        final int[] selectedBionicModel = {shortcut != null
-                ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
+        final int[] selectedModel = {getFrameGenModel(selectedBackend[0])};
         if (activeFrameGenBackend == null) {
             activeFrameGenBackend = selectedBackend[0];
             activeFrameGenMultiplier = selectedMultiplier[0];
             activeExternalFrameGenLayerLoaded = isExternalFrameGenBackend(activeFrameGenBackend)
-                    && activeFrameGenMultiplier >= 2
+                    && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                            || activeFrameGenMultiplier >= 2)
                     && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
         }
         TextView status = findViewById(R.id.TVFrameGenStatus);
         View modelGroup = findViewById(R.id.GroupFrameGenModel);
+        TextView modelGroupLabel = findViewById(R.id.TVFrameGenModelLabel);
 
         Runnable updateUi = () -> {
             boolean nativeBackend = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
             boolean bionicBackend = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+            boolean winBackend = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
+            boolean modelBackend = bionicBackend || winBackend;
             boolean selectedBackendAvailable = nativeBackend
                     ? vkRenderer != null : externalFrameGenAvailable;
             setEnabledIfPresent(R.id.BTFrameGenLsfg, externalFrameGenAvailable);
             setEnabledIfPresent(R.id.BTFrameGenBionic, externalFrameGenAvailable);
+            setEnabledIfPresent(R.id.BTFrameGenWin, externalFrameGenAvailable);
             setEnabledIfPresent(R.id.BTFrameGenNative, vkRenderer != null);
             setEnabledIfPresent(R.id.BTFrameGenOff, selectedBackendAvailable);
             setEnabledIfPresent(R.id.BTFrameGen2x, selectedBackendAvailable);
@@ -2632,20 +2878,38 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setEnabledIfPresent(R.id.BTFrameGenAdvanced, externalFrameGenAvailable);
             setSelectedModeButton(R.id.BTFrameGenLsfg, FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]));
             setSelectedModeButton(R.id.BTFrameGenBionic, bionicBackend);
+            setSelectedModeButton(R.id.BTFrameGenWin, winBackend);
             setSelectedModeButton(R.id.BTFrameGenNative, nativeBackend);
             setSelectedModeButton(R.id.BTFrameGenOff, selectedMultiplier[0] < 2);
             setSelectedModeButton(R.id.BTFrameGen2x, selectedMultiplier[0] == 2);
             setSelectedModeButton(R.id.BTFrameGen3x, selectedMultiplier[0] == 3);
             setSelectedModeButton(R.id.BTFrameGen4x, selectedMultiplier[0] == 4);
+            TextView multiplier2x = findViewById(R.id.BTFrameGen2x);
+            View multiplier3x = findViewById(R.id.BTFrameGen3x);
+            View multiplier4x = findViewById(R.id.BTFrameGen4x);
+            if (multiplier2x != null) multiplier2x.setText(winBackend ? "On" : "2x");
+            if (multiplier3x != null) multiplier3x.setVisibility(winBackend ? View.GONE : View.VISIBLE);
+            if (multiplier4x != null) multiplier4x.setVisibility(winBackend ? View.GONE : View.VISIBLE);
             if (modelGroup != null) {
-                modelGroup.setVisibility(bionicBackend && selectedMultiplier[0] >= 2
+                modelGroup.setVisibility(modelBackend && selectedMultiplier[0] >= 2
                         ? View.VISIBLE : View.GONE);
             }
-            setSelectedModeButton(R.id.BTFrameGenModelDefault, selectedBionicModel[0] == 0);
-            setSelectedModeButton(R.id.BTFrameGenModelTraced, selectedBionicModel[0] == 1);
-            setSelectedModeButton(R.id.BTFrameGenModelV2, selectedBionicModel[0] == 2);
-            setSelectedModeButton(R.id.BTFrameGenModelFsr3, selectedBionicModel[0] == 3);
-            setSelectedModeButton(R.id.BTFrameGenModelFsr3Plus, selectedBionicModel[0] == 4);
+            if (modelGroupLabel != null) modelGroupLabel.setText(winBackend ? "win-fg Model" : "Bionic-FG Model");
+            View modelDefault = findViewById(R.id.BTFrameGenModelDefault);
+            View modelTraced = findViewById(R.id.BTFrameGenModelTraced);
+            View modelV2 = findViewById(R.id.BTFrameGenModelV2);
+            if (modelDefault != null) modelDefault.setVisibility(winBackend ? View.GONE : View.VISIBLE);
+            if (modelTraced != null) modelTraced.setVisibility(winBackend ? View.GONE : View.VISIBLE);
+            if (modelV2 != null) modelV2.setVisibility(winBackend ? View.GONE : View.VISIBLE);
+            TextView modelFsr = findViewById(R.id.BTFrameGenModelFsr3);
+            TextView modelFsrPlus = findViewById(R.id.BTFrameGenModelFsr3Plus);
+            if (modelFsr != null) modelFsr.setText(winBackend ? "Optical" : "FSR");
+            if (modelFsrPlus != null) modelFsrPlus.setText(winBackend ? "Bi-dir" : "FSR3+");
+            setSelectedModeButton(R.id.BTFrameGenModelDefault, selectedModel[0] == 0);
+            setSelectedModeButton(R.id.BTFrameGenModelTraced, selectedModel[0] == 1);
+            setSelectedModeButton(R.id.BTFrameGenModelV2, selectedModel[0] == 2);
+            setSelectedModeButton(R.id.BTFrameGenModelFsr3, selectedModel[0] == 3);
+            setSelectedModeButton(R.id.BTFrameGenModelFsr3Plus, selectedModel[0] == 4);
             if (status != null) {
                 if (!selectedBackendAvailable) {
                     status.setText(nativeBackend
@@ -2667,6 +2931,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                     ? "Bionic-FG is experimental. Multiplier, model, and flow changes apply immediately; Mailbox is automatic while multiplying."
                                     : "Bionic-FG is experimental. Multiplier, model, and flow changes apply immediately with SurfaceFlinger.")
                             : "Bionic-FG is experimental. Relaunch to load its Vulkan layer.");
+                } else if (winBackend) {
+                    boolean settingsApplyLive = activeExternalFrameGenLayerLoaded
+                            && FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend);
+                    status.setText(settingsApplyLive
+                            ? "win-fg is active. Model and flow changes apply immediately."
+                            : "win-fg is clean-room frame generation. Relaunch to load its Vulkan layer.");
                 } else {
                     boolean appliesLive = activeExternalFrameGenLayerLoaded
                             && FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend);
@@ -2691,13 +2961,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setEnabledIfPresent(R.id.BTFrameGenModelDefault, selectedBackendAvailable && bionicBackend);
             setEnabledIfPresent(R.id.BTFrameGenModelTraced, selectedBackendAvailable && bionicBackend);
             setEnabledIfPresent(R.id.BTFrameGenModelV2, selectedBackendAvailable && bionicBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelFsr3, selectedBackendAvailable && bionicBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelFsr3Plus, selectedBackendAvailable && bionicBackend);
+            setEnabledIfPresent(R.id.BTFrameGenModelFsr3, selectedBackendAvailable && modelBackend);
+            setEnabledIfPresent(R.id.BTFrameGenModelFsr3Plus, selectedBackendAvailable && modelBackend);
         };
 
         View.OnClickListener backendListener = view -> {
             String backend = view.getId() == R.id.BTFrameGenBionic
                     ? FrameGenManager.BACKEND_BIONIC_FG
+                    : view.getId() == R.id.BTFrameGenWin
+                            ? FrameGenManager.BACKEND_WIN_FG
                     : view.getId() == R.id.BTFrameGenNative
                             ? FrameGenManager.BACKEND_NATIVE_FG
                             : FrameGenManager.BACKEND_LSFG_VK;
@@ -2712,7 +2984,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean changed = !backend.equals(selectedBackend[0]);
             selectedBackend[0] = backend;
             selectedMultiplier[0] = getFrameGenMultiplier(backend);
-            persistFrameGenSelection(backend, selectedMultiplier[0], selectedBionicModel[0]);
+            selectedModel[0] = getFrameGenModel(backend);
+            persistFrameGenSelection(backend, selectedMultiplier[0], selectedModel[0]);
             updateUi.run();
             boolean needsRelaunch = changed && (!FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
                     || (!FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
@@ -2723,6 +2996,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenLsfg, backendListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenBionic, backendListener);
+        setOnClickListenerIfPresent(R.id.BTFrameGenWin, backendListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenNative, backendListener);
 
         View.OnClickListener multiplierListener = view -> {
@@ -2742,7 +3016,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 return;
             }
             selectedMultiplier[0] = multiplier;
-            persistFrameGenSelection(selectedBackend[0], multiplier, selectedBionicModel[0]);
+            persistFrameGenSelection(selectedBackend[0], multiplier, selectedModel[0]);
             boolean externalAppliesLive = activeExternalFrameGenLayerLoaded
                     && selectedBackend[0].equals(activeFrameGenBackend)
                     && isExternalFrameGenBackend(selectedBackend[0]);
@@ -2771,15 +3045,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : view.getId() == R.id.BTFrameGenModelV2 ? 2
                     : view.getId() == R.id.BTFrameGenModelFsr3 ? 3
                     : view.getId() == R.id.BTFrameGenModelFsr3Plus ? 4 : 0;
-            selectedBionicModel[0] = model;
+            selectedModel[0] = model;
             persistFrameGenSelection(selectedBackend[0], selectedMultiplier[0], model);
             updateUi.run();
             boolean appliesLive = activeExternalFrameGenLayerLoaded
-                    && FrameGenManager.BACKEND_BIONIC_FG.equals(activeFrameGenBackend)
-                    && FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+                    && activeFrameGenBackend.equals(selectedBackend[0]);
+            boolean winBackend = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
             AppUtils.showToast(this, appliesLive
-                    ? "Bionic-FG model changed"
-                    : "Bionic-FG model saved. Relaunch the game to apply it.");
+                    ? (winBackend ? "win-fg model changed" : "Bionic-FG model changed")
+                    : (winBackend
+                            ? "win-fg model saved. Relaunch the game to apply it."
+                            : "Bionic-FG model saved. Relaunch the game to apply it."));
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenModelDefault, modelListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenModelTraced, modelListener);
@@ -2791,8 +3067,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     selectedBackend[0] = shortcut != null
                             ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container);
                     selectedMultiplier[0] = getFrameGenMultiplier(selectedBackend[0]);
-                    selectedBionicModel[0] = shortcut != null
-                            ? shortcut.getBionicFgModel() : container.getBionicFgModel();
+                    selectedModel[0] = getFrameGenModel(selectedBackend[0]);
                     if (activeExternalFrameGenLayerLoaded
                             && selectedBackend[0].equals(activeFrameGenBackend)) {
                         activeFrameGenMultiplier = selectedMultiplier[0];
@@ -2832,6 +3107,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? shortcut.getBionicFgFlowScale() : container.getBionicFgFlowScale()};
         final int[] selectedBionicModel = {shortcut != null
                 ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
+        final int[] selectedWinMultiplier = {shortcut != null
+                ? shortcut.getWinFgMultiplier() : container.getWinFgMultiplier()};
+        final float[] selectedWinFlowScale = {shortcut != null
+                ? shortcut.getWinFgFlowScale() : container.getWinFgFlowScale()};
+        final int[] selectedWinModel = {shortcut != null
+                ? shortcut.getWinFgModel() : container.getWinFgModel()};
         final int[] selectedNativeMultiplier = {shortcut != null
                 ? shortcut.getNativeFgMultiplier() : container.getNativeFgMultiplier()};
         final float[] selectedNativeSmoothing = {shortcut != null
@@ -2850,15 +3131,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner backendSpinner = new Spinner(this);
         ArrayAdapter<String> backendAdapter = ThemeUtils.createSpinnerAdapter(
                 this,
-                new String[]{"LSFG-VK", "Bionic-FG", "Native Framegen"});
+                new String[]{"LSFG-VK", "Bionic-FG", "win-fg", "Native Framegen"});
         backendSpinner.setAdapter(backendAdapter);
         ThemeUtils.applySpinnerTheme(backendSpinner);
         backendSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
         backendSpinner.setPadding(padding / 2, 0, padding / 2, 0);
         backendSpinner.setMinimumHeight(padding * 3);
         int initialBackendPosition = FrameGenManager.BACKEND_BIONIC_FG.equals(currentSettings.backend) ? 1
-                : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 2 : 0;
-        if (initialBackendPosition == 2 && !nativeAvailable && externalFrameGenAvailable) {
+                : FrameGenManager.BACKEND_WIN_FG.equals(currentSettings.backend) ? 2
+                : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 3 : 0;
+        if (initialBackendPosition == 3 && !nativeAvailable && externalFrameGenAvailable) {
             initialBackendPosition = 1;
         }
         backendSpinner.setSelection(initialBackendPosition);
@@ -2931,14 +3213,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
             selectedBackend[0] = backendPosition == 1
                     ? FrameGenManager.BACKEND_BIONIC_FG
                     : backendPosition == 2
-                            ? FrameGenManager.BACKEND_NATIVE_FG
-                            : FrameGenManager.BACKEND_LSFG_VK;
+                            ? FrameGenManager.BACKEND_WIN_FG
+                            : backendPosition == 3
+                                    ? FrameGenManager.BACKEND_NATIVE_FG
+                                    : FrameGenManager.BACKEND_LSFG_VK;
             boolean useBionicFg = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+            boolean useWinFg = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
             boolean useNativeFg = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
             boolean backendAvailable = useNativeFg ? nativeAvailable
-                    : externalFrameGenAvailable && (useBionicFg || dllAvailable);
+                    : externalFrameGenAvailable && (useBionicFg || useWinFg || dllAvailable);
 
-            status.setText(useBionicFg
+            status.setText(useWinFg
+                    ? "Bundled clean-room win-fg with device-proven presentation and live config reload."
+                    : useBionicFg
                     ? "Bundled Bionic-FG. Model changes can apply live when Bionic-FG is active."
                     : useNativeFg
                             ? (nativeAvailable
@@ -2949,20 +3236,26 @@ public class XServerDisplayActivity extends AppCompatActivity {
                                     : "Import Lossless.dll before enabling LSFG-VK."));
 
             int selectedMultiplier = useNativeFg ? selectedNativeMultiplier[0]
+                    : useWinFg ? selectedWinMultiplier[0]
                     : useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
             for (int i = 0; i < multiplierGroup.getChildCount(); i++) {
                 View child = multiplierGroup.getChildAt(i);
                 if (child instanceof android.widget.RadioButton) {
                     Object tag = child.getTag();
-                    ((android.widget.RadioButton) child).setChecked(tag instanceof Integer
-                            && (Integer) tag == selectedMultiplier);
+                    int multiplierValue = tag instanceof Integer ? (Integer) tag : 0;
+                    ((android.widget.RadioButton) child).setChecked(multiplierValue == selectedMultiplier);
+                    ((android.widget.RadioButton) child).setText(useWinFg && multiplierValue == 2
+                            ? "On" : multiplierValue == 0 ? "Off" : multiplierValue + "x");
+                    child.setVisibility(useWinFg && multiplierValue > 2 ? View.GONE : View.VISIBLE);
                     child.setEnabled(backendAvailable || (tag instanceof Integer && (Integer) tag == 0));
                 }
             }
 
-            float flowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
-            flowLabel.setVisibility(View.VISIBLE);
-            flowSeekBar.setVisibility(View.VISIBLE);
+            float flowScale = useWinFg ? selectedWinFlowScale[0]
+                    : useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
+            boolean showWinFgTuning = !useWinFg || selectedMultiplier > 0;
+            flowLabel.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
+            flowSeekBar.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
             flowSeekBar.setEnabled(backendAvailable);
             flowSeekBar.setMax(useNativeFg ? 100 : 75);
             flowSeekBar.setProgress(useNativeFg
@@ -2971,9 +3264,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
             flowLabel.setText(useNativeFg
                     ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
                     : String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
-            modelLabel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-            modelSpinner.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-            performanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
+            boolean modelBackend = useBionicFg || useWinFg;
+            modelLabel.setText(useWinFg ? "win-fg Model" : "Bionic-FG Model");
+            modelLabel.setVisibility(modelBackend && showWinFgTuning ? View.VISIBLE : View.GONE);
+            modelSpinner.setVisibility(modelBackend && showWinFgTuning ? View.VISIBLE : View.GONE);
+            modelSpinner.setAdapter(ThemeUtils.createSpinnerAdapter(
+                    XServerDisplayActivity.this,
+                    useWinFg
+                            ? new String[]{"Optical flow", "Optical flow · bidirectional"}
+                            : new String[]{"Default", "Traced graph (experimental)", "V2 engine (experimental)",
+                                    "FidelityFX optical flow (experimental)",
+                                    "FidelityFX optical flow v2 (experimental)"}));
+            ThemeUtils.applySpinnerTheme(modelSpinner);
+            modelSpinner.setSelection(useWinFg
+                    ? Math.max(0, Math.min(1, selectedWinModel[0] - 3))
+                    : FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
+            performanceMode.setVisibility(modelBackend || useNativeFg ? View.GONE : View.VISIBLE);
             performanceMode.setEnabled(dllAvailable);
             syncingUi[0] = false;
         };
@@ -2981,7 +3287,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         backendSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position == 2 && !nativeAvailable) {
+                if (position == 3 && !nativeAvailable) {
                     AppUtils.showToast(XServerDisplayActivity.this,
                             getString(R.string.frame_generation_requires_vulkan));
                     backendSpinner.setSelection(1);
@@ -3000,11 +3306,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (!(tag instanceof Integer)) return;
             if (FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
                 selectedNativeMultiplier[0] = (Integer) tag;
+            } else if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
+                selectedWinMultiplier[0] = (Integer) tag;
             } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
                 selectedBionicMultiplier[0] = (Integer) tag;
             } else {
                 selectedLsfgMultiplier[0] = (Integer) tag;
             }
+            syncUi.run();
         });
         flowSeekBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -3017,7 +3326,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     return;
                 }
                 float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + progress / 100.0f);
-                if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
+                if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
+                    selectedWinFlowScale[0] = value;
+                } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
                     selectedBionicFlowScale[0] = value;
                 } else {
                     selectedLsfgFlowScale[0] = value;
@@ -3034,7 +3345,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         modelSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (!syncingUi[0]) selectedBionicModel[0] = FrameGenQuickMenuHelper.modelFromPosition(position);
+                if (syncingUi[0]) return;
+                if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
+                    selectedWinModel[0] = Math.max(3, Math.min(4, position + 3));
+                } else {
+                    selectedBionicModel[0] = FrameGenQuickMenuHelper.modelFromPosition(position);
+                }
             }
 
             @Override
@@ -3062,6 +3378,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         frameGenDialog.setOnConfirmCallback(() -> {
                     int selectedMultiplier = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
                             ? selectedNativeMultiplier[0]
+                            : FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])
+                                    ? selectedWinMultiplier[0]
                             : FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
                                     ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
                     if (shortcut != null) {
@@ -3074,6 +3392,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         shortcut.setBionicFgMultiplier(selectedBionicMultiplier[0]);
                         shortcut.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                         shortcut.setBionicFgModel(selectedBionicModel[0]);
+                        shortcut.setWinFgMultiplier(selectedWinMultiplier[0]);
+                        shortcut.setWinFgFlowScale(selectedWinFlowScale[0]);
+                        shortcut.setWinFgModel(selectedWinModel[0]);
                         shortcut.setNativeFgMultiplier(selectedNativeMultiplier[0]);
                         shortcut.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         shortcut.saveData();
@@ -3089,6 +3410,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         container.setBionicFgMultiplier(selectedBionicMultiplier[0]);
                         container.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                         container.setBionicFgModel(selectedBionicModel[0]);
+                        container.setWinFgMultiplier(selectedWinMultiplier[0]);
+                        container.setWinFgFlowScale(selectedWinFlowScale[0]);
+                        container.setWinFgModel(selectedWinModel[0]);
                         container.setNativeFgMultiplier(selectedNativeMultiplier[0]);
                         container.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         container.saveData();
@@ -3114,21 +3438,33 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (container == null) return 0;
         if (shortcut != null) {
             if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return shortcut.getNativeFgMultiplier();
+            if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return shortcut.getWinFgMultiplier();
             if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return shortcut.getBionicFgMultiplier();
             return shortcut.getLsfgMultiplier();
         }
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return container.getNativeFgMultiplier();
+        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return container.getWinFgMultiplier();
         if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return container.getBionicFgMultiplier();
         return container.getLsfgMultiplier();
     }
 
+    private int getFrameGenModel(String backend) {
+        if (container == null) return 0;
+        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
+            return shortcut != null ? shortcut.getWinFgModel() : container.getWinFgModel();
+        }
+        return shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel();
+    }
+
     private boolean isExternalFrameGenBackend(String backend) {
         return FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
+                || FrameGenManager.BACKEND_WIN_FG.equals(backend)
                 || FrameGenManager.BACKEND_LSFG_VK.equals(backend);
     }
 
     private boolean isExternalFrameGenRuntimeAvailable(String backend) {
         if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return true;
+        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return true;
         if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) return false;
         return shortcut != null
                 ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
@@ -3144,9 +3480,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private void persistFrameGenSelection(String backend, int multiplier, int bionicModel) {
         float flowScale = shortcut != null
-                ? (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
+                ? (FrameGenManager.BACKEND_WIN_FG.equals(backend)
+                        ? shortcut.getWinFgFlowScale()
+                        : FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
                         ? shortcut.getBionicFgFlowScale() : shortcut.getLsfgFlowScale())
-                : (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
+                : (FrameGenManager.BACKEND_WIN_FG.equals(backend)
+                        ? container.getWinFgFlowScale()
+                        : FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
                         ? container.getBionicFgFlowScale() : container.getLsfgFlowScale());
         boolean performanceMode = shortcut != null
                 ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode();
@@ -3684,8 +4024,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!"bgra8".equalsIgnoreCase(surfaceFormat)) surfaceFormat = "rgba8";
         envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
         envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
-        if (getLaunchGraphicsBoolean("displayxTrue", false)) {
+        boolean bypassRequested = getLaunchGraphicsBoolean("displayxTrue", false);
+        if (bypassRequested && wineInfo != null && wineInfo.isArm64EC()) {
+            envVars.remove("VK_INSTANCE_LAYERS");
+            envVars.put("ENABLE_DISPLAYX", "1");
+            envVars.remove("DISABLE_DISPLAYX");
+            Log.i("XServerDisplayActivity",
+                    "True DisplayX enabled through the ARM64EC implicit Vulkan layer");
+        } else if (bypassRequested) {
             envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
+            envVars.remove("ENABLE_DISPLAYX");
+            envVars.put("DISABLE_DISPLAYX", "1");
+        } else {
+            if (envVars.get("VK_INSTANCE_LAYERS").contains("VK_LAYER_DISPLAYX_display_x")) {
+                envVars.remove("VK_INSTANCE_LAYERS");
+            }
+            envVars.remove("ENABLE_DISPLAYX");
+            envVars.put("DISABLE_DISPLAYX", "1");
         }
     }
 
@@ -4305,7 +4660,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             lastRendererName = null;
         }
 
-        if (classicHud == null && modernHud == null) return;
+        if (classicHud == null && modernHud == null && fusionHud == null) return;
 
         if (property != null) {
             if (frameRatingWindowId == -1 && propName.contains("_MESA_DRV")) {
@@ -4318,17 +4673,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     final String nameToPass = lastRendererName;
                     runOnUiThread(() -> modernHud.onRendererDetected(nameToPass));
                 }
+                if (fusionHud != null && fusionHudEnabled) {
+                    runOnUiThread(() -> fusionHud.setVisibility(View.VISIBLE));
+                }
             }
 
             if (propName.contains("_MESA_DRV_ENGINE_NAME") && window.id == frameRatingWindowId) {
                 String rendererName = property.toString();
                 if (classicHud != null) runOnUiThread(() -> classicHud.setRenderer(rendererName));
                 if (modernHud != null) runOnUiThread(() -> modernHud.setRenderer(rendererName));
+                if (fusionHud != null) runOnUiThread(() -> fusionHud.setEngineLabel(rendererName));
             }
             if (propName.contains("_MESA_DRV_GPU_NAME") && window.id == frameRatingWindowId) {
                 String gpuName = property.toString();
                 if (classicHud != null) runOnUiThread(() -> classicHud.setGpuName(gpuName));
                 if (modernHud != null) runOnUiThread(() -> modernHud.setGpuName(gpuName));
+                String fusionGpuName = com.winlator.star.core.GPUInformation.extractModelName(gpuName);
+                com.winlator.star.core.GPUInformation.setRenderer(gpuName);
+                if (fusionHud != null) runOnUiThread(() -> fusionHud.setGpuModel(fusionGpuName));
             }
         } else if (frameRatingWindowId != -1 && window.id == frameRatingWindowId) {
 
@@ -4340,6 +4702,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 classicHud.reset();
             });
             if (modernHud != null) runOnUiThread(() -> modernHud.onRendererGone());
+            if (fusionHud != null) runOnUiThread(() -> fusionHud.setVisibility(View.GONE));
+            fusionFpsCounter.reset();
         }
     }
 

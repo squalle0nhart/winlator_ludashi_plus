@@ -53,6 +53,10 @@ public abstract class FrameGenQuickMenuHelper {
             return new Settings(backend, container.getBionicFgMultiplier(), container.getBionicFgFlowScale(),
                     container.getLsfgPerformanceMode(), container.getBionicFgModel());
         }
+        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
+            return new Settings(backend, container.getWinFgMultiplier(), container.getWinFgFlowScale(),
+                    container.getLsfgPerformanceMode(), container.getWinFgModel());
+        }
         return new Settings(backend, container.getLsfgMultiplier(), container.getLsfgFlowScale(),
                 container.getLsfgPerformanceMode(), container.getBionicFgModel());
     }
@@ -67,6 +71,10 @@ public abstract class FrameGenQuickMenuHelper {
             return new Settings(backend, shortcut.getBionicFgMultiplier(), shortcut.getBionicFgFlowScale(),
                     shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
         }
+        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
+            return new Settings(backend, shortcut.getWinFgMultiplier(), shortcut.getWinFgFlowScale(),
+                    shortcut.getLsfgPerformanceMode(), shortcut.getWinFgModel());
+        }
         return new Settings(backend, shortcut.getLsfgMultiplier(), shortcut.getLsfgFlowScale(),
                 shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
     }
@@ -80,6 +88,11 @@ public abstract class FrameGenQuickMenuHelper {
             container.setBionicFgMultiplier(settings.multiplier);
             container.setBionicFgFlowScale(settings.flowScale);
             container.setBionicFgModel(settings.model);
+            container.setLsfgEnabled(false);
+        } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
+            container.setWinFgMultiplier(settings.multiplier);
+            container.setWinFgFlowScale(settings.flowScale);
+            container.setWinFgModel(settings.model);
             container.setLsfgEnabled(false);
         } else {
             container.setLsfgMultiplier(settings.multiplier);
@@ -99,6 +112,11 @@ public abstract class FrameGenQuickMenuHelper {
             shortcut.setBionicFgMultiplier(settings.multiplier);
             shortcut.setBionicFgFlowScale(settings.flowScale);
             shortcut.setBionicFgModel(settings.model);
+            shortcut.setLsfgEnabled(false);
+        } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
+            shortcut.setWinFgMultiplier(settings.multiplier);
+            shortcut.setWinFgFlowScale(settings.flowScale);
+            shortcut.setWinFgModel(settings.model);
             shortcut.setLsfgEnabled(false);
         } else {
             shortcut.setLsfgMultiplier(settings.multiplier);

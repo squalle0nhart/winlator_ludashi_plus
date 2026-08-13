@@ -77,6 +77,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     private final EffectComposer effectComposer;
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
+    private java.util.function.IntConsumer hudFrameTick = null;
     private int fpsWindowId = -1;
 
     /**
@@ -334,9 +335,10 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     @Override public void onUnmapWindow(Window window) { xServerView.queueEvent(this::updateScene); xServerView.requestRender(); }
     @Override public void onChangeWindowZOrder(Window window) { xServerView.queueEvent(this::updateScene); xServerView.requestRender(); }
     @Override public void onUpdateWindowContent(Window window) {
-        if (window != null && window.id == fpsWindowId) {
+        if (!nativeMode && window != null && window.id == fpsWindowId) {
             if (hudRef != null) hudRef.onFrame();
             if (classicHudRef != null) classicHudRef.update();
+            if (hudFrameTick != null) hudFrameTick.accept(window.id);
         }
         xServerView.requestRender();
     }
@@ -549,6 +551,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
         xServerView.requestRender();
     }
     @Override public void setFpsWindowId(int id) { fpsWindowId = id; }
+    @Override public void setHudFrameTick(java.util.function.IntConsumer tick) { hudFrameTick = tick; }
     @Override public void setFrameRating(Object fr) {
         if (fr instanceof WinlatorHUD) hudRef = (WinlatorHUD) fr;
         else if (fr instanceof FrameRating) classicHudRef = (FrameRating) fr;
@@ -619,6 +622,7 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
             if (window.id == fpsWindowId) {
                 if (hudRef != null) hudRef.onFrame();
                 if (classicHudRef != null) classicHudRef.update();
+                if (hudFrameTick != null) hudFrameTick.accept(window.id);
             }
         }
     }

@@ -263,6 +263,44 @@ public class Container {
         putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
     }
 
+    public int getWinFgMultiplier() {
+        String value = getExtra("winFgMultiplier", "0");
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed < 2 ? 0 : 2;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public void setWinFgMultiplier(int multiplier) {
+        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
+    }
+
+    public float getWinFgFlowScale() {
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(getExtra("winFgFlowScale", "0.80"))));
+        } catch (NumberFormatException e) {
+            return 0.80f;
+        }
+    }
+
+    public void setWinFgFlowScale(float flowScale) {
+        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
+    public int getWinFgModel() {
+        try {
+            return Math.max(3, Math.min(4, Integer.parseInt(getExtra("winFgModel", "3"))));
+        } catch (NumberFormatException e) {
+            return 3;
+        }
+    }
+
+    public void setWinFgModel(int model) {
+        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
+    }
+
     public int getNativeFgMultiplier() {
         String value = getExtra("nativeFgMultiplier", "0");
         try {

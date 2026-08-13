@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <thread>
 #include <functional>
+#include <memory>
 #include <queue>
 #include <cmath>
 #include <dlfcn.h>
@@ -48,6 +49,10 @@ class DisplayX {
 
         struct PresentRequest {
             Drawable *drawable;
+            // DisplayX swapchains may be destroyed while a present is still
+            // queued or owned by SurfaceFlinger. Keep that image alive until
+            // the transaction-complete callback releases this request.
+            std::shared_ptr<Drawable> retainedDrawable;
             int sync_fence;
             uint64_t presentId;
             uint8_t swapchainId;
@@ -90,7 +95,7 @@ class DisplayX {
         struct DisplayXSwapchain {
             uint8_t id;
             Window *window;
-            std::vector<std::unique_ptr<Drawable>> images;
+            std::vector<std::shared_ptr<Drawable>> images;
         };
 
         struct OnCompleteContext {
@@ -106,6 +111,7 @@ class DisplayX {
 
         APerformanceHintManager *performanceHintManager = nullptr;
         APerformanceHintSession *performanceHintSession = nullptr;
+        std::mutex performanceHintMutex;
 
         DisplayXLock eventLock;
         DisplayXLock presentLock;
@@ -126,6 +132,7 @@ class DisplayX {
         std::atomic_bool cursorUpdate{false};
         std::atomic_bool surfaceChanged{false};
         std::atomic_bool perfMode{true};
+        std::atomic_bool presentRR{false};
 
         bool requestUpdate = false;
 
@@ -181,4 +188,5 @@ class DisplayX {
         void drawRootCursor();
         void toggleFullscreen();
         void setPerformanceMode(bool perfMode);
+        void setPresentRR(bool presentRR);
 };

@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Winlator"
-include ':app'
+include ':app', ':fusionhud'

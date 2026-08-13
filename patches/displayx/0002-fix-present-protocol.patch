@@ -1,0 +1,181 @@
+From: Winlator Ludashi
+Subject: [PATCH] displayx: harden the present socket protocol
+
+Apply after 0001-fix-arm64ec-swapchain-lifetime.patch against Pipetto
+DisplayX commit 1d0c11a5bec937ac92d086752d9128c4ae048395.
+
+Vulkan sync-fd export may return -1 when work is already complete. Send the
+protocol marker without SCM_RIGHTS in that case instead of failing sendmsg.
+Avoid SIGPIPE at the Wine Unix-call boundary, validate queue state and Vulkan
+results, and report a disconnected presentation server as surface loss.
+
+diff --git a/src/displayx_layer.cpp b/src/displayx_layer.cpp
+index 098309a..24313e4 100644
+--- a/src/displayx_layer.cpp
++++ b/src/displayx_layer.cpp
+@@ -1,5 +1,22 @@
+ #include "displayx_layer.hpp"
+ 
++static bool writeSocket(int socket, const void *data, size_t size) {
++	const auto *bytes = static_cast<const char *>(data);
++	while (size > 0) {
++		ssize_t written = send(socket, bytes, size, MSG_NOSIGNAL);
++		if (written < 0) {
++			if (errno == EINTR)
++				continue;
++			return false;
++		}
++		if (written == 0)
++			return false;
++		bytes += written;
++		size -= static_cast<size_t>(written);
++	}
++	return true;
++}
++
+ static int readFD(int& socket) {
+     std::vector<char> msg_contents(1);
+     struct iovec iov{};
+@@ -700,10 +717,13 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
+ 	swapchain->images.resize(swapchain->imageCount);
+ 	
+ 	int request_code = 1;
+-	write(fake_surface->displayx_server_fd, &request_code, 4);
+-	write(fake_surface->displayx_server_fd, &swapchain->id, 1);
+-	write(fake_surface->displayx_server_fd, &swapchain->imageCount, 4);
+-	write(fake_surface->displayx_server_fd, &swapchain->surface->window, 4);
++	if (!writeSocket(fake_surface->displayx_server_fd, &request_code, 4) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->id, 1) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->imageCount, 4) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->surface->window, 4)) {
++		delete swapchain;
++		return VK_ERROR_SURFACE_LOST_KHR;
++	}
+ 	
+ 	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
+ 		VkResult result;
+@@ -934,8 +954,8 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
+ 	fake_swapchain->images.clear();
+ 
+ 	int request_code = 3;
+-	write(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
+-	write(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
++	writeSocket(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
++	writeSocket(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
+ 
+ 	swapchains.erase(fake_swapchain->id);
+ 
+@@ -944,7 +964,7 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
+ 	delete fake_swapchain;
+ }
+ 
+-void sendFD(int& socket, int fd) {
++static bool sendFD(int socket, int fd) {
+ 	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
+ 	
+ 	char dummy = 0;
+@@ -955,16 +975,18 @@ void sendFD(int& socket, int fd) {
+ 	struct msghdr msg{};
+ 	msg.msg_iov = &iov;
+ 	msg.msg_iovlen = 1;
+-	msg.msg_control = control_buffer.data();
+-	msg.msg_controllen = control_buffer.size();
+-
+-	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+-	cmsg->cmsg_level = SOL_SOCKET;
+-	cmsg->cmsg_type = SCM_RIGHTS;
+-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+-	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
++	if (fd >= 0) {
++		msg.msg_control = control_buffer.data();
++		msg.msg_controllen = control_buffer.size();
++
++		struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
++		cmsg->cmsg_level = SOL_SOCKET;
++		cmsg->cmsg_type = SCM_RIGHTS;
++		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
++		*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
++	}
+ 
+-	sendmsg(socket, &msg, 0);
++	return sendmsg(socket, &msg, MSG_NOSIGNAL) == 1;
+ }
+ 
+ VK_LAYER_EXPORT VkResult VKAPI_CALL
+@@ -974,7 +996,17 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 	Logger::log("trace", "Calling vkQueuePresentKHR");
+ 	const VkPresentIdKHR *presentIdInfo = nullptr;
+ 
+-	auto q = queues[queue];
++	std::shared_ptr<struct queue> q;
++	{
++		scoped_lock l(global_lock);
++		auto queueIt = queues.find(queue);
++		if (queueIt != queues.end())
++			q = queueIt->second;
++	}
++	if (!q || !q->device || !q->fence) {
++		Logger::log("error", "No DisplayX state for present queue %p", queue);
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 
+ 	const VkBaseInStructure *current = reinterpret_cast<const VkBaseInStructure *>(pPresentInfo->pNext);
+ 	while(current) {
+@@ -1004,8 +1036,13 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 	submitInfo.pWaitDstStageMask = waitStages.data();
+ 	submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
+ 	submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+-	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
+-	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
++	VkResult result = q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
++	if (result != VK_SUCCESS)
++		return result;
++
++	result = q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
++	if (result != VK_SUCCESS)
++		return result;
+ 
+ 	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+ 		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
+@@ -1018,14 +1055,23 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 			present_id = presentIdInfo->pPresentIds[i];
+ 		}
+ 		
+-		write(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
+-		write(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
+-		write(fake_swapchain->surface->displayx_server_fd, &index, 4);
+-		sendFD(fake_swapchain->surface->displayx_server_fd, fence);
+-		write(fake_swapchain->surface->displayx_server_fd, &present_id, 8);
++		if (!writeSocket(fake_swapchain->surface->displayx_server_fd, &request_code, 4) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &index, 4) ||
++			!sendFD(fake_swapchain->surface->displayx_server_fd, fence) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &present_id, 8)) {
++			if (q->fence->sync_fd >= 0)
++				close(q->fence->sync_fd);
++			q->fence->sync_fd = -1;
++			return VK_ERROR_SURFACE_LOST_KHR;
++		}
++		if (pPresentInfo->pResults)
++			pPresentInfo->pResults[i] = VK_SUCCESS;
+ 	}
+ 
+-	close(q->fence->sync_fd);
++	if (q->fence->sync_fd >= 0)
++		close(q->fence->sync_fd);
++	q->fence->sync_fd = -1;
+ 	
+ 	return VK_SUCCESS;
+ }
+diff --git a/src/displayx_layer.hpp b/src/displayx_layer.hpp
+index db37788..25b713e 100755
+--- a/src/displayx_layer.hpp
++++ b/src/displayx_layer.hpp
+@@ -22,6 +22,7 @@
+ #include <sys/un.h>
+ #include <memory>
+ #include <cstring>
++#include <cerrno>
+ 
+ #undef VK_LAYER_EXPORT
+ #if defined(WIN32)

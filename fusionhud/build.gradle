@@ -1,0 +1,42 @@
+plugins {
+    id 'com.android.library'
+}
+apply plugin: 'kotlin-android'
+
+android {
+    // Namespace is kept as `com.winlator.star` (NOT `com.winlator.star.hud`) for package consistency:
+    // every shipped source file declares a `com.winlator.star.*` package, so matching the module
+    // namespace keeps the HUD byte-identical to upstream Bannerlator (fixes sync by a plain file copy).
+    // (This module no longer ships any resource-inflating view — the classic overlays that did
+    // `import com.winlator.star.R` were removed in the Fusion-only trim — so there is no longer an R
+    // class here and no hard R-resolution requirement; the choice is now purely package hygiene.)
+    namespace 'com.winlator.star'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 26
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+}

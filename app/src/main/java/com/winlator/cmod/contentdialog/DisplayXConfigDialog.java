@@ -11,7 +11,8 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.KeyValueSet;
 
 public class DisplayXConfigDialog extends ContentDialog {
-    public static String DEFAULT_CONFIG = "trueDisplayX=0" + ",performanceMode=1" + ",surfaceFormat=rgba8";
+    public static String DEFAULT_CONFIG = "trueDisplayX=0" + ",performanceMode=1"
+            + ",surfaceFormat=rgba8" + ",presentRR=0";
     private Context context;
     
     public DisplayXConfigDialog(View anchor) {
@@ -22,6 +23,7 @@ public class DisplayXConfigDialog extends ContentDialog {
         
         final CheckBox cbEnableTrueDisplayX = findViewById(R.id.CBEnableTrueDisplayX);
         final CheckBox cbEnablePerfMode = findViewById(R.id.CBEnablePerfMode);
+        final CheckBox cbPresentRR = findViewById(R.id.CBPresentRR);
         final Spinner sSurfaceFormat = findViewById(R.id.SSurfaceFormat);
         
         String tag = anchor.getTag().toString();
@@ -29,11 +31,13 @@ public class DisplayXConfigDialog extends ContentDialog {
         
         cbEnableTrueDisplayX.setChecked(config.get("trueDisplayX").equals("1") ? true : false);
         cbEnablePerfMode.setChecked(config.get("performanceMode").equals("1") ? true : false);
+        cbPresentRR.setChecked(config.get("presentRR", "0").equals("1"));
         AppUtils.setSpinnerSelectionFromIdentifier(sSurfaceFormat, config.get("surfaceFormat"));
         
         setOnConfirmCallback(() -> {
             config.put("trueDisplayX", cbEnableTrueDisplayX.isChecked() ? "1": "0");
             config.put("performanceMode", cbEnablePerfMode.isChecked() ? "1" : "0");
+            config.put("presentRR", cbPresentRR.isChecked() ? "1" : "0");
             config.put("surfaceFormat", sSurfaceFormat.getSelectedItem().toString());
             anchor.setTag(config.toString());
         });
@@ -45,10 +49,16 @@ public class DisplayXConfigDialog extends ContentDialog {
     }
 
     public static String createConfig(String trueDisplayX, String performanceMode, String surfaceFormat) {
+        return createConfig(trueDisplayX, performanceMode, surfaceFormat, "0");
+    }
+
+    public static String createConfig(String trueDisplayX, String performanceMode, String surfaceFormat,
+                                      String presentRR) {
         KeyValueSet config = new KeyValueSet();
         config.put("trueDisplayX", "1".equals(trueDisplayX) ? "1" : "0");
         config.put("performanceMode", "0".equals(performanceMode) ? "0" : "1");
         config.put("surfaceFormat", "bgra8".equalsIgnoreCase(surfaceFormat) ? "bgra8" : "rgba8");
+        config.put("presentRR", "1".equals(presentRR) ? "1" : "0");
         return config.toString();
     }
 }

@@ -98,6 +98,7 @@ public class Keyboard {
 
         int action = event.getAction();
         int keyCode = event.getKeyCode();
+        if (keyCode < 0 || keyCode >= keycodeMap.length) return false;
 
         if (keyCode == KeyEvent.KEYCODE_TAB || keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (action == KeyEvent.ACTION_DOWN) {

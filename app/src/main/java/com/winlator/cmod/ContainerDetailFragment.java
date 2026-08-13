@@ -428,7 +428,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             savedDisplayXConfig = DisplayXConfigDialog.createConfig(
                     rendererCfgHolder.getExtra("displayxTrue", "0"),
                     rendererCfgHolder.getExtra("displayxPerformanceMode", "1"),
-                    rendererCfgHolder.getExtra("displayxSurfaceFormat", "rgba8"));
+                    rendererCfgHolder.getExtra("displayxSurfaceFormat", "rgba8"),
+                    rendererCfgHolder.getExtra("displayxPresentRR", "0"));
         }
         vDisplayDriverConfig.setTag(savedDisplayXConfig);
         Runnable syncDisplayDriverUi = () -> {
@@ -679,6 +680,33 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
+                            public int getWinFgMultiplier() {
+                                return rendererCfgHolder.getWinFgMultiplier();
+                            }
+
+                            public void setWinFgMultiplier(int val) {
+                                rendererCfgHolder.setWinFgMultiplier(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public float getWinFgFlowScale() {
+                                return rendererCfgHolder.getWinFgFlowScale();
+                            }
+
+                            public void setWinFgFlowScale(float val) {
+                                rendererCfgHolder.setWinFgFlowScale(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
+                            public int getWinFgModel() {
+                                return rendererCfgHolder.getWinFgModel();
+                            }
+
+                            public void setWinFgModel(int val) {
+                                rendererCfgHolder.setWinFgModel(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
                             public int getNativeFgMultiplier() {
                                 return rendererCfgHolder.getNativeFgMultiplier();
                             }
@@ -715,7 +743,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
         Spinner sHudMode = view.findViewById(R.id.SHudMode);
         ArrayAdapter<String> hudAdapter = ThemeUtils.createSpinnerAdapter(context,
-                new String[]{"Off", "Classic", "Modern"});
+                new String[]{"Off", "Classic", "Modern", "Fusion"});
         sHudMode.setAdapter(hudAdapter);
         // Carrega modo: tenta extra "hudMode", senão converte showFPS antigo
         int savedHudMode = 0;
@@ -956,7 +984,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
                 String wincomponents = getWinComponents(view);
                 String drives = getDrives(view);
-                int hudMode = sHudMode.getSelectedItemPosition(); // 0=Off 1=Classic 2=Modern
+                int hudMode = sHudMode.getSelectedItemPosition(); // 0=Off 1=Classic 2=Modern 3=Fusion
                 boolean showFPS = hudMode != 0;
                 int fullscreenMode = getFullscreenModeFromSpinner(sFullscreenMode, false);
                 boolean exclusiveXInput = cbExclusiveXInput.isChecked();
@@ -991,6 +1019,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                         displayXConfig.get("performanceMode", "1"));
                 rendererCfgHolder.putExtra("displayxSurfaceFormat",
                         displayXConfig.get("surfaceFormat", "rgba8"));
+                rendererCfgHolder.putExtra("displayxPresentRR",
+                        displayXConfig.get("presentRR", "0"));
 
                 if (isEditMode()) {
                     // Update existing container properties

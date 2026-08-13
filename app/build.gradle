@@ -12,7 +12,6 @@ buildscript {
     dependencies {
         // Adjust Gradle plugin versions if needed
         classpath 'com.android.tools.build:gradle:8.8.0'
-        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21'
     }
 
 }
@@ -144,6 +143,7 @@ android {
 }
 
 dependencies {
+    implementation project(':fusionhud')
     // Winlator’s dependencies
     implementation 'androidx.appcompat:appcompat:1.4.0'
     implementation 'androidx.preference:preference:1.2.1'

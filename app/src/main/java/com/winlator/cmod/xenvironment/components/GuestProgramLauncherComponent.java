@@ -466,6 +466,10 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             if (bionicFgManifest.exists() && !bionicFgManifest.delete()) {
                 Log.w("GuestProgramLauncherComponent", "Failed to remove stale Bionic-FG manifest: " + bionicFgManifest);
             }
+            File winFgManifest = new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_win_framegen.json");
+            if (winFgManifest.exists() && !winFgManifest.delete()) {
+                Log.w("GuestProgramLauncherComponent", "Failed to remove stale win-fg manifest: " + winFgManifest);
+            }
             execEnvVars.put("DISABLE_LSFG", "1");
             execEnvVars.remove("LSFG_CONFIG");
             execEnvVars.remove("LSFG_PROCESS");
@@ -475,6 +479,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             execEnvVars.remove("BIONIC_FG_MULTIPLIER");
             execEnvVars.remove("BIONIC_FG_FLOW_SCALE");
             execEnvVars.remove("BIONIC_FG_MODEL");
+            execEnvVars.put("WIN_FG_DISABLE", "1");
+            execEnvVars.remove("WIN_FG_ENABLE");
+            execEnvVars.remove("WIN_FG_CONF");
+            execEnvVars.remove("WIN_FG_MULT");
+            execEnvVars.remove("WIN_FG_FLOWSCALE");
+            execEnvVars.remove("WIN_FG_MODEL");
         }
 
         String emulator = container.getEmulator();

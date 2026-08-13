@@ -88,6 +88,13 @@ public class RendererOptionsDialog extends ContentDialog {
         int getBionicFgModel();
         void setBionicFgModel(int v);
 
+        int getWinFgMultiplier();
+        void setWinFgMultiplier(int v);
+        float getWinFgFlowScale();
+        void setWinFgFlowScale(float v);
+        int getWinFgModel();
+        void setWinFgModel(int v);
+
         int getNativeFgMultiplier();
         void setNativeFgMultiplier(int v);
         float getNativeFgSmoothing();
@@ -106,13 +113,15 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
-    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg", "native_fg"};
-    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG", "Native Framegen"};
+    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg", "win_fg", "native_fg"};
+    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG", "win-fg", "Native Framegen"};
     private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
     private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
     private static final int[] LSFG_MULTIPLIER_VALUES = {0, 2, 3, 4};
     private static final String[] LSFG_MULTIPLIER_LABELS = {"Off", "2x", "3x", "4x"};
+    private static final int[] WIN_FG_MULTIPLIER_VALUES = {0, 2};
+    private static final String[] WIN_FG_MULTIPLIER_LABELS = {"Off", "On"};
     private static final int[] BIONIC_FG_MODEL_VALUES = {0, 1, 2, 3, 4};
     private static final String[] BIONIC_FG_MODEL_LABELS = {
         "Default",
@@ -120,6 +129,10 @@ public class RendererOptionsDialog extends ContentDialog {
         "V2 engine (experimental)",
         "FidelityFX optical flow (experimental)",
         "FidelityFX optical flow v2 (experimental)"
+    };
+    private static final String[] WIN_FG_MODEL_LABELS = {
+        "Optical flow",
+        "Optical flow · bidirectional"
     };
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
@@ -281,7 +294,6 @@ public class RendererOptionsDialog extends ContentDialog {
                 && sbLsfgFlowScale != null && tvLsfgFlowScale != null && cbLsfgPerformanceMode != null
                 && groupBionicFgModel != null && spBionicFgModel != null) {
             setAmoledAdapter(ctx, spFrameGenBackend, FRAME_GEN_BACKEND_LABELS);
-            setAmoledAdapter(ctx, spLsfgMultiplier, LSFG_MULTIPLIER_LABELS);
             setAmoledAdapter(ctx, spBionicFgModel, BIONIC_FG_MODEL_LABELS);
 
             final int[] selectedLsfgMultiplier = {config.getLsfgMultiplier()};
@@ -290,6 +302,9 @@ public class RendererOptionsDialog extends ContentDialog {
             final int[] selectedBionicMultiplier = {config.getBionicFgMultiplier()};
             final float[] selectedBionicFlowScale = {sanitizeFlowScale(config.getBionicFgFlowScale())};
             final int[] selectedBionicModel = {config.getBionicFgModel()};
+            final int[] selectedWinMultiplier = {config.getWinFgMultiplier()};
+            final float[] selectedWinFlowScale = {sanitizeFlowScale(config.getWinFgFlowScale())};
+            final int[] selectedWinModel = {Math.max(3, Math.min(4, config.getWinFgModel()))};
             final int[] selectedNativeMultiplier = {config.getNativeFgMultiplier()};
             final float[] selectedNativeSmoothing = {
                     Math.max(0.0f, Math.min(1.0f, config.getNativeFgSmoothing()))};
@@ -315,13 +330,16 @@ public class RendererOptionsDialog extends ContentDialog {
                     spFrameGenBackend.setSelection(backendPosition);
                 }
                 boolean useBionicFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("bionic_fg");
+                boolean useWinFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("win_fg");
                 useNativeFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("native_fg");
                 boolean frameGenAvailable = useNativeFg
                         ? isVulkanRendererSelected[0] : isExternalFrameGenRendererSelected[0];
-                boolean dllAvailable = !useBionicFg && !useNativeFg && config.isLsfgDllAvailable();
+                boolean dllAvailable = !useBionicFg && !useWinFg && !useNativeFg && config.isLsfgDllAvailable();
                 int multiplier = useNativeFg ? selectedNativeMultiplier[0]
+                        : useWinFg ? selectedWinMultiplier[0]
                         : (useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0]);
-                float flowScale = useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
+                float flowScale = useWinFg ? selectedWinFlowScale[0]
+                        : useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
 
                 tvLsfgStatus.setText(!frameGenAvailable
                         ? ctx.getString(useNativeFg
@@ -329,15 +347,20 @@ public class RendererOptionsDialog extends ContentDialog {
                                 : R.string.frame_generation_requires_vulkan_or_surfaceflinger)
                         : (useNativeFg
                                 ? "Open optical-flow interpolation in the native Vulkan compositor."
-                                : (useBionicFg
+                                : (useWinFg
+                                        ? "Clean-room win-fg Vulkan layer with live model and flow-scale updates. On uses 2x frame generation."
+                                        : useBionicFg
                                         ? "Experimental bundled Vulkan frame generation layer. No DLL import required."
                                         : (dllAvailable
                                                 ? "Experimental LSFG-VK will use the imported Lossless.dll at launch."
                                                 : "Import Lossless.dll in app settings before enabling LSFG-VK."))));
 
                 int multiplierSelection = 0;
-                for (int i = 0; i < LSFG_MULTIPLIER_VALUES.length; i++) {
-                    if (LSFG_MULTIPLIER_VALUES[i] == multiplier) {
+                int[] multiplierValues = useWinFg ? WIN_FG_MULTIPLIER_VALUES : LSFG_MULTIPLIER_VALUES;
+                setAmoledAdapter(ctx, spLsfgMultiplier,
+                        useWinFg ? WIN_FG_MULTIPLIER_LABELS : LSFG_MULTIPLIER_LABELS);
+                for (int i = 0; i < multiplierValues.length; i++) {
+                    if (multiplierValues[i] == multiplier) {
                         multiplierSelection = i;
                         break;
                     }
@@ -351,18 +374,22 @@ public class RendererOptionsDialog extends ContentDialog {
                         ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
                         : String.format(Locale.US, "%.2f", flowScale));
                 cbLsfgPerformanceMode.setChecked(selectedLsfgPerformanceMode[0]);
-                groupBionicFgModel.setVisibility(useBionicFg ? View.VISIBLE : View.GONE);
-                spBionicFgModel.setSelection(FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
-                cbLsfgPerformanceMode.setVisibility(useBionicFg || useNativeFg ? View.GONE : View.VISIBLE);
+                boolean modelBackend = useBionicFg || useWinFg;
+                groupBionicFgModel.setVisibility(modelBackend ? View.VISIBLE : View.GONE);
+                setAmoledAdapter(ctx, spBionicFgModel, useWinFg ? WIN_FG_MODEL_LABELS : BIONIC_FG_MODEL_LABELS);
+                spBionicFgModel.setSelection(useWinFg
+                        ? selectedWinModel[0] - 3
+                        : FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
+                cbLsfgPerformanceMode.setVisibility(modelBackend || useNativeFg ? View.GONE : View.VISIBLE);
                 spFrameGenBackend.setEnabled(isExternalFrameGenRendererSelected[0]);
-                spLsfgMultiplier.setEnabled(frameGenAvailable && (useBionicFg || useNativeFg || dllAvailable));
+                spLsfgMultiplier.setEnabled(frameGenAvailable && (modelBackend || useNativeFg || dllAvailable));
                 sbLsfgFlowScale.setVisibility(View.VISIBLE);
                 tvLsfgFlowScale.setVisibility(View.VISIBLE);
-                sbLsfgFlowScale.setEnabled(frameGenAvailable && (useNativeFg || useBionicFg || dllAvailable));
+                sbLsfgFlowScale.setEnabled(frameGenAvailable && (useNativeFg || modelBackend || dllAvailable));
                 cbLsfgPerformanceMode.setEnabled(frameGenAvailable && dllAvailable);
-                spBionicFgModel.setEnabled(frameGenAvailable && useBionicFg);
+                spBionicFgModel.setEnabled(frameGenAvailable && modelBackend);
                 boolean externalFgMultiplying = !useNativeFg && multiplier >= 2
-                        && (useBionicFg || dllAvailable);
+                        && (modelBackend || dllAvailable);
                 if (presentModeNote != null) {
                     presentModeNote.setVisibility(isVulkanRendererSelected[0] && externalFgMultiplying
                             ? View.VISIBLE : View.GONE);
@@ -385,10 +412,15 @@ public class RendererOptionsDialog extends ContentDialog {
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     if (syncingFrameGenUi[0]) return;
                     boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
+                    boolean useWinFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("win_fg");
                     boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
-                    if (useNativeFg) selectedNativeMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
-                    else if (useBionicFg) selectedBionicMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
-                    else selectedLsfgMultiplier[0] = LSFG_MULTIPLIER_VALUES[position];
+                    int multiplier = useWinFg
+                            ? WIN_FG_MULTIPLIER_VALUES[Math.min(position, WIN_FG_MULTIPLIER_VALUES.length - 1)]
+                            : LSFG_MULTIPLIER_VALUES[Math.min(position, LSFG_MULTIPLIER_VALUES.length - 1)];
+                    if (useNativeFg) selectedNativeMultiplier[0] = multiplier;
+                    else if (useWinFg) selectedWinMultiplier[0] = multiplier;
+                    else if (useBionicFg) selectedBionicMultiplier[0] = multiplier;
+                    else selectedLsfgMultiplier[0] = multiplier;
                 }
 
                 @Override
@@ -407,7 +439,9 @@ public class RendererOptionsDialog extends ContentDialog {
                     }
                     float value = sanitizeFlowScale(0.25f + (progress / 100.0f));
                     boolean useBionicFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("bionic_fg");
-                    if (useBionicFg) selectedBionicFlowScale[0] = value;
+                    boolean useWinFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("win_fg");
+                    if (useWinFg) selectedWinFlowScale[0] = value;
+                    else if (useBionicFg) selectedBionicFlowScale[0] = value;
                     else selectedLsfgFlowScale[0] = value;
                     tvLsfgFlowScale.setText(String.format(Locale.US, "%.2f", value));
                 }
@@ -422,7 +456,9 @@ public class RendererOptionsDialog extends ContentDialog {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     if (syncingFrameGenUi[0]) return;
-                    selectedBionicModel[0] = BIONIC_FG_MODEL_VALUES[position];
+                    boolean useWinFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("win_fg");
+                    if (useWinFg) selectedWinModel[0] = Math.max(3, Math.min(4, position + 3));
+                    else selectedBionicModel[0] = BIONIC_FG_MODEL_VALUES[position];
                 }
 
                 @Override
@@ -458,6 +494,9 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setBionicFgMultiplier(selectedBionicMultiplier[0]);
                 config.setBionicFgFlowScale(selectedBionicFlowScale[0]);
                 config.setBionicFgModel(selectedBionicModel[0]);
+                config.setWinFgMultiplier(selectedWinMultiplier[0]);
+                config.setWinFgFlowScale(selectedWinFlowScale[0]);
+                config.setWinFgModel(selectedWinModel[0]);
                 config.setNativeFgMultiplier(selectedNativeMultiplier[0]);
                 config.setNativeFgSmoothing(selectedNativeSmoothing[0]);
             });

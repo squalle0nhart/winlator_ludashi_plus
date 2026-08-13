@@ -557,6 +557,18 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="12sp" />
                         <Button
+                            android:id="@+id/BTFrameGenWin"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginHorizontal="4dp"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="win-fg"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="11sp" />
+                        <Button
                             android:id="@+id/BTFrameGenNative"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -639,6 +651,7 @@
                         android:visibility="gone">
 
                         <TextView
+                            android:id="@+id/TVFrameGenModelLabel"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="Bionic-FG Model"
@@ -1275,10 +1288,12 @@
 
                     <CheckBox
                         android:id="@+id/CBHudGraph"
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:visibility="gone"
-                        android:enabled="false" />
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:text="FPS graph"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <LinearLayout

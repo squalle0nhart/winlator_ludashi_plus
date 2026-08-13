@@ -526,6 +526,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         if (!nativeMode && window.id == fpsWindowId) {
             if (hudRef != null) hudRef.onFrame();
             if (classicHudRef != null) classicHudRef.update();
+            if (hudFrameTick != null) hudFrameTick.accept(window.id);
         }
         synchronized (lock) {
             if (nativeHandle == 0 || pixmap == null) return;
@@ -602,6 +603,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                                 hudRef.setIsNative(delivered);
                             }
                             if (classicHudRef != null) classicHudRef.update();
+                            if (hudFrameTick != null) hudFrameTick.accept(window.id);
                         } else if (!scanoutNow) {
                             nativeUpdateWindowContentAHB(nativeHandle, did(drawable), ahbPtr,
                                 drawable.width, drawable.height, rx, ry);
@@ -795,9 +797,13 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
+    private java.util.function.IntConsumer hudFrameTick = null;
     private int fpsWindowId = -1;
 
     public void setFpsWindowId(int id) { fpsWindowId = id; }
+
+    @Override
+    public void setHudFrameTick(java.util.function.IntConsumer tick) { hudFrameTick = tick; }
 
     public void setFrameRating(Object fr) {
         if (fr instanceof WinlatorHUD) hudRef = (WinlatorHUD) fr;

@@ -85,6 +85,8 @@ public final class ContainerGlossaryDialog extends ContentDialog {
                 "Inserts generated in-between frames to make motion look smoother. It can add latency and visual artifacts, and remains experimental."),
         new Entry("Picture settings", "Bionic-FG",
                 "A bundled experimental Vulkan frame-generation layer. It needs no external DLL and results vary by game and device."),
+        new Entry("Picture settings", "win-fg",
+                "A bundled clean-room Vulkan frame-generation layer using FSR3 optical flow and its own synthesis. On uses 2x; its model and flow scale can update live."),
         new Entry("Picture settings", "LSFG-VK",
                 "An experimental Vulkan frame-generation layer that requires your own Lossless.dll. Try it when Bionic-FG is not a good match."),
         new Entry("Picture settings", "Frame-gen FPS numbers",

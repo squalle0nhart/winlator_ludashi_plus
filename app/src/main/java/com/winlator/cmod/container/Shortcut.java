@@ -357,7 +357,7 @@ public class Shortcut {
         String value = getExtra("lsfgMultiplier", null);
         try {
             return value != null && !value.isEmpty()
-                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    ? (Integer.parseInt(value) < 2 ? 0 : 2)
                     : container.getLsfgMultiplier();
         } catch (NumberFormatException e) {
             return container.getLsfgMultiplier();
@@ -448,6 +448,51 @@ public class Shortcut {
 
     public void setBionicFgModel(int model) {
         putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
+    }
+
+    public int getWinFgMultiplier() {
+        String value = getExtra("winFgMultiplier", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    : container.getWinFgMultiplier();
+        } catch (NumberFormatException e) {
+            return container.getWinFgMultiplier();
+        }
+    }
+
+    public void setWinFgMultiplier(int multiplier) {
+        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
+    }
+
+    public float getWinFgFlowScale() {
+        String value = getExtra("winFgFlowScale", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getWinFgFlowScale();
+        } catch (NumberFormatException e) {
+            return container.getWinFgFlowScale();
+        }
+    }
+
+    public void setWinFgFlowScale(float flowScale) {
+        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
+    public int getWinFgModel() {
+        String value = getExtra("winFgModel", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(3, Math.min(4, Integer.parseInt(value)))
+                    : container.getWinFgModel();
+        } catch (NumberFormatException e) {
+            return container.getWinFgModel();
+        }
+    }
+
+    public void setWinFgModel(int model) {
+        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
     }
 
     public int getNativeFgMultiplier() {

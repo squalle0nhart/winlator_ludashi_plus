@@ -162,7 +162,9 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                     shortcut.getExtra("displayxPerformanceMode",
                             shortcut.container.getExtra("displayxPerformanceMode", "1")),
                     shortcut.getExtra("displayxSurfaceFormat",
-                            shortcut.container.getExtra("displayxSurfaceFormat", "rgba8")));
+                            shortcut.container.getExtra("displayxSurfaceFormat", "rgba8")),
+                    shortcut.getExtra("displayxPresentRR",
+                            shortcut.container.getExtra("displayxPresentRR", "0")));
         }
         vDisplayDriverConfig.setTag(savedDisplayXConfig);
         Runnable syncDisplayDriverUi = () -> {
@@ -258,6 +260,12 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setBionicFgFlowScale(float val) { shortcut.setBionicFgFlowScale(val); }
                 public int getBionicFgModel() { return shortcut.getBionicFgModel(); }
                 public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
+                public int getWinFgMultiplier() { return shortcut.getWinFgMultiplier(); }
+                public void setWinFgMultiplier(int val) { shortcut.setWinFgMultiplier(val); }
+                public float getWinFgFlowScale() { return shortcut.getWinFgFlowScale(); }
+                public void setWinFgFlowScale(float val) { shortcut.setWinFgFlowScale(val); }
+                public int getWinFgModel() { return shortcut.getWinFgModel(); }
+                public void setWinFgModel(int val) { shortcut.setWinFgModel(val); }
                 public int getNativeFgMultiplier() { return shortcut.getNativeFgMultiplier(); }
                 public void setNativeFgMultiplier(int val) { shortcut.setNativeFgMultiplier(val); }
                 public float getNativeFgSmoothing() { return shortcut.getNativeFgSmoothing(); }
@@ -594,6 +602,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("displayxTrue", displayXConfig.get("trueDisplayX", "0"));
                 shortcut.putExtra("displayxPerformanceMode", displayXConfig.get("performanceMode", "1"));
                 shortcut.putExtra("displayxSurfaceFormat", displayXConfig.get("surfaceFormat", "rgba8"));
+                shortcut.putExtra("displayxPresentRR", displayXConfig.get("presentRR", "0"));
                 shortcut.setRendererNative(rendererNativeHolder[0]);
                 shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);

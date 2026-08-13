@@ -406,9 +406,14 @@ public abstract class ProcessHelper {
                 data = br.readLine();
             }
             catch (IOException e) {}
+            if (data == null) data = "";
+            String cmdline = readProcFile(new File(proc, allPids[index] + "/cmdline"));
+            String haystack = data + " " + (cmdline != null ? cmdline : "");
             for (String filter : filterList) {
-                if (data.contains(filter))
+                if (haystack.contains(filter)) {
                     filteredPids.add(allPids[index]);
+                    break;
+                }
             }
         }
         return filteredPids;

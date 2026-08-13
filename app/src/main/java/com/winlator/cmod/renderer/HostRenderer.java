@@ -21,6 +21,7 @@ public interface HostRenderer {
     boolean isScreenOffsetYRelativeToCursor();
     void setFpsWindowId(int id);
     void setFrameRating(Object fr);
+    default void setHudFrameTick(java.util.function.IntConsumer tick) {}
     int getFpsLimit();
     void setFpsLimit(int limit);
     int getSurfaceWidth();
