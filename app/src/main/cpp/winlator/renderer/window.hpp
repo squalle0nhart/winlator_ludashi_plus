@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 #include <unordered_map>
 #include <vector>
 
@@ -28,6 +29,10 @@ struct Window {
     jobject windowObj;
     std::unordered_map<int, std::unique_ptr<struct Drawable>> directContents;
     Drawable *currentDirectContent;
+    // Number of True DisplayX swapchains owned by this window or one of its
+    // descendants. DXVK may Present to a parent of the Vulkan surface window,
+    // so ordinary X11/DRI3 updates for that branch must not replace its buffer.
+    std::atomic_uint32_t displayXSwapchainCount{0};
     ASurfaceControl *control;
 
     bool hasDirectContents() {

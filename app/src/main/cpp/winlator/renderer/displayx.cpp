@@ -158,6 +158,23 @@ static int readFD(int& socket) {
     return -1;
 }
 
+static void adjustDisplayXOwnership(Window *window, int delta) {
+    // DXVK's DRI3 Present window can be the parent of the child window used to
+    // create VkSurfaceKHR. Mark the entire ancestor chain so both paths cannot
+    // alternate full-screen buffers on different SurfaceControls.
+    for (auto *current = window; current; current = current->parent) {
+        auto &count = current->displayXSwapchainCount;
+        if (delta > 0) {
+            count.fetch_add(static_cast<uint32_t>(delta), std::memory_order_acq_rel);
+        }
+        else {
+            uint32_t value = count.load(std::memory_order_acquire);
+            while (value > 0 && !count.compare_exchange_weak(
+                    value, value - 1, std::memory_order_acq_rel, std::memory_order_acquire)) {}
+        }
+    }
+}
+
 void DisplayX::networkThreadLoop() {
     static constexpr int ADD_CLIENT_SWAPCHAIN = 1;
     static constexpr int PRESENT_IMAGE = 2;
@@ -169,6 +186,16 @@ void DisplayX::networkThreadLoop() {
     int efd;
     int server_fd;
     std::unordered_map<uint8_t, std::unique_ptr<DisplayXSwapchain>> clientSwapchains;
+
+    auto releaseClientSwapchains = [&clientSwapchains] {
+        for (auto &entry : clientSwapchains) {
+            auto *swapchain = entry.second.get();
+            if (swapchain && swapchain->window) {
+                adjustDisplayXOwnership(swapchain->window, -1);
+            }
+        }
+        clientSwapchains.clear();
+    };
 
     server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_fd < 0)
@@ -198,7 +225,7 @@ void DisplayX::networkThreadLoop() {
         if (stopped) {
             printf("Stopping networkThread");
             close(server_fd);
-            clientSwapchains.erase(clientSwapchains.begin(), clientSwapchains.end());
+            releaseClientSwapchains();
             return;
         }
 
@@ -218,7 +245,7 @@ void DisplayX::networkThreadLoop() {
                     printf("Client has disconnected");
                     epoll_ctl(efd, EPOLL_CTL_DEL, events[i].data.fd, nullptr);
                     close(events[i].data.fd);
-                    clientSwapchains.erase(clientSwapchains.begin(), clientSwapchains.end());
+                    releaseClientSwapchains();
                     continue;
                 }
 
@@ -239,9 +266,9 @@ void DisplayX::networkThreadLoop() {
                             read(events[i].data.fd, &imageCount, 4);
                             read(events[i].data.fd, &windowId, 4);
 
-                            printf("Received new swapchain from client, id %d images %d", id, imageCount);
-
                             auto window = windowManager->getWindow(windowId);
+                            printf("Received swapchain %d for window %u, images %u", id, windowId, imageCount);
+
                             auto swapchain = std::make_unique<DisplayXSwapchain>();
                             swapchain->id = id;
                             swapchain->window = window;
@@ -250,9 +277,6 @@ void DisplayX::networkThreadLoop() {
                             bool validSwapchain = window != nullptr;
                             for (uint32_t j = 0; j < imageCount; j++) {
                                 auto drawable = std::shared_ptr<Drawable>(new Drawable{}, [](Drawable *drawable) {
-                                    // recvHandleFromUnixSocket gives this process its own
-                                    // AHardwareBuffer reference. Releasing only the client-side
-                                    // reference leaks one full swapchain image per recreation.
                                     if (drawable->ahb)
                                         AHardwareBuffer_release(drawable->ahb);
                                     delete drawable;
@@ -270,13 +294,20 @@ void DisplayX::networkThreadLoop() {
                                 int receiveResult = AHardwareBuffer_recvHandleFromUnixSocket(
                                     events[i].data.fd, &drawable->ahb);
                                 if (receiveResult != 0 || !drawable->ahb) {
-                                    printf("Failed to receive image %d for swapchain %d: %d", j, id, receiveResult);
+                                    printf("Failed to receive image %u for swapchain %d: %d", j, id, receiveResult);
                                     validSwapchain = false;
                                 }
                                 else {
                                     AHardwareBuffer_Desc outDesc{};
                                     AHardwareBuffer_describe(drawable->ahb, &outDesc);
-                                    drawable->stride = outDesc.stride;
+                                    drawable->width = static_cast<int>(outDesc.width);
+                                    drawable->height = static_cast<int>(outDesc.height);
+                                    drawable->stride = static_cast<int>(outDesc.stride);
+                                    if (j == 0) {
+                                        printf("DisplayX window %u is %dx%d, swapchain buffer is %ux%u",
+                                            windowId, window ? window->width : 0, window ? window->height : 0,
+                                            outDesc.width, outDesc.height);
+                                    }
                                 }
                                 drawable->isDirectContent = false;
                                 drawable->isDisplayX = true;
@@ -286,12 +317,17 @@ void DisplayX::networkThreadLoop() {
                                 swapchain->images[j] = std::move(drawable);
                             }
 
-                            if (validSwapchain) {
-                                clientSwapchains[id] = std::move(swapchain);
-                            }
-                            else {
+                            if (!validSwapchain) {
                                 printf("Discarding invalid swapchain %d", id);
+                                break;
                             }
+
+                            auto previous = clientSwapchains.find(id);
+                            if (previous != clientSwapchains.end() && previous->second->window) {
+                                adjustDisplayXOwnership(previous->second->window, -1);
+                            }
+                            adjustDisplayXOwnership(window, 1);
+                            clientSwapchains[id] = std::move(swapchain);
                             break;
                         }
                         case PRESENT_IMAGE:
@@ -354,6 +390,7 @@ void DisplayX::networkThreadLoop() {
 
                             auto swapchain = swapchainIt->second.get();
                             swapchain->window->currentDirectContent = nullptr;
+                            adjustDisplayXOwnership(swapchain->window, -1);
                             clientSwapchains.erase(swapchainIt);
                             printf("Destroyed swapchain %d, %zu active", id, clientSwapchains.size());
                             break;
@@ -461,9 +498,7 @@ int64_t DisplayX::getCurrentTimeNanos() {
 
 void DisplayX::onCommitCallback(void *context, ASurfaceTransactionStats *stats) {
     auto *self = reinterpret_cast<DisplayX *>(context);
-    std::lock_guard<std::mutex> lock(self->performanceHintMutex);
-    if (self->stopped || !self->isPerformanceHintAPIAvailable() ||
-        !self->performanceHintSession || !self->performanceHintManager || !self->perfMode)
+    if (!self->isPerformanceHintAPIAvailable() || !self->performanceHintSession || !self->performanceHintManager)
         return;
 
     if (self->previousReportedWorkTime == 0) {
@@ -495,10 +530,10 @@ void DisplayX::presentThreadLoop() {
     ASurfaceTransaction *presentTransaction = pfnASurfaceTransactionCreate();
     JNIEnv *env = cache->getEnv();
 
-    if (isPerformanceHintAPIAvailable() && perfMode) {
+    if (isPerformanceHintAPIAvailable()) {
         performanceHintManager = pfnAPerformanceHintGetManager();
-        float targetRefreshRate = std::max(xServer->refreshRate, 1.0f);
-        int64_t targetWorkDuration = static_cast<int64_t>(1000000000.0f / targetRefreshRate);
+        float targetFloat = this->perfMode ? xServer->refreshRate * 100.0f : xServer->refreshRate;
+        int64_t targetWorkDuration = static_cast<int64_t>(1000000000.0f / targetFloat);
 
         int tid = gettid();
         std::vector<int32_t> tids{tid};
@@ -510,7 +545,9 @@ void DisplayX::presentThreadLoop() {
         auto lock = presentLock.lock();
 
         presentLock.wait(lock, [&]{
-            return stopped || (eventsPending == 0 && ((requestUpdate && presentRR) || (!presentRequests.empty() && !presentRR)) && hasSurface && surfaceChanged && !paused);
+            return stopped || (eventsPending == 0 &&
+                ((requestUpdate && presentRR) || (!presentRequests.empty() && !presentRR)) &&
+                hasSurface && surfaceChanged && !paused);
         });
 
         if (stopped) {
@@ -543,6 +580,14 @@ void DisplayX::presentThreadLoop() {
                 continue;
             }
 
+            // Once True DisplayX owns a window, its normal X11 backing drawable and DRI3 direct
+            // content are stale alternative presentation paths. The ownership count is also
+            // propagated to ancestors because DXVK may Present to the parent of the Vulkan child.
+            if (!drawable->isDisplayX &&
+                    window->displayXSwapchainCount.load(std::memory_order_acquire) > 0) {
+                continue;
+            }
+
             if (!window->enabled) {
                 pfnASurfaceTransactionSetBuffer(presentTransaction, window->control, nullptr, presentRequest->sync_fence);
             }
@@ -556,20 +601,13 @@ void DisplayX::presentThreadLoop() {
             }
         }
 
-        if (perfMode && pfnASurfaceTransactionSetOnCommit) pfnASurfaceTransactionSetOnCommit(presentTransaction, this, DisplayX::onCommitCallback);
+        if (pfnASurfaceTransactionSetOnCommit) pfnASurfaceTransactionSetOnCommit(presentTransaction, this, DisplayX::onCommitCallback);
         if (!completeContext->requests.empty()) pfnASurfaceTransactionSetOnComplete(presentTransaction, completeContext.release(), DisplayX::onCompleteCallback);
         pfnASurfaceTransactionApply(presentTransaction);
     }
 
-    {
-        // Transaction callbacks run on Binder threads. Serialize shutdown with
-        // onCommitCallback so it cannot report work through a closed session.
-        std::lock_guard<std::mutex> lock(performanceHintMutex);
-        if (isPerformanceHintAPIAvailable() && performanceHintSession) {
-            pfnAPerformanceHintCloseSession(performanceHintSession);
-            performanceHintSession = nullptr;
-            performanceHintManager = nullptr;
-        }
+    if (isPerformanceHintAPIAvailable()) {
+        pfnAPerformanceHintCloseSession(performanceHintSession);
     }
 }
 
@@ -669,12 +707,18 @@ void DisplayX::queueEvent(std::function<void()> func) {
 }
 
 void DisplayX::requestWindowUpdate(Drawable *drawable, Window *window) {
+    if (!drawable || !window) return;
+    if (!drawable->isDisplayX &&
+            window->displayXSwapchainCount.load(std::memory_order_acquire) > 0) {
+        return;
+    }
+
     auto lock = presentLock.lock();
 
     auto presentRequest = std::make_unique<PresentRequest>();
     presentRequest->drawable = drawable;
     presentRequest->sync_fence = -1;
-    presentRequest->presentId = -1;
+    presentRequest->presentId = UINT64_MAX;
     presentRequest->clientFd = -1;
     presentRequest->window = window;
 

@@ -335,9 +335,12 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
     @Override public void onUnmapWindow(Window window) { xServerView.queueEvent(this::updateScene); xServerView.requestRender(); }
     @Override public void onChangeWindowZOrder(Window window) { xServerView.queueEvent(this::updateScene); xServerView.requestRender(); }
     @Override public void onUpdateWindowContent(Window window) {
-        if (!nativeMode && window != null && window.id == fpsWindowId) {
-            if (hudRef != null) hudRef.onFrame();
-            if (classicHudRef != null) classicHudRef.update();
+        if (!nativeMode && window != null) {
+            if (hudFrameTick == null && window.id == fpsWindowId) {
+                if (hudRef != null) hudRef.onFrame();
+                if (classicHudRef != null) classicHudRef.update();
+            }
+            // The activity performs the shared game-window branch check for every HUD style.
             if (hudFrameTick != null) hudFrameTick.accept(window.id);
         }
         xServerView.requestRender();
@@ -619,11 +622,11 @@ public class GLRenderer implements GLSurfaceView.Renderer, WindowManager.OnWindo
                 xRenderingPausedForScanout = true;
             }
 
-            if (window.id == fpsWindowId) {
+            if (hudFrameTick == null && window.id == fpsWindowId) {
                 if (hudRef != null) hudRef.onFrame();
                 if (classicHudRef != null) classicHudRef.update();
-                if (hudFrameTick != null) hudFrameTick.accept(window.id);
             }
+            if (hudFrameTick != null) hudFrameTick.accept(window.id);
         }
     }
 

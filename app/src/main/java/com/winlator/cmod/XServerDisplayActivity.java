@@ -165,7 +165,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
     private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "2d9f62bf-20260813";
-    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-implicit-pacing-20260813";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-swapchain-restored-20260813";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -752,14 +752,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     winStarted[0] = true;
                 }
 
-                if (frameRatingWindowId == window.id) {
-                    if (classicHud != null) classicHud.update();
-                    if (modernHud != null) modernHud.onFrame();
-                    if (fusionHud != null && xServerView != null
-                            && xServerView.getRenderer() instanceof DisplayXRenderer) {
-                        driveFusionHudFrameTick(window.id);
-                    }
-                } else if (frameRatingWindowId == -1 && window.isApplicationWindow()
+                if (frameRatingWindowId == -1 && window.isApplicationWindow()
                         && ((modernHud != null && modernHud.isUserEnabled())
                          || (classicHud != null && classicHud.isUserEnabled())
                          || fusionHud != null)) {
@@ -767,11 +760,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     frameRatingWindowId = window.id;
                     activeRendererWindowId = window.id;
                     if (xServerView != null) xServerView.getRenderer().setFpsWindowId(window.id);
-                    if (classicHud != null) classicHud.update();
-                    if (modernHud != null) modernHud.onFrame();
-                    if (fusionHud != null && xServerView.getRenderer() instanceof DisplayXRenderer) {
-                        driveFusionHudFrameTick(window.id);
-                    }
                 }
             }
 
@@ -1413,20 +1401,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             || activeFrameGenMultiplier >= 2)
                     && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
         }
-        String rendererType = getLaunchRendererType();
-        if ("surfaceflinger".equalsIgnoreCase(rendererType) && !ASurfaceRenderer.isSupported()) {
-            rendererType = "vulkan";
-        }
-        if (xServer.isDisplayX()) {
-            rendererType = android.os.Build.VERSION.SDK_INT >= 29 ? "displayx" : "vulkan";
-        }
+        String rendererType = getEffectiveHostRendererType();
         performanceMode = xServer.isDisplayX()
                 && getLaunchGraphicsBoolean("displayxPerformanceMode", true);
         presentRR = xServer.isDisplayX()
                 && getLaunchGraphicsBoolean("displayxPresentRR", false);
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
-        renderer.setHudFrameTick(this::driveFusionHudFrameTick);
+        if (!(renderer instanceof DisplayXRenderer)) {
+            renderer.setHudFrameTick(this::driveHudFrameTick);
+        }
         renderer.setCursorVisible(false);
         final String rendererLabel = "gl".equalsIgnoreCase(rendererType) ? "OpenGL"
                 : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger"
@@ -1997,13 +1981,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View         btResetHud      = findViewById(R.id.BTResetHud);
 
         int currentMode = 0;
-        if      (fusionHud  != null) currentMode = 3;
-        else if (modernHud  != null) currentMode = 2;
-        else if (classicHud != null) currentMode = 1;
-        else if (container  != null) {
+        if (container != null) {
             String extra = container.getExtra("hudMode");
             if (!extra.isEmpty())           currentMode = Integer.parseInt(extra);
             else if (container.isShowFPS()) currentMode = 1;
+        } else if (fusionHud != null) {
+            currentMode = 3;
+        } else if (modernHud != null && modernHud.isUserEnabled()) {
+            currentMode = 2;
+        } else if (classicHud != null && classicHud.isUserEnabled()) {
+            currentMode = 1;
         }
 
         boolean hudOn    = currentMode != 0;
@@ -2066,8 +2053,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 } else {
                     if (classicHud != null) classicHud.disableByUser();
                     if (modernHud  != null) modernHud.disableByUser();
-                    if (fusionHud  != null) fusionHud.setVisibility(View.GONE);
-                    fusionHudEnabled = false;
+                    removeFusionHud();
                     if (llHudStyleRow  != null) llHudStyleRow.setVisibility(View.GONE);
                     if (llModernOptions != null) llModernOptions.setVisibility(View.GONE);
                     saveHudModeToContainer(0);
@@ -2084,7 +2070,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         int newStyle = pos + 1;
                         if (classicHud != null) classicHud.disableByUser(false);
                         if (modernHud  != null) modernHud.disableByUser(false);
-                        if (fusionHud  != null) fusionHud.setVisibility(View.GONE);
+                        if (newStyle != 3) removeFusionHud();
                         enableHudLazily(newStyle);
                         if (llModernOptions != null)
                             llModernOptions.setVisibility(newStyle >= 2 ? View.VISIBLE : View.GONE);
@@ -2125,6 +2111,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 }
             }
         } else if (style == 2) {
+            removeFusionHud();
             if (modernHud == null) {
                 modernHud = new WinlatorHUD(this);
                 modernHud.setVisibility(View.GONE);
@@ -2141,6 +2128,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             modernHud.enableByUser();
         } else {
+            removeFusionHud();
             if (classicHud == null) {
                 classicHud = new FrameRating(this, graphicsDriverConfig);
                 classicHud.setVisibility(View.GONE);
@@ -2290,11 +2278,62 @@ public class XServerDisplayActivity extends AppCompatActivity {
         fusionHudEnabled = true;
     }
 
-    private void driveFusionHudFrameTick(int windowId) {
-        if (fusionHudEnabled && fusionHud != null && frameRatingWindowId != -1
-                && windowId == frameRatingWindowId) {
-            fusionFpsCounter.tick();
+    private void removeFusionHud() {
+        fusionHudEnabled = false;
+        fusionFpsCounter.reset();
+        if (fusionHud == null) return;
+        fusionHud.setOnMovedListener(null);
+        fusionHud.setOnSizeCycledListener(null);
+        fusionHud.setOnLockChangedListener(null);
+        ViewGroup parent = (ViewGroup) fusionHud.getParent();
+        if (parent != null) parent.removeView(fusionHud);
+        fusionHud = null;
+    }
+
+    private void driveHudFrameTick(int windowId) {
+        if (!isHudFrameWindow(windowId)) return;
+        recordHudFrame();
+    }
+
+    private void recordHudFrame() {
+        if (classicHud != null) classicHud.update();
+        if (modernHud != null) modernHud.onFrame();
+        if (fusionHudEnabled && fusionHud != null) fusionFpsCounter.tick();
+    }
+
+    private boolean isHudFrameWindow(int windowId) {
+        if (frameRatingWindowId == -1) return false;
+        if (windowId == frameRatingWindowId) return true;
+        if (xServer == null) return false;
+
+        Window presentedWindow = xServer.windowManager.getWindow(windowId);
+        Window rendererWindow = xServer.windowManager.getWindow(frameRatingWindowId);
+        if (presentedWindow == null || rendererWindow == null) return false;
+        Window rootWindow = xServer.windowManager.rootWindow;
+        if (presentedWindow == rootWindow || rendererWindow == rootWindow) return false;
+
+        // Wine may put _MESA_DRV on a top-level/reparented window while DXVK, wined3d, or the
+        // native scanout path presents through one of its children (or, after a reparent, parent).
+        if (isWindowAncestor(rendererWindow, presentedWindow)
+                || isWindowAncestor(presentedWindow, rendererWindow)) {
+            return true;
         }
+
+        // Some window managers make the renderer-property and present windows siblings. They are
+        // still the same game when they belong to the same X client or the same known process.
+        if (rendererWindow.originClient != null
+                && rendererWindow.originClient == presentedWindow.originClient) {
+            return true;
+        }
+        int rendererPid = rendererWindow.getProcessId();
+        return rendererPid > 0 && rendererPid == presentedWindow.getProcessId();
+    }
+
+    private static boolean isWindowAncestor(Window ancestor, Window window) {
+        for (Window current = window.getParent(); current != null; current = current.getParent()) {
+            if (current == ancestor) return true;
+        }
+        return false;
     }
 
     private void persistFusionHudPosition(float x, float y) {
@@ -4045,9 +4084,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private boolean isPipettoDirectRgbaMode() {
-        String rendererType = getLaunchRendererType();
+        // True DisplayX presents its swapchain through DisplayXRenderer's own SurfaceControls.
+        // Do not apply ASurfaceRenderer's DRI3/direct-RGBA assumptions merely because the saved
+        // host-renderer preference is SurfaceFlinger; bypass mode no longer feeds that path.
+        String rendererType = getEffectiveHostRendererType();
         return "surfaceflinger".equalsIgnoreCase(rendererType)
                 && "wrapper-pipetto".equals(resolveGraphicsDriverArchiveName());
+    }
+
+    private String getEffectiveHostRendererType() {
+        String requestedRenderer = getLaunchRendererType();
+        if ("displayx".equalsIgnoreCase(getLaunchDisplayDriver())) {
+            String effectiveRenderer = android.os.Build.VERSION.SDK_INT >= 29 ? "displayx" : "vulkan";
+            if (!effectiveRenderer.equalsIgnoreCase(requestedRenderer)) {
+                Log.i("XServerDisplayActivity", "DisplayX owns presentation; replacing host renderer "
+                        + requestedRenderer + " with " + effectiveRenderer);
+            }
+            return effectiveRenderer;
+        }
+        if ("surfaceflinger".equalsIgnoreCase(requestedRenderer)
+                && !ASurfaceRenderer.isSupported()) {
+            return "vulkan";
+        }
+        return requestedRenderer;
     }
 
     private String getLaunchRendererType() {
@@ -4076,9 +4135,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     public void updateFrameRating(Window window) {
-        if (window == null || frameRatingWindowId != window.id) return;
-        if (classicHud != null) classicHud.update();
-        if (modernHud != null) modernHud.onFrame();
+        // This callback is emitted only for a submitted True DisplayX swapchain image.
+        // Wine/DXVK can put the _MESA_DRV properties and Vulkan surface on unrelated
+        // reparented X11 windows, so X11 window identity is not a reliable FPS filter.
+        if (window == null) return;
+        recordHudFrame();
     }
 
     @Override

@@ -8,8 +8,8 @@
  * link to https://github.com/The412Banner/FusionHUD in the project documentation
  * AND in the in-app credits/about screen.
  *
- * Kept source-compatible with the upstream Bannerlator HUD so fixes sync by copy;
- * only this header is added on top of the original file.
+ * Based on the upstream Bannerlator HUD. The Ludashi integration adds stable overlay bounds so
+ * periodic metric refreshes do not relayout its SurfaceView game host.
  */
 
 package com.winlator.star.widget.fusionhud
@@ -169,6 +169,13 @@ class FusionHudView(
     private var graphRect: RectF? = null
     private var contentW = 0f
     private var contentH = 0f
+    // Winlator-Ludashi hosts the game in a SurfaceView. Relaying requestLayout() to the root on every
+    // metrics sample forces Android to resynchronise that surface and can make the whole game frame
+    // flicker. Keep a grow-only allocation while live metrics change; config/size changes explicitly
+    // reset it. Keeping the normal View layer avoids creating another hardware composition layer over
+    // SurfaceView/DisplayX; invalidation remains limited to this view's stable bounds.
+    private var layoutW = 0f
+    private var layoutH = 0f
 
     // ---- Listeners --------------------------------------------------------
     private var onMovedListener: BiConsumer<Float, Float>? = null
@@ -200,7 +207,7 @@ class FusionHudView(
     private fun cycleSize() {
         size = size.next()
         onSizeCycledListener?.accept(size.token)
-        rebuildAndInvalidate()
+        rebuildAndInvalidate(resetLayoutBounds = true)
     }
 
     fun applyConfig(configString: String?) {
@@ -243,7 +250,7 @@ class FusionHudView(
         scale = (parseIntOr(cfg.get("hudScale", "100"), 100).coerceIn(50, 200)) / 100f
         bgOpacity = (parseIntOr(cfg.get("hudOpacity", "80"), 80).coerceIn(0, 100)) / 100f
 
-        rebuildAndInvalidate()
+        rebuildAndInvalidate(resetLayoutBounds = true)
     }
 
     // ---- Lifecycle: self-refresh ------------------------------------------
@@ -287,9 +294,18 @@ class FusionHudView(
         graphSamples.addLast(if (ms.isFinite() && ms > 0f) ms else Float.NaN)
     }
 
-    private fun rebuildAndInvalidate() {
+    private fun rebuildAndInvalidate(resetLayoutBounds: Boolean = false) {
         rebuild()
-        requestLayout()
+        if (resetLayoutBounds) {
+            layoutW = contentW
+            layoutH = contentH
+        } else {
+            layoutW = max(layoutW, contentW)
+            layoutH = max(layoutH, contentH)
+        }
+        val desiredW = layoutW.roundToInt()
+        val desiredH = layoutH.roundToInt()
+        if (desiredW != measuredWidth || desiredH != measuredHeight) requestLayout()
         invalidate()
     }
 
@@ -882,8 +898,8 @@ class FusionHudView(
     // ---- Measure / draw ---------------------------------------------------
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(
-            resolveSize(contentW.roundToInt(), widthMeasureSpec),
-            resolveSize(contentH.roundToInt(), heightMeasureSpec),
+            resolveSize(layoutW.roundToInt(), widthMeasureSpec),
+            resolveSize(layoutH.roundToInt(), heightMeasureSpec),
         )
     }
 

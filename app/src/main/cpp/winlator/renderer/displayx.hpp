@@ -49,9 +49,8 @@ class DisplayX {
 
         struct PresentRequest {
             Drawable *drawable;
-            // DisplayX swapchains may be destroyed while a present is still
-            // queued or owned by SurfaceFlinger. Keep that image alive until
-            // the transaction-complete callback releases this request.
+            // The guest can destroy/recreate a swapchain while a submitted
+            // image is still queued or owned by SurfaceFlinger.
             std::shared_ptr<Drawable> retainedDrawable;
             int sync_fence;
             uint64_t presentId;
@@ -111,7 +110,6 @@ class DisplayX {
 
         APerformanceHintManager *performanceHintManager = nullptr;
         APerformanceHintSession *performanceHintSession = nullptr;
-        std::mutex performanceHintMutex;
 
         DisplayXLock eventLock;
         DisplayXLock presentLock;

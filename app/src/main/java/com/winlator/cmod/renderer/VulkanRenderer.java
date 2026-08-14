@@ -523,11 +523,15 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
     }
 
     public void onUpdateWindowContentDirect(Window window, Drawable pixmap, short xOff, short yOff) {
-        if (!nativeMode && window.id == fpsWindowId) {
-            if (hudRef != null) hudRef.onFrame();
-            if (classicHudRef != null) classicHudRef.update();
-            if (hudFrameTick != null) hudFrameTick.accept(window.id);
+        if (!nativeMode) {
+            if (hudFrameTick == null && window.id == fpsWindowId) {
+                if (hudRef != null) hudRef.onFrame();
+                if (classicHudRef != null) classicHudRef.update();
+            }
         }
+        // The activity resolves child/reparented present windows for every HUD style. Do not
+        // discard the real present here just because _MESA_DRV lives on another X11 window.
+        if (hudFrameTick != null) hudFrameTick.accept(window.id);
         synchronized (lock) {
             if (nativeHandle == 0 || pixmap == null) return;
             int rx = window.getRootX() + xOff, ry = window.getRootY() + yOff;
@@ -568,8 +572,6 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     @Override
     public void onUpdateWindowContent(Window window) {
-        
-        
         synchronized (lock) {
             if (nativeHandle == 0) return;
             Drawable drawable = window.getContent();
@@ -578,6 +580,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                 String wc = window.getClassName();
                 for (String cls : unviewableWMClasses) if (wc.contains(cls)) return;
             }
+            if (!nativeMode && hudFrameTick != null) hudFrameTick.accept(window.id);
             int rx = window.getRootX(), ry = window.getRootY();
             synchronized (drawable.renderLock) {
                 if (drawable.getTexture() instanceof GPUImage) {
@@ -599,10 +602,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
                                 xRenderingPausedForScanout = true;
                             }
                             if (hudRef != null) {
-                                hudRef.onFrame();
+                                if (hudFrameTick == null) hudRef.onFrame();
                                 hudRef.setIsNative(delivered);
                             }
-                            if (classicHudRef != null) classicHudRef.update();
+                            if (hudFrameTick == null && classicHudRef != null) classicHudRef.update();
                             if (hudFrameTick != null) hudFrameTick.accept(window.id);
                         } else if (!scanoutNow) {
                             nativeUpdateWindowContentAHB(nativeHandle, did(drawable), ahbPtr,
