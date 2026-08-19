@@ -257,6 +257,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private Handler handler;
     private Runnable savePlaytimeRunnable;
     private static final long SAVE_INTERVAL_MS = 1000;
+    private static final long SHORTCUT_FOREGROUND_RETRY_INTERVAL_MS = 2000;
+    private static final int SHORTCUT_FOREGROUND_RETRY_COUNT = 20;
+    private int shortcutForegroundRetryAttempt;
+    private Runnable shortcutForegroundRetryRunnable;
 
     private String getLaunchGraphicsExtra(String key, String fallback) {
         if (shortcut != null) {
@@ -818,7 +822,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         Runnable runnable = () -> {
             Executors.newSingleThreadExecutor().execute(() -> {
-                setupWineSystemFiles();
+                if (!setupWineSystemFiles()) {
+                    runOnUiThread(() -> {
+                        AppUtils.showToast(this, "Failed to update the Wine prefix. The original prefix was preserved.");
+                        finish();
+                    });
+                    return;
+                }
                 extractGraphicsDriverFiles();
                 changeWineAudioDriver();
                 CountDownLatch uiReady = new CountDownLatch(1);
@@ -1100,6 +1110,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         if (handler != null) {
             handler.removeCallbacks(savePlaytimeRunnable);
+            if (shortcutForegroundRetryRunnable != null) {
+                handler.removeCallbacks(shortcutForegroundRetryRunnable);
+            }
         }
         super.onDestroy();
     }
@@ -1154,7 +1167,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
             touchpadView.releasePointerCapture();
     }
 
-    private void setupWineSystemFiles() {
+    private boolean setupWineSystemFiles() {
+        ContentProfile wineProfile = contentsManager.getProfileByEntryName(container.getWineVersion());
+        if (ContainerManager.needsWinePrefixUpdate(
+                wineProfile, container.getWineVersion(), container.getExtra("wineprefixVersion"))) {
+            Log.i("XServerDisplayActivity", "Updating legacy Wine prefix for " + container.getWineVersion());
+            if (!containerManager.repairContainerWinePrefix(container, contentsManager)) {
+                Log.e("XServerDisplayActivity", "Failed to update Wine prefix for " + container.getWineVersion());
+                return false;
+            }
+            firstTimeBoot = true;
+        }
+
         String imgVersion = String.valueOf(imageFs.getVersion());
         boolean containerDataChanged = false;
 
@@ -1259,6 +1283,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
         if (containerDataChanged)
             container.saveData();
+        return true;
     }
 
     private void setupXEnvironment() throws PackageManager.NameNotFoundException {
@@ -1375,6 +1400,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         winHandler.start();
+        startShortcutForegroundRetries();
 
         if (wineRequestHandler != null)
             wineRequestHandler.start();
@@ -4700,6 +4726,58 @@ public class XServerDisplayActivity extends AppCompatActivity {
         } else if (!className.isEmpty()) {
             winHandler.setProcessAffinity(window.getClassName(), processAffinity);
         }
+    }
+
+    private void startShortcutForegroundRetries() {
+        if (shortcut == null || handler == null || winHandler == null) return;
+
+        final String processName = getShortcutProcessName();
+        if (processName.isEmpty()) return;
+
+        shortcutForegroundRetryAttempt = 0;
+        shortcutForegroundRetryRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (shortcut == null || winHandler == null || isFinishing() || isDestroyed()) return;
+
+                shortcutForegroundRetryAttempt++;
+                Log.i("XServerDisplayActivity", "Auto foreground shortcut process: "
+                        + processName + " (attempt " + shortcutForegroundRetryAttempt + ")");
+                // Use the same Wine-side command as Task Manager's manual
+                // "Bring to front" action. Some games stay X11-mapped even while
+                // their Windows window is minimized, so X unmap events cannot detect it.
+                winHandler.bringToFront(processName);
+
+                if (shortcutForegroundRetryAttempt < SHORTCUT_FOREGROUND_RETRY_COUNT) {
+                    handler.postDelayed(this, SHORTCUT_FOREGROUND_RETRY_INTERVAL_MS);
+                }
+            }
+        };
+        handler.postDelayed(shortcutForegroundRetryRunnable, SHORTCUT_FOREGROUND_RETRY_INTERVAL_MS);
+    }
+
+    private String getShortcutProcessName() {
+        String path = shortcut != null ? shortcut.path : null;
+        if (path == null) return "";
+
+        String cleanPath = path.trim();
+        if (cleanPath.startsWith("\"")) {
+            int closingQuote = cleanPath.indexOf('"', 1);
+            if (closingQuote > 1) cleanPath = cleanPath.substring(1, closingQuote);
+        } else {
+            int exeEnd = cleanPath.toLowerCase().indexOf(".exe");
+            if (exeEnd >= 0) cleanPath = cleanPath.substring(0, exeEnd + 4);
+        }
+
+        cleanPath = cleanPath.replace("\"", "");
+        int lastSeparator = Math.max(cleanPath.lastIndexOf('/'), cleanPath.lastIndexOf('\\'));
+        String processName = lastSeparator >= 0 ? cleanPath.substring(lastSeparator + 1) : cleanPath;
+
+        if (processName.toLowerCase().endsWith(".lnk")) {
+            String wmClass = shortcut.getExtra("wmClass", shortcut.wmClass);
+            if (wmClass != null && !wmClass.trim().isEmpty()) return wmClass.trim();
+        }
+        return processName.trim();
     }
 
     private void changeFrameRatingVisibility(Window window, Property property) {

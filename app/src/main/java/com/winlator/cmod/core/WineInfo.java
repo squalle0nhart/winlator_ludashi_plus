@@ -151,11 +151,17 @@ public class WineInfo implements Parcelable {
     }
 
     private static String normalizeIdentifier(String identifier, ContentProfile wineProfile) {
+        // Installed x86_64 profiles must keep their type from the full content entry
+        // (for example, Proton-9.0-x86_64-0) so they launch through Box64.
+        String normalizedIdentifier = extractIdentifier(identifier);
+        if (normalizedIdentifier != null && normalizedIdentifier.endsWith("-x86_64")) {
+            return normalizedIdentifier;
+        }
+
         String normalizedFromProfile = normalizeProfileIdentifier(wineProfile);
         if (normalizedFromProfile != null) return normalizedFromProfile;
 
-        String normalized = extractIdentifier(identifier);
-        if (normalized != null) return normalized;
+        if (normalizedIdentifier != null) return normalizedIdentifier;
 
         return identifier == null ? "" : identifier.toLowerCase(Locale.ROOT);
     }
@@ -180,6 +186,7 @@ public class WineInfo implements Parcelable {
         String candidate = rawIdentifier.trim().toLowerCase(Locale.ROOT).replace(' ', '-');
         int typeIndex = candidate.indexOf("proton-");
         if (typeIndex < 0) typeIndex = candidate.indexOf("wine-");
+        if (typeIndex < 0) return null;
         if (typeIndex > 0) candidate = candidate.substring(typeIndex);
 
         for (String arch : new String[] {"arm64ec", "x86_64", "x86"}) {

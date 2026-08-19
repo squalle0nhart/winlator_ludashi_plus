@@ -6,6 +6,7 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.contents.ContentProfile;
 import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
@@ -141,6 +142,9 @@ public class ContainerManager {
                 return null;
             }
 
+            if (contentsManager.getProfileByEntryName(container.getWineVersion()) != null)
+                container.putExtra("wineprefixVersion", container.getWineVersion());
+
 //            // Extract the selected graphics driver files
 //            String driverVersion = container.getGraphicsDriverVersion();
 //            if (!extractGraphicsDriverFiles(driverVersion, containerDir, null)) {
@@ -264,12 +268,18 @@ public class ContainerManager {
             Log.e("ContainerManager", "Wine path is empty for wineVersion=" + wineVersion);
             return false;
         }
-        String containerPattern = wineInfo.identifier() + "_container_pattern.tzst";
+        String containerPattern = wineVersion + "_container_pattern.tzst";
         boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
 
         if (!result) {
-            File containerPatternFile = new File(wineInfo.path + "/prefixPack.txz");
-            result = TarCompressorUtils.extract(TarCompressorUtils.Type.XZ, containerPatternFile, containerDir);
+            ContentProfile profile = contentsManager.getProfileByEntryName(wineVersion);
+            File installDir = profile != null ? ContentsManager.getInstallDir(context, profile) : new File(wineInfo.path);
+            String prefixPack = profile != null && profile.winePrefixPack != null && !profile.winePrefixPack.isEmpty()
+                    ? profile.winePrefixPack : "prefixPack.txz";
+            File containerPatternFile = new File(installDir, prefixPack);
+            TarCompressorUtils.Type type = prefixPack.endsWith(".tzst")
+                    ? TarCompressorUtils.Type.ZSTD : TarCompressorUtils.Type.XZ;
+            result = TarCompressorUtils.extract(type, containerPatternFile, containerDir);
             if (!result) {
                 Log.e("ContainerManager", "Failed to extract prefix pack from " + containerPatternFile.getAbsolutePath());
             }
@@ -291,6 +301,86 @@ public class ContainerManager {
         }
    
         return result;
+    }
+
+    public static boolean needsWinePrefixUpdate(ContentProfile profile, String wineVersion, String prefixVersion) {
+        return profile != null
+                && (profile.type == ContentProfile.ContentType.CONTENT_TYPE_WINE
+                || profile.type == ContentProfile.ContentType.CONTENT_TYPE_PROTON)
+                && !wineVersion.equals(prefixVersion);
+    }
+
+    public boolean repairContainerWinePrefix(Container container, ContentsManager contentsManager) {
+        File containerDir = container.getRootDir();
+        File tempDir = FileUtils.createTempFile(context.getCacheDir(), "wineprefix-repair");
+        if (!tempDir.mkdirs()) return false;
+
+        try {
+            String wineVersion = container.getWineVersion();
+            if (!extractContainerPatternFile(container, wineVersion, contentsManager, tempDir, null)) return false;
+
+            File repairedPrefix = new File(tempDir, ".wine");
+            if (!repairedPrefix.isDirectory()) return false;
+
+            File prefix = new File(containerDir, ".wine");
+            File backup = new File(containerDir, ".wine.pre-wcp-" + System.currentTimeMillis());
+            boolean movedOldPrefix = prefix.exists();
+            if (movedOldPrefix && !prefix.renameTo(backup)) return false;
+
+            if (!repairedPrefix.renameTo(prefix) && !copyWinePrefixTree(repairedPrefix, prefix)) {
+                FileUtils.delete(prefix);
+                if (movedOldPrefix) backup.renameTo(prefix);
+                return false;
+            }
+
+            if (movedOldPrefix) migrateInPrefixData(backup, prefix);
+
+            container.putExtra("wineprefixVersion", wineVersion);
+            container.putExtra("imgVersion", null);
+            container.putExtra("dxwrapper", null);
+            container.putExtra("wincomponents", null);
+            container.putExtra("desktopTheme", null);
+            container.putExtra("startupSelection", null);
+            container.saveData();
+            Log.i("ContainerManager", "Wine prefix updated for " + wineVersion
+                    + "; previous prefix preserved at " + backup.getAbsolutePath());
+            return true;
+        } finally {
+            FileUtils.delete(tempDir);
+        }
+    }
+
+    private void migrateInPrefixData(File oldPrefix, File newPrefix) {
+        File oldDrive = new File(oldPrefix, "drive_c");
+        File newDrive = new File(newPrefix, "drive_c");
+        File[] files = oldDrive.listFiles();
+        if (files == null) return;
+
+        for (File file : files) {
+            if (file.getName().equalsIgnoreCase("windows")) continue;
+            if (!copyWinePrefixTree(file, new File(newDrive, file.getName())))
+                Log.w("ContainerManager", "Failed to migrate prefix data: " + file.getName());
+        }
+    }
+
+    private boolean copyWinePrefixTree(File source, File target) {
+        if (FileUtils.isSymlink(source)) {
+            File parent = target.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) return false;
+            FileUtils.symlink(FileUtils.readSymlink(source), target.getAbsolutePath());
+            return FileUtils.isSymlink(target);
+        }
+        if (source.isDirectory()) {
+            if (!target.isDirectory() && !target.mkdirs()) return false;
+            File[] children = source.listFiles();
+            if (children == null) return true;
+            for (File child : children)
+                if (!copyWinePrefixTree(child, new File(target, child.getName()))) return false;
+            return true;
+        }
+        return FileUtils.copy(source, target)
+                && target.isFile()
+                && target.length() == source.length();
     }
 
     public Container getContainerForShortcut(Shortcut shortcut) {

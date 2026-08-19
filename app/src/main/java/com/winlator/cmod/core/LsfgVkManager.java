@@ -14,7 +14,6 @@ import java.util.Locale;
 
 public abstract class LsfgVkManager {
     private static final String TAG = "LsfgVkManager";
-    private static final String ASSET_LIB = "lsfg_vk/android_arm64_v8a/liblsfg-vk-layer.so";
     private static final String ASSET_MANIFEST = "lsfg_vk/android_arm64_v8a/VkLayer_LS_frame_generation.json";
     private static final String CONFIG_RELATIVE_PATH = ".config/lsfg-vk/conf.toml";
     private static final String DLL_RELATIVE_DIR = ".local/share/lsfg-vk";
@@ -26,7 +25,7 @@ public abstract class LsfgVkManager {
     private static final String LOSSLESS_DLL_NAME = "Lossless.dll";
     private static final String PROCESS_EXE_IDENTIFIER = "winlator-lsfg";
     private static final String PRESENT_MODE = "fifo";
-    private static final String RUNTIME_VERSION = "v1.4.0-android-arm64-v8a-ahb-no-props";
+    private static final String RUNTIME_VERSION = "v1.3.3-android-arm64-v8a";
 
     public static final String EXTRA_ENABLED = "lsfgEnabled";
     public static final String EXTRA_MULTIPLIER = "lsfgMultiplier";
@@ -155,7 +154,10 @@ public abstract class LsfgVkManager {
             try {
                 localLibDir.mkdirs();
                 layerDir.mkdirs();
-                FileUtils.copy(context, ASSET_LIB, libFile);
+                File nativeLib = new File(context.getApplicationInfo().nativeLibraryDir, LIB_FILENAME);
+                if (!nativeLib.isFile() || !FileUtils.copy(nativeLib, libFile)) {
+                    throw new IllegalStateException("Bundled LSFG native library not found: " + nativeLib);
+                }
                 FileUtils.copy(context, ASSET_MANIFEST, manifestFile);
                 FileUtils.writeString(versionFile, RUNTIME_VERSION);
                 FileUtils.chmod(libFile, 0755);
