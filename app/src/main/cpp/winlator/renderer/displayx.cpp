@@ -703,8 +703,11 @@ void DisplayX::queueEvent(std::function<void()> func) {
     eventLock.notify();
 }
 
-void DisplayX::requestWindowUpdate(Drawable *drawable, Window *window) {
-    if (!drawable || !window) return;
+void DisplayX::requestWindowUpdate(Window *window) {
+    if (!window) return;
+
+    auto drawable = window->hasDirectContents() ? window->currentDirectContent : window->drawable.get();
+    if (!drawable) return;
     if (!drawable->isDisplayX &&
             window->displayXSwapchainCount.load(std::memory_order_acquire) > 0) {
         return;

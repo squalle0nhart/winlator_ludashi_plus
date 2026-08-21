@@ -62,18 +62,13 @@ class DisplayX {
         class PresentQueue {
             private:
                 std::queue<std::unique_ptr<PresentRequest>> mQueue;
-                std::unordered_set<PresentRequest*> mSet;
 
             public:
                 void push(std::unique_ptr<PresentRequest> request) {
                     if (!request)
                         return;
 
-                    PresentRequest* ptr = request.get();
-
-                    if (mSet.insert(ptr).second) {
-                        mQueue.push(std::move(request));
-                    }
+                    mQueue.push(std::move(request));
                 }
 
                 std::unique_ptr<PresentRequest> pop() {
@@ -82,7 +77,6 @@ class DisplayX {
 
                     auto val = std::move(mQueue.front());
                     mQueue.pop();
-                    mSet.erase(val.get());
                     return val;
                 }
 
@@ -171,7 +165,7 @@ class DisplayX {
         void resume();
 
         void queueEvent(std::function<void()> func);
-        void requestWindowUpdate(Drawable *drawable, Window *window);
+        void requestWindowUpdate(Window *window);
         void requestCursorUpdate();
         void updateCursorPosition();
 
