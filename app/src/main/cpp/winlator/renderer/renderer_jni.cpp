@@ -325,6 +325,7 @@ Java_com_winlator_cmod_widget_XServerView_nativeFreeCursor(JNIEnv *env, jobject 
     else {
         displayX.queueEvent([cursor] {
             JNIEnv *env = cache.getEnv();
+            displayX.updateCursor(nullptr);
             cursorManager.removeCursor(env, cursor);
         });
     }
@@ -346,7 +347,7 @@ Java_com_winlator_cmod_widget_XServerView_nativeBindCursor(JNIEnv *env, jobject 
     if (!xserver.isDisplayX())
         renderer.requestRenderer();
     else
-        displayX.queueEvent([window] { displayX.updateCursor(window); });
+        displayX.queueEvent([window] { displayX.updateCursor(window->cursor); });
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -436,7 +437,6 @@ Java_com_winlator_cmod_widget_XServerView_nativeReparentWindow(JNIEnv *env, jobj
     if (!window || !parent) return;
 
     windowManager.reparentWindow(window, parent);
-
     if (xserver.isDisplayX())
         displayX.queueEvent([window, parent] { displayX.reparentWindow(window, parent); });
 }
@@ -460,7 +460,7 @@ Java_com_winlator_cmod_widget_XServerView_nativeSetCursorVisible(JNIEnv *env, jo
     if (!xserver.isDisplayX())
         renderer.requestRenderer();
     else
-        displayX.queueEvent([] { displayX.drawRootCursor(); });
+        displayX.queueEvent([] { displayX.showCursor(); });
 }
 
 extern "C" JNIEXPORT void JNICALL

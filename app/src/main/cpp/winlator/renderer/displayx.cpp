@@ -834,14 +834,8 @@ void DisplayX::changeZOrder(Window *window, Window *sibling, int stackMode) {
     pfnASurfaceTransactionApply(windowTransaction);
 }
 
-void DisplayX::updateCursor(Window *window) {
-    int ret;
-
-    auto cursor = window->cursor;
-    if (!cursor) return;
-
-    pfnASurfaceTransactionSetBuffer(cursorTransaction, cursorManager->control, cursor->image->ahb, -1);
-    pfnASurfaceTransactionSetVisibility(cursorTransaction, cursorManager->control, (cursor->visible && cursorVisible) ?  ASURFACE_TRANSACTION_VISIBILITY_SHOW : ASURFACE_TRANSACTION_VISIBILITY_HIDE);
+void DisplayX::updateCursor(Cursor *cursor) {
+    pfnASurfaceTransactionSetBuffer(cursorTransaction, cursorManager->control, cursor && (cursor->visible && cursorVisible) ? cursor->image->ahb : nullptr, -1);
     pfnASurfaceTransactionApply(cursorTransaction);
 }
 
@@ -894,16 +888,14 @@ void DisplayX::createRootCursorControl() {
     cursorTransaction = pfnASurfaceTransactionCreate();
 }
 
-void DisplayX::drawRootCursor() {
-    createRootCursorControl();
-
-    if (!cursorVisible) return;
+void DisplayX::showCursor() {
+    if (!cursorManager->control) createRootCursorControl();
 
     auto rootCursor = cursorManager->getRootCursor();
-    if (!cursorManager) return;
+    if (!rootCursor) return;
 
     pfnASurfaceTransactionSetBuffer(cursorTransaction, cursorManager->control, rootCursor->image->ahb, -1);
-    pfnASurfaceTransactionSetVisibility(cursorTransaction, cursorManager->control, ASURFACE_TRANSACTION_VISIBILITY_SHOW);
+    pfnASurfaceTransactionSetVisibility(cursorTransaction, cursorManager->control, cursorVisible ? ASURFACE_TRANSACTION_VISIBILITY_SHOW : ASURFACE_TRANSACTION_VISIBILITY_HIDE);
     pfnASurfaceTransactionSetZOrder(cursorTransaction, cursorManager->control, INT32_MAX);
     pfnASurfaceTransactionApply(cursorTransaction);
 }

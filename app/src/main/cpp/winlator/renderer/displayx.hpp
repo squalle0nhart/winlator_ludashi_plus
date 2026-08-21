@@ -182,8 +182,8 @@ class DisplayX {
         void changeGeometry(Window *window, bool resized);
         void changeZOrder(Window *window, Window *sibling, int stackMode);
         void reparentWindow(Window *window, Window *parent);
-        void updateCursor(Window *window);
-        void drawRootCursor();
+        void updateCursor(Cursor *cursor);
+        void showCursor();
         void toggleFullscreen();
         void setPerformanceMode(bool perfMode);
         void setPresentRR(bool presentRR);
