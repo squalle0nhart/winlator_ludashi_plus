@@ -4,15 +4,20 @@
 
 #include "renderer_jni.hpp"
 
-struct Drawable { 
+struct Texture {
+    int id;
+    bool isDirty;
+    EGLImageKHR eglImage;
+    bool sizeChanged;
+};
+
+struct Drawable {
     int id;
     int width;
     int format;
     int height;
     int stride;
-    int textureId;
-    bool isDirty;
-    bool sizeChanged;
+    std::unique_ptr<Texture> texture;
     bool isDirectContent;
     bool isDisplayX;
     void *data;

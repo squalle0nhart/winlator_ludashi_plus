@@ -44,17 +44,15 @@ Java_com_winlator_cmod_widget_XServerView_nativeInit(JNIEnv *env, jobject thiz, 
     auto drawable = std::make_unique<struct Drawable>();
     jobject drawableObj = env->CallObjectMethod(rootWindowObj, cache.windowGetContent);
     drawable->id = env->GetIntField(drawableObj, cache.drawableID);
-    drawable->textureId = -1;
+    drawable->texture = nullptr;
     drawable->width = env->GetShortField(drawableObj, cache.drawableWidth);
     drawable->height = env->GetShortField(drawableObj, cache.drawableHeight);
     drawable->ahb = (AHardwareBuffer *)env->GetLongField(drawableObj, cache.drawableAHB);
     drawable->stride = env->GetShortField(drawableObj, cache.drawableStride);
     drawable->format = env->GetIntField(drawableObj, cache.drawableFormat);
     drawable->data = nullptr;
-    drawable->isDirty = false;
     drawable->isDirectContent = false;
     drawable->isDisplayX = false;
-    drawable->sizeChanged = false;
     drawable->drawableObj = env->NewGlobalRef(drawableObj);
     rootWindow->drawable = std::move(drawable);
 
@@ -94,16 +92,14 @@ Java_com_winlator_cmod_widget_XServerView_nativeInit(JNIEnv *env, jobject thiz, 
 
     auto cursorDrawable = std::make_unique<struct Drawable>();
     cursorDrawable->id = -1;
-    cursorDrawable->textureId = -1;
+    cursorDrawable->texture = nullptr;
     cursorDrawable->isDirectContent = false;
     cursorDrawable->format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
     cursorDrawable->width = w;
     cursorDrawable->height = h;
     cursorDrawable->data = nullptr;
-    cursorDrawable->isDirty = false;
     cursorDrawable->isDirectContent = false;
     cursorDrawable->isDisplayX = false;
-    cursorDrawable->sizeChanged = false;
     cursorDrawable->drawableObj = nullptr;
 
     AHardwareBuffer_Desc desc{};
@@ -195,17 +191,15 @@ Java_com_winlator_cmod_widget_XServerView_nativeCreateWindow(JNIEnv *env, jobjec
         auto drawable = std::make_unique<struct Drawable>();
         jobject drawableObj = env->CallObjectMethod(windowObj, cache.windowGetContent);
         drawable->id = env->GetIntField(drawableObj, cache.drawableID);
-        drawable->textureId = -1;
+        drawable->texture = nullptr;
         drawable->width = env->GetShortField(drawableObj, cache.drawableWidth);
         drawable->height = env->GetShortField(drawableObj, cache.drawableHeight);
         drawable->data = nullptr;
         drawable->ahb = (AHardwareBuffer *)env->GetLongField(drawableObj, cache.drawableAHB);
         drawable->stride = env->GetShortField(drawableObj, cache.drawableStride);
         drawable->format = env->GetIntField(drawableObj, cache.drawableFormat);
-        drawable->isDirty = false;
         drawable->isDirectContent = false;
         drawable->isDisplayX = false;
-        drawable->sizeChanged = false;
         drawable->drawableObj = env->NewGlobalRef(drawableObj);
         window->drawable = std::move(drawable);
         env->DeleteLocalRef(drawableObj);
@@ -272,12 +266,6 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_XServerView_nativeDestroyWindow(JNIEnv *env, jobject thiz, jint id) {
     auto window = windowManager.getWindow(id);
     if (!window) return;
-
-    if (window->inputOutput && window->drawable->textureId > 0) {
-        int textureId = window->drawable->textureId;
-        renderer.queueEvent([textureId] { renderer.destroyTexture(textureId); });
-    }
-
     if (xserver.isDisplayX()) {
         displayX.queueEvent([window] {
             displayX.destroyWindowControl(window);
@@ -286,6 +274,8 @@ Java_com_winlator_cmod_widget_XServerView_nativeDestroyWindow(JNIEnv *env, jobje
     }
     else {
         renderer.queueEvent([window] {
+            if (window->inputOutput && window->drawable->texture != nullptr)
+                renderer.destroyTexture(window->drawable->texture.get());
             windowManager.deleteWindow(window);
             renderer.updateScene();
         });
@@ -305,9 +295,7 @@ Java_com_winlator_cmod_widget_XServerView_nativeCreateCursor(JNIEnv *env, jobjec
     drawable->format = env->GetIntField(drawableObj, cache.drawableFormat);
     drawable->isDirectContent = false;
     drawable->isDisplayX = false;
-    drawable->isDirty = false;
-    drawable->textureId = -1;
-    drawable->sizeChanged = false;
+    drawable->texture = nullptr;
     drawable->drawableObj = env->NewGlobalRef(drawableObj);
 
     env->DeleteLocalRef(drawableObj);
@@ -327,13 +315,19 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_XServerView_nativeFreeCursor(JNIEnv *env, jobject thiz, jint id) {
     auto cursor = cursorManager.getCursor(id);
     if (!cursor) return;
-
-    if (cursor->image->textureId > 0) {
-        int textureId = cursor->image->textureId;
-        renderer.queueEvent([textureId] { renderer.destroyTexture(textureId); });
+    if (!xserver.isDisplayX()) {
+        renderer.queueEvent([cursor] {
+            JNIEnv *env = cache.getEnv();
+            renderer.destroyTexture(cursor->image->texture.get());
+            cursorManager.removeCursor(env, cursor);
+        });
     }
-
-    cursorManager.removeCursor(env, cursor);
+    else {
+        displayX.queueEvent([cursor] {
+            JNIEnv *env = cache.getEnv();
+            cursorManager.removeCursor(env, cursor);
+        });
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -405,7 +399,7 @@ Java_com_winlator_cmod_widget_XServerView_nativeUpdateWindowGeometry(JNIEnv *env
         window->drawable->height = height;
         window->drawable->ahb = (AHardwareBuffer *)env->GetLongField(window->drawable->drawableObj, cache.drawableAHB);
         window->drawable->stride = env->GetShortField(window->drawable->drawableObj, cache.drawableStride);
-        window->drawable->sizeChanged = true;
+        if (window->drawable->texture != nullptr) window->drawable->texture->sizeChanged = true;
     }
 
     if (xserver.isDisplayX()) {
@@ -558,13 +552,11 @@ Java_com_winlator_cmod_widget_XServerView_nativeAddDirectContent(JNIEnv *env, jo
 
     auto drawable = std::make_unique<struct Drawable>();
     drawable->id = env->GetIntField(drawableObj, cache.drawableID);
-    drawable->textureId = -1;
+    drawable->texture = nullptr;
     drawable->width = env->GetShortField(drawableObj, cache.drawableWidth);
     drawable->height = env->GetShortField(drawableObj, cache.drawableHeight);
     drawable->data = nullptr;
-    drawable->isDirty = false;
     drawable->format = env->GetIntField(drawableObj, cache.drawableFormat);
-    drawable->sizeChanged = false;
     drawable->ahb = (AHardwareBuffer *)env->GetLongField(drawableObj, cache.drawableAHB);
     drawable->stride = env->GetShortField(drawableObj, cache.drawableStride);
     drawable->isDirectContent = true;

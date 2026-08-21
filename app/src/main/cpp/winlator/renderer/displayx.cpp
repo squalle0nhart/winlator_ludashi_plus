@@ -282,13 +282,10 @@ void DisplayX::networkThreadLoop() {
                                     delete drawable;
                                 });
                                 drawable->id = -1;
-                                drawable->textureId = -1;
                                 drawable->width = window ? window->width : 0;
                                 drawable->height = window ? window->height : 0;
                                 drawable->data = nullptr;
-                                drawable->isDirty = false;
                                 drawable->format = AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-                                drawable->sizeChanged = false;
 
                                 drawable->ahb = nullptr;
                                 int receiveResult = AHardwareBuffer_recvHandleFromUnixSocket(
@@ -788,11 +785,8 @@ void DisplayX::changeGeometry(Window *window, bool resized) {
     if (!window->control) return;
 
     int ret;
-
-    if (resized) {
-        window->drawable->sizeChanged = false;
+    if (resized)
         pfnASurfaceTransactionSetBuffer(windowTransaction, window->control, nullptr, -1);
-    }
 
     if (pfnASurfaceTransactionSetPosition) {
         pfnASurfaceTransactionSetPosition(windowTransaction, window->control, window->x, window->y);

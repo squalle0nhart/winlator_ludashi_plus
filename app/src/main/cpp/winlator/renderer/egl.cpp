@@ -300,30 +300,31 @@ void EGLRenderer::renderCursor() {
 
 void EGLRenderer::renderDrawable(Drawable *drawable, int x, int y, bool isWindow) {
     if (drawable == nullptr) return;
-
-    if (drawable->textureId < 0) {
-        if (drawable->data == nullptr)
-            drawable->textureId = allocateTextureDirect(drawable->ahb);
+    if (drawable->texture == nullptr) {
+        if (drawable->ahb != nullptr)
+            drawable->texture = allocateTextureDirect(drawable->ahb);
+        else if (drawable->data != nullptr)
+            drawable->texture = allocateTexture(drawable->width, drawable->height);
+    }
+    else if (drawable->texture->sizeChanged) {
+        if (drawable->ahb != nullptr)
+            reallocateTextureDirect(drawable->texture.get(), drawable->ahb);
         else
-            drawable->textureId = allocateTexture(drawable->width, drawable->height);
-    }
-    else if (drawable->sizeChanged) {
-        if (drawable->data == nullptr)
-            drawable->textureId = allocateTextureDirect(drawable->ahb);
-        else
-            reallocateTexture(drawable->textureId, drawable->width, drawable->height);
-        drawable->sizeChanged = false;
+            reallocateTexture(drawable->texture.get(), drawable->width, drawable->height);
+
+        drawable->texture->sizeChanged = false;
     }
 
-    if (drawable->isDirty) {
-        updateTextureDrawable(drawable->textureId, drawable->width, drawable->height, drawable->data);
-        drawable->isDirty = false;
+    if (drawable->texture && drawable->texture->isDirty) {
+        updateTextureDrawable(drawable->texture.get(), drawable->width, drawable->height, drawable->data);
+        drawable->texture->isDirty = false;
     }
 
-    XForm::set(tmpXForm1, x, y, drawable->width, drawable->height);
-    XForm::multiply(tmpXForm1, tmpXForm1, tmpXForm2);
-
-    renderDrawable(drawable->textureId, 6, tmpXForm1, isWindow);
+    if (drawable->texture) {
+        XForm::set(tmpXForm1, x, y, drawable->width, drawable->height);
+        XForm::multiply(tmpXForm1, tmpXForm1, tmpXForm2);
+        renderDrawable(drawable->texture.get(), 6, tmpXForm1, isWindow);
+    }
 }
 
 void EGLRenderer::updateScene() {
@@ -442,9 +443,9 @@ void EGLRenderer::createEGLSurface(ANativeWindow *window) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-void EGLRenderer::renderDrawable(int textureId, int length, float xform[], bool isFromWindow) {
+void EGLRenderer::renderDrawable(Texture *texture, int length, float xform[], bool isFromWindow) {
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureId);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
     glUniform1i(drawableShader->getUniformLoc("texture"), 0);
     glUniform1fv(drawableShader->getUniformLoc("xform"), length, xform);
     glUniform1i(drawableShader->getUniformLoc("is_cursor"), isFromWindow ? 0 : 1);
@@ -452,85 +453,115 @@ void EGLRenderer::renderDrawable(int textureId, int length, float xform[], bool 
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-int EGLRenderer::allocateTextureDirect(AHardwareBuffer* hardwareBuffer) {
-    int textureId;
+std::unique_ptr<Texture> EGLRenderer::allocateTextureDirect(AHardwareBuffer* hardwareBuffer) {
+    if (!hardwareBuffer || !display) return nullptr;
 
+    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
+
+    const EGLint attribList[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
+
+    EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
+    if (!clientBuffer) return nullptr;
+
+    texture->eglImage = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribList);
+    if (!texture->eglImage) return nullptr;
+
+    glGenTextures(1, (GLuint *)&texture->id);
+    glActiveTexture(GL_TEXTURE0);
+
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+    if (glGetError() != GL_NO_ERROR) {
+        eglDestroyImageKHR(display, texture->eglImage);
+        return nullptr;
+    }
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, texture->eglImage);
+    if (glGetError() != GL_NO_ERROR) {
+        eglDestroyImageKHR(display, texture->eglImage);
+        return nullptr;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return texture;
+}
+
+std::unique_ptr<Texture> EGLRenderer::allocateTexture(int width, int height) {
+    std::unique_ptr<Texture> texture = std::make_unique<Texture>();
+
+    glGenTextures(1, (GLuint *)&texture->id);
+
+    glActiveTexture(GL_TEXTURE0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, width, height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    return texture;
+}
+
+void EGLRenderer::reallocateTexture(Texture *texture, int width, int height) {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, width, height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void EGLRenderer::reallocateTextureDirect(Texture *texture, AHardwareBuffer* hardwareBuffer) {
     if (!hardwareBuffer || !display) {
-        return -1;
+        destroyTexture(texture);
+        return;
     }
 
     const EGLint attribList[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
 
     EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
     if (!clientBuffer) {
-        return -1;
+        destroyTexture(texture);
+        return;
     }
 
-    EGLImageKHR imageKHR = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribList);
-    if (!imageKHR) {
-        return -1;
+    eglDestroyImageKHR(display, texture->eglImage);
+
+    texture->eglImage = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribList);
+    if (!texture->eglImage) {
+        destroyTexture(texture);
+        return;
     }
 
-    glGenTextures(1, (GLuint *)&textureId);
     glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
 
-    glBindTexture(GL_TEXTURE_2D, textureId);
+    glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, texture->eglImage);
     if (glGetError() != GL_NO_ERROR) {
-        eglDestroyImageKHR(display, imageKHR);
-        return -1;
-    }
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, imageKHR);
-    if (glGetError() != GL_NO_ERROR) {
-        eglDestroyImageKHR(display, imageKHR);
-        return -1;
+        destroyTexture(texture);
+        return;
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
-    eglDestroyImageKHR(display, imageKHR);
-
-    return textureId;
 }
 
-int EGLRenderer::allocateTexture(int width, int height) {
-    int textureId;
-    glGenTextures(1, (GLuint *)&textureId);
+void EGLRenderer::destroyTexture(Texture* texture) {
+    if (!texture) return;
 
-    glActiveTexture(GL_TEXTURE0);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, width, height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, nullptr);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    return textureId;
+    glDeleteTextures(1, (GLuint *)&texture->id);
+    eglDestroyImageKHR(display, texture->eglImage);
 }
 
-int EGLRenderer::reallocateTexture(int textureId, int width, int height) {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, width, height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, nullptr);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return textureId;
-}
-
-void EGLRenderer::destroyTexture(int textureId) {
-    glDeleteTextures(1, (GLuint *)&textureId);
-}
-
-void EGLRenderer::updateTextureDrawable(int textureId, int width, int height, void *data) {
-    glBindTexture(GL_TEXTURE_2D, textureId);
+void EGLRenderer::updateTextureDrawable(Texture *texture, int width, int height, void *data) {
+    glBindTexture(GL_TEXTURE_2D, texture->id);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_2D, 0);
 }

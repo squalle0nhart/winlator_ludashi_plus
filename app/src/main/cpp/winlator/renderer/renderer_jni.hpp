@@ -6,6 +6,14 @@
 #include <android/log.h>
 #include <android/surface_control.h>
 
+#define EGL_EGLEXT_PROTOTYPES
+#define GL_GLEXT_PROTOTYPES
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
 #define HAL_PIXEL_FORMAT_BGRA_8888 5
 
 #define LOAD_METHOD_ID(method, env, cls, name, sig) \

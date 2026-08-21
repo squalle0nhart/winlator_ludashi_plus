@@ -3,15 +3,6 @@
 #include <android/native_window.h>
 #include <android/hardware_buffer.h>
 #include <android/log.h>
-
-#define EGL_EGLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-
 #include <string>
 #include <algorithm>
 #include <thread>
@@ -92,11 +83,12 @@ class EGLRenderer {
         void destroyEGLSurface();
         void destroyEGLContext();
         void renderCursor();
-        void renderDrawable(int textureId, int length, float xform[], bool isFromWindow);
-        void updateTextureDrawable(int textureId, int width, int height, void *data);
-        int allocateTexture(int width, int height);
-        int allocateTextureDirect(AHardwareBuffer* hardwareBuffer);
-        int reallocateTexture(int id, int width, int height);
+        void renderDrawable(Texture *texture, int length, float xform[], bool isFromWindow);
+        void updateTextureDrawable(Texture *texture, int width, int height, void *data);
+        std::unique_ptr<Texture> allocateTexture(int width, int height);
+        std::unique_ptr<Texture> allocateTextureDirect(AHardwareBuffer* hardwareBuffer);
+        void reallocateTexture(Texture *texture, int width, int height);
+        void reallocateTextureDirect(Texture *texture, AHardwareBuffer* hardwareBuffer);
         void init();
         void createEGLSurface(ANativeWindow *window);
         void collectRenderableWindows(Window *window, int x, int y);
@@ -123,7 +115,7 @@ class EGLRenderer {
         void updateWindowPosition(Window *window);
         void queueEvent(std::function<void()> func);
         void requestRenderer();
-        void destroyTexture(int textureId);
+        void destroyTexture(Texture *texture);
         void destroySurface();
         void createSurface(ANativeWindow *window);
         void changeSurface(int width, int height);
