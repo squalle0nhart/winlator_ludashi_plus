@@ -149,10 +149,10 @@
         <b>FIFO (default):</b> \'Vsync on.\' Every frame waits its turn and is shown on the next refresh — smooth, tear-free and the most power-efficient. Downside: it makes the game wait for the display, which can hold back frame generation.<br /><br />
         <b>Mailbox:</b> \'Fast vsync.\' The screen always grabs the newest frame and never makes the game wait — tear-free like FIFO but lower lag. Best for frame generation, since its extra generated frames actually reach the screen. Costs a little more battery.<br /><br />
         <b>Immediate:</b> \'Vsync off.\' Frames appear the instant they\'re ready — lowest lag, but you may see tearing. Rarely worth it on a high-refresh screen.<br /><br />
-        <b>Tip:</b> Ludashi automatically switches to Mailbox while external frame generation is multiplying, then back to your saved setting when it\'s off.
+        <b>Tip:</b> Your host present-mode choice stays active during frame generation. LSFG switches only its guest layer to Mailbox while generating.
     ]]></string>
-    <string name="renderer_present_mode_fg_note">External frame generation temporarily switches this to Mailbox while it is running, then restores your choice.</string>
-    <string name="present_mode_fg_locked">Mailbox is required while external frame generation is on.</string>
+    <string name="renderer_present_mode_fg_note">Your host present-mode choice remains active during frame generation.</string>
+    <string name="present_mode_fg_locked">Your host present-mode choice remains active during frame generation.</string>
     <string name="frame_generation_requires_vulkan">Frame generation requires the Vulkan renderer.</string>
     <string name="frame_generation_requires_vulkan_or_surfaceflinger">Frame generation requires the Vulkan or SurfaceFlinger renderer.</string>
     <string name="frame_generation_experimental_warning">Frame generation is experimental and still a work in progress. Results vary by game, device, driver, and components. Try Bionic-FG, win-fg, or LSFG-VK and use whichever works best for your game.</string>

@@ -148,6 +148,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -229,6 +230,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int activeFrameGenMultiplier;
     private boolean activeExternalFrameGenLayerLoaded;
     private Runnable updateSidebarPresentModeUi;
+    private Handler lsfgVsyncHandler;
+    private ExecutorService lsfgVsyncExecutor;
+    private int lastCommittedLsfgLevel = -1;
+    private boolean lsfgResetInProgress;
+    private boolean activityResumed;
+    private final Runnable lsfgResetResumeRunnable = this::resumeFromLsfgReset;
     private boolean performanceControlsReverted;
 
     private int activeRendererWindowId = -1;
@@ -965,6 +972,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
+        activityResumed = true;
 
         if (environment != null) {
             xServerView.onResume();
@@ -976,10 +984,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
         handler.postDelayed(savePlaytimeRunnable, SAVE_INTERVAL_MS);
         if (!isInPictureInPictureMode() && isSuspendEnabled)
             ProcessHelper.resumeAllWineProcesses();
+        if (lsfgResetInProgress) resumeFromLsfgReset();
     }
 
     @Override
     public void onPause() {
+        activityResumed = false;
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onPause();
 
@@ -1106,6 +1116,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        stopLsfgVsyncClock();
+        if (lsfgVsyncExecutor != null) {
+            lsfgVsyncExecutor.shutdownNow();
+            lsfgVsyncExecutor = null;
+        }
+        handler.removeCallbacks(lsfgResetResumeRunnable);
+        lsfgResetInProgress = false;
         stopAndRevertPerformanceControls();
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         if (handler != null) {
@@ -1426,6 +1443,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
                             || activeFrameGenMultiplier >= 2)
                     && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
+        }
+        if (FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend)
+                && activeExternalFrameGenLayerLoaded) {
+            lastCommittedLsfgLevel = activeFrameGenMultiplier >= 2 ? activeFrameGenMultiplier : 0;
+            if (activeFrameGenMultiplier >= 2) startLsfgVsyncClock();
         }
         String rendererType = getEffectiveHostRendererType();
         performanceMode = xServer.isDisplayX()
@@ -2839,26 +2861,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setSelectedModeButton(R.id.BTPresentModeFifo, "fifo".equals(effective));
             setSelectedModeButton(R.id.BTPresentModeMailbox, "mailbox".equals(effective));
             setSelectedModeButton(R.id.BTPresentModeImmediate, "immediate".equals(effective));
-            if (!shouldForceMailboxForExternalFrameGen() && status != null) {
-                status.setVisibility(View.GONE);
-            }
+            if (status != null) status.setVisibility(View.GONE);
         };
 
         View.OnClickListener listener = view -> {
             String requested = view.getId() == R.id.BTPresentModeMailbox ? "mailbox"
                     : view.getId() == R.id.BTPresentModeImmediate ? "immediate" : "fifo";
-            if (shouldForceMailboxForExternalFrameGen()) {
-                if (!"mailbox".equals(requested)) {
-                    if (status != null) {
-                        status.setVisibility(View.VISIBLE);
-                        timeoutHandler.removeCallbacksAndMessages(status);
-                        timeoutHandler.postAtTime(() -> status.setVisibility(View.GONE), status,
-                                android.os.SystemClock.uptimeMillis() + 2000L);
-                    }
-                    AppUtils.showToast(this, getString(R.string.present_mode_fg_locked));
-                }
-                return;
-            }
             persistRendererPresentMode(requested);
             applyEffectivePresentMode(vkRenderer);
         };
@@ -2876,7 +2884,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private String getEffectivePresentMode() {
-        return shouldForceMailboxForExternalFrameGen() ? "mailbox" : getSavedRendererPresentMode();
+        return getSavedRendererPresentMode();
     }
 
     private void persistRendererPresentMode(String mode) {
@@ -2894,10 +2902,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String mode = getEffectivePresentMode();
         vkRenderer.setVkPresentMode(
                 com.winlator.cmod.contentdialog.RendererOptionsDialog.toVkPresentMode(mode));
-        if (shouldForceMailboxForExternalFrameGen()) {
-            Log.i("XServerDisplayActivity",
-                    "External frame generation active; forcing Vulkan host present mode to Mailbox");
-        }
         if (updateSidebarPresentModeUi != null) updateSidebarPresentModeUi.run();
     }
 
@@ -3087,7 +3091,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     && selectedBackend[0].equals(activeFrameGenBackend)
                     && isExternalFrameGenBackend(selectedBackend[0]);
             if (externalAppliesLive) {
-                activeFrameGenMultiplier = multiplier;
+                applyLiveExternalFrameGenChange(selectedBackend[0], multiplier);
                 applyEffectivePresentMode(vkRenderer);
             }
             updateUi.run();
@@ -3136,7 +3140,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     selectedModel[0] = getFrameGenModel(selectedBackend[0]);
                     if (activeExternalFrameGenLayerLoaded
                             && selectedBackend[0].equals(activeFrameGenBackend)) {
-                        activeFrameGenMultiplier = selectedMultiplier[0];
+                        applyLiveExternalFrameGenChange(selectedBackend[0], selectedMultiplier[0]);
                         applyEffectivePresentMode(vkRenderer);
                     }
                     updateUi.run();
@@ -3537,27 +3541,96 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
     }
 
-    private boolean shouldForceMailboxForExternalFrameGen() {
-        return xServerView != null && xServerView.getRenderer() instanceof VulkanRenderer
-                && activeExternalFrameGenLayerLoaded
-                && isExternalFrameGenBackend(activeFrameGenBackend)
-                && activeFrameGenMultiplier >= 2;
+    private void applyLiveExternalFrameGenChange(String backend, int multiplier) {
+        activeFrameGenMultiplier = multiplier;
+        if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) return;
+
+        int newLevel = multiplier >= 2 ? multiplier : 0;
+        if (newLevel >= 2) startLsfgVsyncClock(); else stopLsfgVsyncClock();
+        boolean changed = lastCommittedLsfgLevel >= 0 && newLevel != lastCommittedLsfgLevel;
+        lastCommittedLsfgLevel = newLevel;
+        if (changed) triggerLsfgPresentationReset();
     }
 
-    private void persistFrameGenSelection(String backend, int multiplier, int bionicModel) {
+    private void startLsfgVsyncClock() {
+        if (lsfgVsyncHandler != null || imageFs == null) return;
+        File vsyncFile = new File(imageFs.home_path, ".config/lsfg-vk/vsync.txt");
+        if (lsfgVsyncExecutor == null) {
+            lsfgVsyncExecutor = Executors.newSingleThreadExecutor(r -> {
+                Thread thread = new Thread(r, "lsfg-vsync");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+        Handler clock = new Handler(Looper.getMainLooper());
+        lsfgVsyncHandler = clock;
+        Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                if (lsfgVsyncHandler != clock) return;
+                android.view.Choreographer.getInstance().postFrameCallback(frameTimeNanos -> {
+                    if (lsfgVsyncHandler != clock || lsfgVsyncExecutor == null) return;
+                    float refreshRate = getRefreshRate();
+                    long periodNanos = (long) (1_000_000_000.0 / Math.max(1.0f, refreshRate));
+                    lsfgVsyncExecutor.execute(() -> {
+                        File parent = vsyncFile.getParentFile();
+                        if (parent != null) parent.mkdirs();
+                        FileUtils.writeString(vsyncFile, "vsync_ns=" + frameTimeNanos
+                                + "\nperiod_ns=" + periodNanos + "\n");
+                    });
+                });
+                clock.postDelayed(this, 1000L);
+            }
+        };
+        clock.post(tick);
+    }
+
+    private void stopLsfgVsyncClock() {
+        if (lsfgVsyncHandler == null) return;
+        lsfgVsyncHandler.removeCallbacksAndMessages(null);
+        lsfgVsyncHandler = null;
+    }
+
+    private void triggerLsfgPresentationReset() {
+        if (lsfgResetInProgress || !activityResumed || environment == null || isPaused
+                || xServerView == null || !xServerView.canRecreateSurface()) return;
+        lsfgResetInProgress = true;
+        environment.onPause();
+        xServerView.onPause();
+        ProcessHelper.pauseAllWineProcesses();
+        xServerView.setDisplayFrameRate(0f);
+        xServerView.teardownSurface();
+        handler.removeCallbacks(lsfgResetResumeRunnable);
+        handler.postDelayed(lsfgResetResumeRunnable, 250L);
+    }
+
+    private void resumeFromLsfgReset() {
+        if (!lsfgResetInProgress || !activityResumed) return;
+        lsfgResetInProgress = false;
+        if (xServerView != null) {
+            xServerView.rebuildSurface();
+            xServerView.onResume();
+        }
+        if (environment != null) environment.onResume();
+        ProcessHelper.resumeAllWineProcesses();
+        if (xServerView != null) xServerView.setDisplayFrameRate(getRefreshRate());
+        if (xServerView != null && xServerView.getRenderer() instanceof VulkanRenderer) {
+            applyEffectivePresentMode((VulkanRenderer) xServerView.getRenderer());
+        }
+    }
+
+    private void persistFrameGenSelection(String backend, int multiplier, int model) {
         float flowScale = shortcut != null
                 ? (FrameGenManager.BACKEND_WIN_FG.equals(backend)
                         ? shortcut.getWinFgFlowScale()
-                        : FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
-                        ? shortcut.getBionicFgFlowScale() : shortcut.getLsfgFlowScale())
+                        : shortcut.getLsfgFlowScale())
                 : (FrameGenManager.BACKEND_WIN_FG.equals(backend)
                         ? container.getWinFgFlowScale()
-                        : FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
-                        ? container.getBionicFgFlowScale() : container.getLsfgFlowScale());
+                        : container.getLsfgFlowScale());
         boolean performanceMode = shortcut != null
                 ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode();
         FrameGenQuickMenuHelper.Settings settings = new FrameGenQuickMenuHelper.Settings(
-                backend, multiplier, flowScale, performanceMode, bionicModel);
+                backend, multiplier, flowScale, performanceMode, model);
         if (shortcut != null) {
             FrameGenQuickMenuHelper.applySettings(shortcut, settings);
             if (multiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);

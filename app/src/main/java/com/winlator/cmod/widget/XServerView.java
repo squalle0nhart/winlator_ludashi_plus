@@ -5,6 +5,7 @@ import android.content.Context;
 import android.opengl.GLSurfaceView;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
@@ -153,6 +154,29 @@ public class XServerView extends FrameLayout {
     public void onResume() {
         if (glSurfaceView != null) glSurfaceView.onResume();
         else if (renderer instanceof DisplayXRenderer) ((DisplayXRenderer) renderer).onResume();
+    }
+
+    public boolean canRecreateSurface() {
+        return vulkanSurfaceView != null && !(renderer instanceof DisplayXRenderer);
+    }
+
+    public void teardownSurface() {
+        if (canRecreateSurface()) vulkanSurfaceView.setVisibility(View.GONE);
+    }
+
+    public void rebuildSurface() {
+        if (canRecreateSurface()) vulkanSurfaceView.setVisibility(View.VISIBLE);
+    }
+
+    public void setDisplayFrameRate(float frameRate) {
+        if (android.os.Build.VERSION.SDK_INT < 30 || vulkanSurfaceView == null) return;
+        try {
+            android.view.SurfaceControl control = vulkanSurfaceView.getSurfaceControl();
+            if (control == null || !control.isValid()) return;
+            new android.view.SurfaceControl.Transaction()
+                    .setFrameRate(control, frameRate, android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                    .apply();
+        } catch (RuntimeException ignored) {}
     }
 
     public Object getSurfaceControl() {

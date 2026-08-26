@@ -24,7 +24,6 @@ public abstract class LsfgVkManager {
     private static final String VERSION_FILENAME = ".lsfg_vk_runtime_version";
     private static final String LOSSLESS_DLL_NAME = "Lossless.dll";
     private static final String PROCESS_EXE_IDENTIFIER = "winlator-lsfg";
-    private static final String PRESENT_MODE = "fifo";
     private static final String RUNTIME_VERSION = "v1.3.3-android-arm64-v8a";
 
     public static final String EXTRA_ENABLED = "lsfgEnabled";
@@ -348,7 +347,7 @@ public abstract class LsfgVkManager {
         envVars.put("LSFG_FLOW_SCALE", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
         envVars.put("LSFG_PERFORMANCE_MODE", performanceMode ? "1" : "0");
         envVars.put("LSFG_HDR_MODE", "0");
-        envVars.put("LSFG_EXPERIMENTAL_PRESENT_MODE", PRESENT_MODE);
+        envVars.put("LSFG_EXPERIMENTAL_PRESENT_MODE", presentModeForMultiplier(multiplier));
     }
 
     private static void disableLayerInContainer(Container container) {
@@ -374,10 +373,14 @@ public abstract class LsfgVkManager {
             builder.append("flow_scale = ").append(String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale)))).append('\n');
             builder.append("performance_mode = ").append(performanceMode ? "true" : "false").append('\n');
             builder.append("hdr_mode = false\n");
-            builder.append("experimental_present_mode = ").append(tomlString(PRESENT_MODE)).append('\n');
+            builder.append("experimental_present_mode = ").append(tomlString(presentModeForMultiplier(multiplier))).append('\n');
         }
 
         return builder.toString();
+    }
+
+    static String presentModeForMultiplier(int multiplier) {
+        return multiplier >= 2 ? "mailbox" : "fifo";
     }
 
     private static String tomlString(String value) {
