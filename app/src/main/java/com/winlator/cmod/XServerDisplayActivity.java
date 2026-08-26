@@ -1444,6 +1444,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         if (renderer instanceof VulkanRenderer) {
             VulkanRenderer vkRenderer = (VulkanRenderer) renderer;
+            vkRenderer.setInitialNativeMode(getLaunchRendererNative());
             String rendererDriverId = shortcut != null ? shortcut.getRendererDriverId()
                     : (container != null ? container.getRendererDriverId() : "");
             if (rendererDriverId == null || rendererDriverId.isEmpty()) {
@@ -4128,11 +4129,45 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             return effectiveRenderer;
         }
+        if ("vulkan".equalsIgnoreCase(requestedRenderer)
+                && getLaunchRendererNative()
+                && getLaunchScalingMode() < GRAPHICS_SCALING_SGSR
+                && !(shortcut != null ? shortcut.getRendererSwapRB()
+                        : container != null && container.getRendererSwapRB())
+                && !"flip".equalsIgnoreCase(getLaunchRendererNativeBackend())
+                && ASurfaceRenderer.isSupported()) {
+            return "surfaceflinger";
+        }
         if ("surfaceflinger".equalsIgnoreCase(requestedRenderer)
                 && !ASurfaceRenderer.isSupported()) {
             return "vulkan";
         }
         return requestedRenderer;
+    }
+
+    private boolean getLaunchRendererNative() {
+        return shortcut != null ? shortcut.getRendererNative()
+                : container != null && container.isRendererNative();
+    }
+
+    private String getLaunchRendererNativeBackend() {
+        return shortcut != null ? shortcut.getRendererNativeBackend()
+                : container != null ? container.getRendererNativeBackend() : "auto";
+    }
+
+    private int getLaunchScalingMode() {
+        String value = getLaunchGraphicsExtra(GRAPHICS_SIDEBAR_SCALING_MODE_KEY, "");
+        if (!value.isEmpty()) {
+            try {
+                return Integer.parseInt(value);
+            } catch (NumberFormatException ignored) {}
+        }
+        String filter = getLaunchGraphicsExtra("graphicsFilterMode", "0");
+        if ("2".equals(filter)) return GRAPHICS_SCALING_SGSR;
+        if ("4".equals(filter)) return GRAPHICS_SCALING_FSR;
+        if ("5".equals(filter)) return GRAPHICS_SCALING_DLS;
+        if ("3".equals(filter)) return GRAPHICS_SCALING_NIS;
+        return GRAPHICS_SCALING_NONE;
     }
 
     private String getLaunchRendererType() {

@@ -527,6 +527,15 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
+                            public String getRendererNativeBackend() {
+                                return rendererCfgHolder.getRendererNativeBackend();
+                            }
+
+                            public void setRendererNativeBackend(String val) {
+                                rendererCfgHolder.setRendererNativeBackend(val);
+                                if (isEditMode()) rendererCfgHolder.saveData();
+                            }
+
                             public boolean getRendererSfCompatMode() {
                                 return rendererCfgHolder.getRendererSfCompatMode();
                             }
@@ -1034,6 +1043,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     container.setGraphicsDriverConfig(graphicsDriverConfig);
                     container.setDXWrapper(dxwrapper);
                     container.setRendererNative(rendererCfgHolder.isRendererNative());
+                    container.setRendererNativeBackend(rendererCfgHolder.getRendererNativeBackend());
                     container.setRendererPresentMode(rendererCfgHolder.getRendererPresentMode());
                     container.setRendererDriverId(rendererCfgHolder.getRendererDriverId());
                     container.setRendererFilterMode(rendererCfgHolder.getRendererFilterMode());
@@ -1078,6 +1088,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     data.put("dxwrapper", dxwrapper);
                     data.put("renderer", rendererCfgHolder.getRenderer());
                     data.put("rendererNative", rendererCfgHolder.isRendererNative());
+                    data.put("rendererNativeBackend", rendererCfgHolder.getRendererNativeBackend());
                     data.put("rendererPresentMode", rendererCfgHolder.getRendererPresentMode());
                     if (!rendererCfgHolder.getRendererDriverId().isEmpty())
                         data.put("rendererDriverId", rendererCfgHolder.getRendererDriverId());

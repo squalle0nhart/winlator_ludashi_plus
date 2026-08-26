@@ -38,6 +38,9 @@ public class RendererOptionsDialog extends ContentDialog {
         boolean getRendererNative();
         void setRendererNative(boolean v);
 
+        String getRendererNativeBackend();
+        void setRendererNativeBackend(String v);
+
         String getRendererPresentMode();
         void setRendererPresentMode(String v);
 
@@ -113,8 +116,9 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
-    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "bionic_fg", "win_fg", "native_fg"};
-    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "Bionic-FG", "win-fg", "Native Framegen"};
+    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "win_fg", "native_fg"};
+    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "win-fg", "Native Framegen"};
+    private static final String[] NATIVE_BACKEND_IDS = {"auto", "asr", "flip"};
     private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
     private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String[] POSTFX_LABELS = {"None", "DLS", "CRT", "HDR", "Natural"};
@@ -157,6 +161,8 @@ public class RendererOptionsDialog extends ContentDialog {
         Spinner  spDriver  = findViewById(R.id.SPRendererDriver);
         Spinner  spFilter  = findViewById(R.id.SPRendererFilter);
         CheckBox cbNativeRendering = findViewById(R.id.CBRendererNative);
+        View groupNativeBackend = findViewById(R.id.GroupRendererNativeBackend);
+        Spinner spNativeBackend = findViewById(R.id.SPRendererNativeBackend);
         CheckBox cbSwapRB  = findViewById(R.id.CBRendererSwapRB);
         CheckBox cbSfCompatMode = findViewById(R.id.CBRendererSfCompatMode);
         CheckBox cbLegacyScanout = findViewById(R.id.CBRendererLegacyScanout);
@@ -222,7 +228,10 @@ public class RendererOptionsDialog extends ContentDialog {
             if (spPresent != null) spPresent.setEnabled(isVulkanRenderer);
             if (groupLsfg != null) groupLsfg.setAlpha(isExternalFrameGenRendererSelected[0] ? 1.0f : 0.5f);
             if (spFrameGenBackend != null) spFrameGenBackend.setEnabled(isExternalFrameGenRendererSelected[0]);
-            if (cbNativeRendering != null) cbNativeRendering.setVisibility(isGlRenderer ? View.VISIBLE : View.GONE);
+            if (cbNativeRendering != null) cbNativeRendering.setVisibility(
+                    isGlRenderer || isVulkanRenderer ? View.VISIBLE : View.GONE);
+            if (groupNativeBackend != null) groupNativeBackend.setVisibility(
+                    isVulkanRenderer && cbNativeRendering.isChecked() ? View.VISIBLE : View.GONE);
             if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
             if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(isSurfaceFlingerRenderer ? View.VISIBLE : View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
@@ -269,6 +278,22 @@ public class RendererOptionsDialog extends ContentDialog {
         setAmoledAdapter(ctx, spFilter, FILTER_LABELS);
         spFilter.setSelection(config.getRendererFilterMode());
         cbNativeRendering.setChecked(isNativeMode);
+        setAmoledAdapter(ctx, spNativeBackend, new String[] {
+                ctx.getString(R.string.renderer_native_backend_auto),
+                ctx.getString(R.string.renderer_native_backend_asr),
+                ctx.getString(R.string.renderer_native_backend_flip)
+        });
+        String nativeBackend = config.getRendererNativeBackend();
+        int nativeBackendSelection = 0;
+        for (int i = 0; i < NATIVE_BACKEND_IDS.length; i++) {
+            if (NATIVE_BACKEND_IDS[i].equalsIgnoreCase(nativeBackend)) {
+                nativeBackendSelection = i;
+                break;
+            }
+        }
+        spNativeBackend.setSelection(nativeBackendSelection);
+        cbNativeRendering.setOnCheckedChangeListener((button, checked) -> syncRendererUi.run());
+        syncRendererUi.run();
         cbSwapRB.setChecked(config.getRendererSwapRB());
         cbSfCompatMode.setChecked(config.getRendererSfCompatMode());
         cbLegacyScanout.setChecked(config.getRendererLegacyScanout());
@@ -481,6 +506,7 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
                 config.setRendererFilterMode(spFilter.getSelectedItemPosition());
                 config.setRendererNative(cbNativeRendering.isChecked());
+                config.setRendererNativeBackend(NATIVE_BACKEND_IDS[spNativeBackend.getSelectedItemPosition()]);
                 config.setRendererSwapRB(cbSwapRB.isChecked());
                 config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
                 config.setRendererLegacyScanout(cbLegacyScanout.isChecked());
@@ -515,6 +541,7 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererNative(cbNativeRendering.isChecked());
+            config.setRendererNativeBackend(NATIVE_BACKEND_IDS[spNativeBackend.getSelectedItemPosition()]);
             config.setRendererSwapRB(cbSwapRB.isChecked());
             config.setRendererSfCompatMode(cbSfCompatMode.isChecked());
             config.setRendererLegacyScanout(cbLegacyScanout.isChecked());

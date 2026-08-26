@@ -181,6 +181,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         });
         syncDisplayDriverUi.run();
         final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
+        final String[] rendererNativeBackendHolder = new String[] { shortcut.getRendererNativeBackend() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
@@ -205,6 +206,8 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
                 public void setRendererNative(boolean val) { rendererNativeHolder[0] = val; }
+                public String getRendererNativeBackend() { return rendererNativeBackendHolder[0]; }
+                public void setRendererNativeBackend(String val) { rendererNativeBackendHolder[0] = val; }
                 public String getRendererPresentMode() { return rendererPresentModeHolder[0]; }
                 public void setRendererPresentMode(String val) { rendererPresentModeHolder[0] = val; }
                 public String getRendererDriverId() { return rendererDriverHolder[0]; }
@@ -604,6 +607,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 shortcut.putExtra("displayxSurfaceFormat", displayXConfig.get("surfaceFormat", "rgba8"));
                 shortcut.putExtra("displayxPresentRR", displayXConfig.get("presentRR", "0"));
                 shortcut.setRendererNative(rendererNativeHolder[0]);
+                shortcut.setRendererNativeBackend(rendererNativeBackendHolder[0]);
                 shortcut.setRendererPresentMode(rendererPresentModeHolder[0]);
                 shortcut.setRendererDriverId(rendererDriverHolder[0]);
                 shortcut.setRendererFilterMode(rendererFilterHolder[0]);

@@ -61,6 +61,7 @@ public class Container {
     private String wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
     private boolean showFPS;
     private boolean rendererNative = false;
+    private String rendererNativeBackend = "auto";
     private String rendererPresentMode = "fifo";
     private String rendererDriverId = "system";
     private int rendererFilterMode = 0;
@@ -150,6 +151,13 @@ public class Container {
 
     public boolean isRendererNative() { return rendererNative; }
     public void setRendererNative(boolean v) { this.rendererNative = v; }
+    public String getRendererNativeBackend() {
+        return rendererNativeBackend == null || rendererNativeBackend.isEmpty()
+                ? "auto" : rendererNativeBackend;
+    }
+    public void setRendererNativeBackend(String v) {
+        rendererNativeBackend = v == null || v.isEmpty() ? "auto" : v;
+    }
     public String getRendererPresentMode() { return rendererPresentMode; }
     public void setRendererPresentMode(String v) { this.rendererPresentMode = v != null ? v : "fifo"; }
     public String getRendererDriverId() { return rendererDriverId; }
@@ -668,6 +676,7 @@ public class Container {
             data.put("graphicsDriver", graphicsDriver);
             data.put("graphicsDriverConfig", graphicsDriverConfig);
             data.put("rendererNative", rendererNative);
+            data.put("rendererNativeBackend", getRendererNativeBackend());
             data.put("rendererPresentMode", rendererPresentMode);
             if (!rendererDriverId.isEmpty()) data.put("rendererDriverId", rendererDriverId);
             if (rendererFilterMode != 0) data.put("rendererFilterMode", rendererFilterMode);
@@ -708,6 +717,7 @@ public class Container {
         wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
         dxwrapperConfig = "";
         rendererSfCompatMode = true;
+        rendererNativeBackend = "auto";
         checkObsoleteOrMissingProperties(data);
 
         for (Iterator<String> it = data.keys(); it.hasNext(); ) {
@@ -739,6 +749,9 @@ public class Container {
                     break;
                 case "rendererNative" :
                     rendererNative = data.getBoolean(key);
+                    break;
+                case "rendererNativeBackend" :
+                    setRendererNativeBackend(data.getString(key));
                     break;
                 case "rendererPresentMode" :
                     rendererPresentMode = data.getString(key);

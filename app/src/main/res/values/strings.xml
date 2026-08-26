@@ -718,6 +718,10 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="store_section_title">Store</string>
     <string name="wine_version_locked_for_existing_container">Wine version is locked for existing containers</string>
     <string name="renderer_sf_compat">Correct SurfaceFlinger colors</string>
+    <string name="renderer_native_backend">Native backend</string>
+    <string name="renderer_native_backend_auto">Auto (recommended)</string>
+    <string name="renderer_native_backend_asr">SurfaceFlinger</string>
+    <string name="renderer_native_backend_flip">Vulkan direct-scanout</string>
     <string name="power_user_performance">Power-user Performance</string>
     <string name="performance_global_summary">Global defaults apply to every game unless a game has a different per-game override.</string>
     <string name="performance_game_summary">This game inherits each global default unless you set a different value.</string>

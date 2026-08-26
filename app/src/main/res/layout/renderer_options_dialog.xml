@@ -114,6 +114,30 @@
                 android:layout_marginTop="8dp"
                 android:text="Enable Native Rendering+ (Low-Latency Mode)" />
 
+            <LinearLayout
+                android:id="@+id/GroupRendererNativeBackend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="8dp"
+                    android:text="@string/renderer_native_backend"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+                <Spinner
+                    android:id="@+id/SPRendererNativeBackend"
+                    style="@style/ComboBoxCompact"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/combo_box_no_arrow_dark"
+                    android:spinnerMode="dropdown" />
+            </LinearLayout>
+
             <CheckBox
                 android:id="@+id/CBRendererSwapRB"
                 android:layout_width="match_parent"

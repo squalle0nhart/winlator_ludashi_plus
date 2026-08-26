@@ -696,6 +696,10 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
 
     public boolean isCursorVisible() { return cursorVisible; }
 
+    public void setInitialNativeMode(boolean enabled) {
+        nativeMode = enabled;
+    }
+
     public void setNativeMode(boolean mode) {
         if (!this.nativeMode && !mode) return;
         this.nativeMode = false;
@@ -709,7 +713,7 @@ public class VulkanRenderer implements WindowManager.OnWindowModificationListene
         xServerView.queueEvent(this::updateScene);
     }
 
-    public boolean isNativeMode() { return false; }
+    public boolean isNativeMode() { return nativeMode; }
     @Override
     public void setRenderingEnabled(boolean enabled) {
         xServer.setRenderingEnabled(enabled);

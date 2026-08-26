@@ -291,6 +291,14 @@ public class Shortcut {
     }
     public void setRendererNative(boolean v) { putExtra("rendererNative", v ? "1" : "0"); }
 
+    public String getRendererNativeBackend() {
+        String v = getExtra("rendererNativeBackend", null);
+        return v != null && !v.isEmpty() ? v : container.getRendererNativeBackend();
+    }
+    public void setRendererNativeBackend(String v) {
+        putExtra("rendererNativeBackend", v == null || v.isEmpty() ? "auto" : v);
+    }
+
     public String getRenderer() {
         String v = getExtra("renderer", null);
         return v != null && !v.isEmpty() ? v : container.getRenderer();
