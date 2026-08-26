@@ -2932,13 +2932,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         Runnable updateUi = () -> {
             boolean nativeBackend = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
-            boolean bionicBackend = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
             boolean winBackend = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
-            boolean modelBackend = bionicBackend || winBackend;
             boolean selectedBackendAvailable = nativeBackend
                     ? vkRenderer != null : externalFrameGenAvailable;
             setEnabledIfPresent(R.id.BTFrameGenLsfg, externalFrameGenAvailable);
-            setEnabledIfPresent(R.id.BTFrameGenBionic, externalFrameGenAvailable);
             setEnabledIfPresent(R.id.BTFrameGenWin, externalFrameGenAvailable);
             setEnabledIfPresent(R.id.BTFrameGenNative, vkRenderer != null);
             setEnabledIfPresent(R.id.BTFrameGenOff, selectedBackendAvailable);
@@ -2947,7 +2944,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setEnabledIfPresent(R.id.BTFrameGen4x, selectedBackendAvailable);
             setEnabledIfPresent(R.id.BTFrameGenAdvanced, externalFrameGenAvailable);
             setSelectedModeButton(R.id.BTFrameGenLsfg, FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]));
-            setSelectedModeButton(R.id.BTFrameGenBionic, bionicBackend);
             setSelectedModeButton(R.id.BTFrameGenWin, winBackend);
             setSelectedModeButton(R.id.BTFrameGenNative, nativeBackend);
             setSelectedModeButton(R.id.BTFrameGenOff, selectedMultiplier[0] < 2);
@@ -2961,16 +2957,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (multiplier3x != null) multiplier3x.setVisibility(winBackend ? View.GONE : View.VISIBLE);
             if (multiplier4x != null) multiplier4x.setVisibility(winBackend ? View.GONE : View.VISIBLE);
             if (modelGroup != null) {
-                modelGroup.setVisibility(modelBackend && selectedMultiplier[0] >= 2
+                modelGroup.setVisibility(winBackend && selectedMultiplier[0] >= 2
                         ? View.VISIBLE : View.GONE);
             }
-            if (modelGroupLabel != null) modelGroupLabel.setText(winBackend ? "win-fg Model" : "Bionic-FG Model");
+            if (modelGroupLabel != null) modelGroupLabel.setText("win-fg Model");
             View modelDefault = findViewById(R.id.BTFrameGenModelDefault);
             View modelTraced = findViewById(R.id.BTFrameGenModelTraced);
             View modelV2 = findViewById(R.id.BTFrameGenModelV2);
-            if (modelDefault != null) modelDefault.setVisibility(winBackend ? View.GONE : View.VISIBLE);
-            if (modelTraced != null) modelTraced.setVisibility(winBackend ? View.GONE : View.VISIBLE);
-            if (modelV2 != null) modelV2.setVisibility(winBackend ? View.GONE : View.VISIBLE);
+            if (modelDefault != null) modelDefault.setVisibility(View.GONE);
+            if (modelTraced != null) modelTraced.setVisibility(View.GONE);
+            if (modelV2 != null) modelV2.setVisibility(View.GONE);
             TextView modelFsr = findViewById(R.id.BTFrameGenModelFsr3);
             TextView modelFsrPlus = findViewById(R.id.BTFrameGenModelFsr3Plus);
             if (modelFsr != null) modelFsr.setText(winBackend ? "Optical" : "FSR");
@@ -2993,14 +2989,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             : canApplyLive
                                     ? "Native optical-flow frame generation applies immediately."
                                     : "Relaunch to switch from the active external framegen layer.");
-                } else if (bionicBackend) {
-                    boolean modelAppliesLive = activeExternalFrameGenLayerLoaded
-                            && FrameGenManager.BACKEND_BIONIC_FG.equals(activeFrameGenBackend);
-                    status.setText(modelAppliesLive
-                            ? (vkRenderer != null
-                                    ? "Bionic-FG is experimental. Multiplier, model, and flow changes apply immediately; Mailbox is automatic while multiplying."
-                                    : "Bionic-FG is experimental. Multiplier, model, and flow changes apply immediately with SurfaceFlinger.")
-                            : "Bionic-FG is experimental. Relaunch to load its Vulkan layer.");
                 } else if (winBackend) {
                     boolean settingsApplyLive = activeExternalFrameGenLayerLoaded
                             && FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend);
@@ -3028,17 +3016,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 vkRenderer.setFrameGenerationMultiplier(nativeBackend && canApplyLive ? selectedMultiplier[0] : 0);
             }
             if (updateSidebarPresentModeUi != null) updateSidebarPresentModeUi.run();
-            setEnabledIfPresent(R.id.BTFrameGenModelDefault, selectedBackendAvailable && bionicBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelTraced, selectedBackendAvailable && bionicBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelV2, selectedBackendAvailable && bionicBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelFsr3, selectedBackendAvailable && modelBackend);
-            setEnabledIfPresent(R.id.BTFrameGenModelFsr3Plus, selectedBackendAvailable && modelBackend);
+            setEnabledIfPresent(R.id.BTFrameGenModelDefault, false);
+            setEnabledIfPresent(R.id.BTFrameGenModelTraced, false);
+            setEnabledIfPresent(R.id.BTFrameGenModelV2, false);
+            setEnabledIfPresent(R.id.BTFrameGenModelFsr3, selectedBackendAvailable && winBackend);
+            setEnabledIfPresent(R.id.BTFrameGenModelFsr3Plus, selectedBackendAvailable && winBackend);
         };
 
         View.OnClickListener backendListener = view -> {
-            String backend = view.getId() == R.id.BTFrameGenBionic
-                    ? FrameGenManager.BACKEND_BIONIC_FG
-                    : view.getId() == R.id.BTFrameGenWin
+            String backend = view.getId() == R.id.BTFrameGenWin
                             ? FrameGenManager.BACKEND_WIN_FG
                     : view.getId() == R.id.BTFrameGenNative
                             ? FrameGenManager.BACKEND_NATIVE_FG
@@ -3065,7 +3051,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenLsfg, backendListener);
-        setOnClickListenerIfPresent(R.id.BTFrameGenBionic, backendListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenWin, backendListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenNative, backendListener);
 
@@ -3120,12 +3105,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             updateUi.run();
             boolean appliesLive = activeExternalFrameGenLayerLoaded
                     && activeFrameGenBackend.equals(selectedBackend[0]);
-            boolean winBackend = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
             AppUtils.showToast(this, appliesLive
-                    ? (winBackend ? "win-fg model changed" : "Bionic-FG model changed")
-                    : (winBackend
-                            ? "win-fg model saved. Relaunch the game to apply it."
-                            : "Bionic-FG model saved. Relaunch the game to apply it."));
+                    ? "win-fg model changed"
+                    : "win-fg model saved. Relaunch the game to apply it.");
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenModelDefault, modelListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenModelTraced, modelListener);
@@ -3171,12 +3153,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? shortcut.getLsfgFlowScale() : container.getLsfgFlowScale()};
         final boolean[] selectedPerformanceMode = {shortcut != null
                 ? shortcut.getLsfgPerformanceMode() : container.getLsfgPerformanceMode()};
-        final int[] selectedBionicMultiplier = {shortcut != null
-                ? shortcut.getBionicFgMultiplier() : container.getBionicFgMultiplier()};
-        final float[] selectedBionicFlowScale = {shortcut != null
-                ? shortcut.getBionicFgFlowScale() : container.getBionicFgFlowScale()};
-        final int[] selectedBionicModel = {shortcut != null
-                ? shortcut.getBionicFgModel() : container.getBionicFgModel()};
         final int[] selectedWinMultiplier = {shortcut != null
                 ? shortcut.getWinFgMultiplier() : container.getWinFgMultiplier()};
         final float[] selectedWinFlowScale = {shortcut != null
@@ -3201,17 +3177,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner backendSpinner = new Spinner(this);
         ArrayAdapter<String> backendAdapter = ThemeUtils.createSpinnerAdapter(
                 this,
-                new String[]{"LSFG-VK", "Bionic-FG", "win-fg", "Native Framegen"});
+                new String[]{"LSFG-VK", "win-fg", "Native Framegen"});
         backendSpinner.setAdapter(backendAdapter);
         ThemeUtils.applySpinnerTheme(backendSpinner);
         backendSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
         backendSpinner.setPadding(padding / 2, 0, padding / 2, 0);
         backendSpinner.setMinimumHeight(padding * 3);
-        int initialBackendPosition = FrameGenManager.BACKEND_BIONIC_FG.equals(currentSettings.backend) ? 1
-                : FrameGenManager.BACKEND_WIN_FG.equals(currentSettings.backend) ? 2
-                : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 3 : 0;
-        if (initialBackendPosition == 3 && !nativeAvailable && externalFrameGenAvailable) {
-            initialBackendPosition = 1;
+        int initialBackendPosition = FrameGenManager.BACKEND_WIN_FG.equals(currentSettings.backend) ? 1
+                : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 2 : 0;
+        if (initialBackendPosition == 2 && !nativeAvailable && externalFrameGenAvailable) {
+            initialBackendPosition = 0;
         }
         backendSpinner.setSelection(initialBackendPosition);
         backendSpinner.setEnabled(externalFrameGenAvailable);
@@ -3252,22 +3227,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         TextView modelLabel = new TextView(this);
         modelLabel.setPadding(0, padding, 0, 0);
-        modelLabel.setText("Bionic-FG Model");
+        modelLabel.setText("win-fg Model");
         modelLabel.setTextColor(ThemeUtils.getColorAttr(this, R.attr.colorOnSurface));
         layout.addView(modelLabel);
 
         Spinner modelSpinner = new Spinner(this);
         ArrayAdapter<String> modelAdapter = ThemeUtils.createSpinnerAdapter(
                 this,
-                new String[]{"Default", "Traced graph (experimental)", "V2 engine (experimental)",
-                        "FidelityFX optical flow (experimental)",
-                        "FidelityFX optical flow v2 (experimental)"});
+                new String[]{"Optical flow", "Optical flow · bidirectional"});
         modelSpinner.setAdapter(modelAdapter);
         ThemeUtils.applySpinnerTheme(modelSpinner);
         modelSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
         modelSpinner.setPadding(padding / 2, 0, padding / 2, 0);
         modelSpinner.setMinimumHeight(padding * 3);
-        modelSpinner.setSelection(FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
+        modelSpinner.setSelection(Math.max(0, Math.min(1, selectedWinModel[0] - 3)));
         layout.addView(modelSpinner);
 
         CheckBox performanceMode = new CheckBox(this);
@@ -3281,22 +3254,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
             syncingUi[0] = true;
             int backendPosition = backendSpinner.getSelectedItemPosition();
             selectedBackend[0] = backendPosition == 1
-                    ? FrameGenManager.BACKEND_BIONIC_FG
+                    ? FrameGenManager.BACKEND_WIN_FG
                     : backendPosition == 2
-                            ? FrameGenManager.BACKEND_WIN_FG
-                            : backendPosition == 3
-                                    ? FrameGenManager.BACKEND_NATIVE_FG
-                                    : FrameGenManager.BACKEND_LSFG_VK;
-            boolean useBionicFg = FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0]);
+                            ? FrameGenManager.BACKEND_NATIVE_FG
+                            : FrameGenManager.BACKEND_LSFG_VK;
             boolean useWinFg = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
             boolean useNativeFg = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
             boolean backendAvailable = useNativeFg ? nativeAvailable
-                    : externalFrameGenAvailable && (useBionicFg || useWinFg || dllAvailable);
+                    : externalFrameGenAvailable && (useWinFg || dllAvailable);
 
             status.setText(useWinFg
                     ? "Bundled clean-room win-fg with device-proven presentation and live config reload."
-                    : useBionicFg
-                    ? "Bundled Bionic-FG. Model changes can apply live when Bionic-FG is active."
                     : useNativeFg
                             ? (nativeAvailable
                                     ? "Native frame generation can apply live with the Vulkan renderer."
@@ -3307,7 +3275,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             int selectedMultiplier = useNativeFg ? selectedNativeMultiplier[0]
                     : useWinFg ? selectedWinMultiplier[0]
-                    : useBionicFg ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
+                    : selectedLsfgMultiplier[0];
             for (int i = 0; i < multiplierGroup.getChildCount(); i++) {
                 View child = multiplierGroup.getChildAt(i);
                 if (child instanceof android.widget.RadioButton) {
@@ -3321,8 +3289,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 }
             }
 
-            float flowScale = useWinFg ? selectedWinFlowScale[0]
-                    : useBionicFg ? selectedBionicFlowScale[0] : selectedLsfgFlowScale[0];
+            float flowScale = useWinFg ? selectedWinFlowScale[0] : selectedLsfgFlowScale[0];
             boolean showWinFgTuning = !useWinFg || selectedMultiplier > 0;
             flowLabel.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
             flowSeekBar.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
@@ -3334,22 +3301,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             flowLabel.setText(useNativeFg
                     ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
                     : String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
-            boolean modelBackend = useBionicFg || useWinFg;
-            modelLabel.setText(useWinFg ? "win-fg Model" : "Bionic-FG Model");
-            modelLabel.setVisibility(modelBackend && showWinFgTuning ? View.VISIBLE : View.GONE);
-            modelSpinner.setVisibility(modelBackend && showWinFgTuning ? View.VISIBLE : View.GONE);
+            modelLabel.setText("win-fg Model");
+            modelLabel.setVisibility(useWinFg && showWinFgTuning ? View.VISIBLE : View.GONE);
+            modelSpinner.setVisibility(useWinFg && showWinFgTuning ? View.VISIBLE : View.GONE);
             modelSpinner.setAdapter(ThemeUtils.createSpinnerAdapter(
                     XServerDisplayActivity.this,
-                    useWinFg
-                            ? new String[]{"Optical flow", "Optical flow · bidirectional"}
-                            : new String[]{"Default", "Traced graph (experimental)", "V2 engine (experimental)",
-                                    "FidelityFX optical flow (experimental)",
-                                    "FidelityFX optical flow v2 (experimental)"}));
+                    new String[]{"Optical flow", "Optical flow · bidirectional"}));
             ThemeUtils.applySpinnerTheme(modelSpinner);
-            modelSpinner.setSelection(useWinFg
-                    ? Math.max(0, Math.min(1, selectedWinModel[0] - 3))
-                    : FrameGenQuickMenuHelper.modelToPosition(selectedBionicModel[0]));
-            performanceMode.setVisibility(modelBackend || useNativeFg ? View.GONE : View.VISIBLE);
+            modelSpinner.setSelection(Math.max(0, Math.min(1, selectedWinModel[0] - 3)));
+            performanceMode.setVisibility(useWinFg || useNativeFg ? View.GONE : View.VISIBLE);
             performanceMode.setEnabled(dllAvailable);
             syncingUi[0] = false;
         };
@@ -3357,10 +3317,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         backendSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position == 3 && !nativeAvailable) {
+                if (position == 2 && !nativeAvailable) {
                     AppUtils.showToast(XServerDisplayActivity.this,
                             getString(R.string.frame_generation_requires_vulkan));
-                    backendSpinner.setSelection(1);
+                    backendSpinner.setSelection(0);
                     return;
                 }
                 syncUi.run();
@@ -3378,8 +3338,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 selectedNativeMultiplier[0] = (Integer) tag;
             } else if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
                 selectedWinMultiplier[0] = (Integer) tag;
-            } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
-                selectedBionicMultiplier[0] = (Integer) tag;
             } else {
                 selectedLsfgMultiplier[0] = (Integer) tag;
             }
@@ -3398,8 +3356,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + progress / 100.0f);
                 if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
                     selectedWinFlowScale[0] = value;
-                } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])) {
-                    selectedBionicFlowScale[0] = value;
                 } else {
                     selectedLsfgFlowScale[0] = value;
                 }
@@ -3416,11 +3372,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (syncingUi[0]) return;
-                if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
-                    selectedWinModel[0] = Math.max(3, Math.min(4, position + 3));
-                } else {
-                    selectedBionicModel[0] = FrameGenQuickMenuHelper.modelFromPosition(position);
-                }
+                selectedWinModel[0] = Math.max(3, Math.min(4, position + 3));
             }
 
             @Override
@@ -3449,9 +3401,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     int selectedMultiplier = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
                             ? selectedNativeMultiplier[0]
                             : FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])
-                                    ? selectedWinMultiplier[0]
-                            : FrameGenManager.BACKEND_BIONIC_FG.equals(selectedBackend[0])
-                                    ? selectedBionicMultiplier[0] : selectedLsfgMultiplier[0];
+                                    ? selectedWinMultiplier[0] : selectedLsfgMultiplier[0];
                     if (shortcut != null) {
                         shortcut.setFrameGenBackend(selectedBackend[0]);
                         shortcut.setLsfgMultiplier(selectedLsfgMultiplier[0]);
@@ -3459,9 +3409,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         shortcut.setLsfgPerformanceMode(selectedPerformanceMode[0]);
                         shortcut.setLsfgEnabled(FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0])
                                 && selectedLsfgMultiplier[0] >= 2);
-                        shortcut.setBionicFgMultiplier(selectedBionicMultiplier[0]);
-                        shortcut.setBionicFgFlowScale(selectedBionicFlowScale[0]);
-                        shortcut.setBionicFgModel(selectedBionicModel[0]);
                         shortcut.setWinFgMultiplier(selectedWinMultiplier[0]);
                         shortcut.setWinFgFlowScale(selectedWinFlowScale[0]);
                         shortcut.setWinFgModel(selectedWinModel[0]);
@@ -3477,9 +3424,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         container.setLsfgPerformanceMode(selectedPerformanceMode[0]);
                         container.setLsfgEnabled(FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0])
                                 && selectedLsfgMultiplier[0] >= 2);
-                        container.setBionicFgMultiplier(selectedBionicMultiplier[0]);
-                        container.setBionicFgFlowScale(selectedBionicFlowScale[0]);
-                        container.setBionicFgModel(selectedBionicModel[0]);
                         container.setWinFgMultiplier(selectedWinMultiplier[0]);
                         container.setWinFgFlowScale(selectedWinFlowScale[0]);
                         container.setWinFgModel(selectedWinModel[0]);
@@ -3509,12 +3453,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (shortcut != null) {
             if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return shortcut.getNativeFgMultiplier();
             if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return shortcut.getWinFgMultiplier();
-            if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return shortcut.getBionicFgMultiplier();
             return shortcut.getLsfgMultiplier();
         }
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return container.getNativeFgMultiplier();
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return container.getWinFgMultiplier();
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return container.getBionicFgMultiplier();
         return container.getLsfgMultiplier();
     }
 
@@ -3523,17 +3465,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
             return shortcut != null ? shortcut.getWinFgModel() : container.getWinFgModel();
         }
-        return shortcut != null ? shortcut.getBionicFgModel() : container.getBionicFgModel();
+        return 3;
     }
 
     private boolean isExternalFrameGenBackend(String backend) {
-        return FrameGenManager.BACKEND_BIONIC_FG.equals(backend)
-                || FrameGenManager.BACKEND_WIN_FG.equals(backend)
+        return FrameGenManager.BACKEND_WIN_FG.equals(backend)
                 || FrameGenManager.BACKEND_LSFG_VK.equals(backend);
     }
 
     private boolean isExternalFrameGenRuntimeAvailable(String backend) {
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) return true;
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return true;
         if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) return false;
         return shortcut != null

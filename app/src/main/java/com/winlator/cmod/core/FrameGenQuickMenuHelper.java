@@ -47,47 +47,34 @@ public abstract class FrameGenQuickMenuHelper {
         String backend = FrameGenManager.getBackend(container);
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
             return new Settings(backend, container.getNativeFgMultiplier(), container.getLsfgFlowScale(),
-                    container.getLsfgPerformanceMode(), container.getBionicFgModel());
-        }
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) {
-            return new Settings(backend, container.getBionicFgMultiplier(), container.getBionicFgFlowScale(),
-                    container.getLsfgPerformanceMode(), container.getBionicFgModel());
+                    container.getLsfgPerformanceMode(), 3);
         }
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
             return new Settings(backend, container.getWinFgMultiplier(), container.getWinFgFlowScale(),
                     container.getLsfgPerformanceMode(), container.getWinFgModel());
         }
         return new Settings(backend, container.getLsfgMultiplier(), container.getLsfgFlowScale(),
-                container.getLsfgPerformanceMode(), container.getBionicFgModel());
+                container.getLsfgPerformanceMode(), 3);
     }
 
     public static Settings readSettings(Shortcut shortcut) {
         String backend = FrameGenManager.getBackend(shortcut);
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
             return new Settings(backend, shortcut.getNativeFgMultiplier(), shortcut.getLsfgFlowScale(),
-                    shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
-        }
-        if (FrameGenManager.BACKEND_BIONIC_FG.equals(backend)) {
-            return new Settings(backend, shortcut.getBionicFgMultiplier(), shortcut.getBionicFgFlowScale(),
-                    shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
+                    shortcut.getLsfgPerformanceMode(), 3);
         }
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
             return new Settings(backend, shortcut.getWinFgMultiplier(), shortcut.getWinFgFlowScale(),
                     shortcut.getLsfgPerformanceMode(), shortcut.getWinFgModel());
         }
         return new Settings(backend, shortcut.getLsfgMultiplier(), shortcut.getLsfgFlowScale(),
-                shortcut.getLsfgPerformanceMode(), shortcut.getBionicFgModel());
+                shortcut.getLsfgPerformanceMode(), 3);
     }
 
     public static void applySettings(Container container, Settings settings) {
         container.setFrameGenBackend(settings.backend);
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
             container.setNativeFgMultiplier(settings.multiplier);
-            container.setLsfgEnabled(false);
-        } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
-            container.setBionicFgMultiplier(settings.multiplier);
-            container.setBionicFgFlowScale(settings.flowScale);
-            container.setBionicFgModel(settings.model);
             container.setLsfgEnabled(false);
         } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
             container.setWinFgMultiplier(settings.multiplier);
@@ -107,11 +94,6 @@ public abstract class FrameGenQuickMenuHelper {
         shortcut.setFrameGenBackend(settings.backend);
         if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
             shortcut.setNativeFgMultiplier(settings.multiplier);
-            shortcut.setLsfgEnabled(false);
-        } else if (FrameGenManager.BACKEND_BIONIC_FG.equals(settings.backend)) {
-            shortcut.setBionicFgMultiplier(settings.multiplier);
-            shortcut.setBionicFgFlowScale(settings.flowScale);
-            shortcut.setBionicFgModel(settings.model);
             shortcut.setLsfgEnabled(false);
         } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
             shortcut.setWinFgMultiplier(settings.multiplier);

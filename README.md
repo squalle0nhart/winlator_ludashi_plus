@@ -36,7 +36,7 @@ You can find updated components (known as `wcps`) to improve compatibility and p
 
 # Frame Generation
 
-The app provides separately selectable **Bionic-FG**, **win-fg**, and **LSFG-VK** backends. **win-fg** is Bannerlator's clean-room Vulkan frame-generation layer: its motion estimation adapts AMD FidelityFX FSR3 optical flow under the MIT license, while its synthesis was written from first principles and bundles no proprietary model weights. It needs no external DLL. In the current device-proven runtime, win-fg uses an Off/On control (On = 2x) with live Optical flow/Bidirectional model and flow-scale updates.
+The app provides separately selectable **win-fg** and **LSFG-VK** backends. **win-fg** is Bannerlator's clean-room Vulkan frame-generation layer: its motion estimation adapts AMD FidelityFX FSR3 optical flow under the MIT license, while its synthesis was written from first principles and bundles no proprietary model weights. It needs no external DLL. In the current device-proven runtime, win-fg uses an Off/On control (On = 2x) with live Optical flow/Bidirectional model and flow-scale updates.
 
 # Credits and Third-party apps
 

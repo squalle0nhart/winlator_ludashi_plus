@@ -659,36 +659,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                     rendererCfgHolder.saveData();
                             }
 
-                            public int getBionicFgMultiplier() {
-                                return rendererCfgHolder.getBionicFgMultiplier();
-                            }
-
-                            public void setBionicFgMultiplier(int val) {
-                                rendererCfgHolder.setBionicFgMultiplier(val);
-                                if (isEditMode())
-                                    rendererCfgHolder.saveData();
-                            }
-
-                            public float getBionicFgFlowScale() {
-                                return rendererCfgHolder.getBionicFgFlowScale();
-                            }
-
-                            public void setBionicFgFlowScale(float val) {
-                                rendererCfgHolder.setBionicFgFlowScale(val);
-                                if (isEditMode())
-                                    rendererCfgHolder.saveData();
-                            }
-
-                            public int getBionicFgModel() {
-                                return rendererCfgHolder.getBionicFgModel();
-                            }
-
-                            public void setBionicFgModel(int val) {
-                                rendererCfgHolder.setBionicFgModel(val);
-                                if (isEditMode())
-                                    rendererCfgHolder.saveData();
-                            }
-
                             public int getWinFgMultiplier() {
                                 return rendererCfgHolder.getWinFgMultiplier();
                             }

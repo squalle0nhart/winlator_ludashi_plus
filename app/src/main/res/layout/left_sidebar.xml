@@ -545,18 +545,6 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="12sp" />
                         <Button
-                            android:id="@+id/BTFrameGenBionic"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:layout_marginHorizontal="4dp"
-                            android:background="@drawable/sidebar_mode_button_background"
-                            android:maxLines="1"
-                            android:text="Bionic"
-                            android:textAllCaps="false"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="12sp" />
-                        <Button
                             android:id="@+id/BTFrameGenWin"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -654,7 +642,7 @@
                             android:id="@+id/TVFrameGenModelLabel"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Bionic-FG Model"
+                            android:text="win-fg Model"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="15sp"
                             android:textStyle="bold" />

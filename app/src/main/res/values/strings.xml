@@ -155,7 +155,7 @@
     <string name="present_mode_fg_locked">Your host present-mode choice remains active during frame generation.</string>
     <string name="frame_generation_requires_vulkan">Frame generation requires the Vulkan renderer.</string>
     <string name="frame_generation_requires_vulkan_or_surfaceflinger">Frame generation requires the Vulkan or SurfaceFlinger renderer.</string>
-    <string name="frame_generation_experimental_warning">Frame generation is experimental and still a work in progress. Results vary by game, device, driver, and components. Try Bionic-FG, win-fg, or LSFG-VK and use whichever works best for your game.</string>
+    <string name="frame_generation_experimental_warning">Frame generation is experimental and still a work in progress. Results vary by game, device, driver, and components. Try win-fg or LSFG-VK and use whichever works best for your game.</string>
     <string name="container_glossary">What is all this?</string>
     <string name="container_glossary_description">Plain-language explanations of the container and game options.</string>
     <string name="container_glossary_search_hint">Search terms</string>

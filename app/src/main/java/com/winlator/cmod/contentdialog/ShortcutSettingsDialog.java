@@ -257,12 +257,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setLsfgFlowScale(float val) { shortcut.setLsfgFlowScale(val); }
                 public boolean getLsfgPerformanceMode() { return shortcut.getLsfgPerformanceMode(); }
                 public void setLsfgPerformanceMode(boolean val) { shortcut.setLsfgPerformanceMode(val); }
-                public int getBionicFgMultiplier() { return shortcut.getBionicFgMultiplier(); }
-                public void setBionicFgMultiplier(int val) { shortcut.setBionicFgMultiplier(val); }
-                public float getBionicFgFlowScale() { return shortcut.getBionicFgFlowScale(); }
-                public void setBionicFgFlowScale(float val) { shortcut.setBionicFgFlowScale(val); }
-                public int getBionicFgModel() { return shortcut.getBionicFgModel(); }
-                public void setBionicFgModel(int val) { shortcut.setBionicFgModel(val); }
                 public int getWinFgMultiplier() { return shortcut.getWinFgMultiplier(); }
                 public void setWinFgMultiplier(int val) { shortcut.setWinFgMultiplier(val); }
                 public float getWinFgFlowScale() { return shortcut.getWinFgFlowScale(); }

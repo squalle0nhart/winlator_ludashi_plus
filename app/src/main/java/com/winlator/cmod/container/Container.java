@@ -220,6 +220,7 @@ public class Container {
 
     public String getFrameGenBackend() {
         String value = getExtra("frameGenBackend", "");
+        if ("bionic_fg".equalsIgnoreCase(value)) return "win_fg";
         if (!value.isEmpty()) return value;
         return isLsfgEnabled() ? "lsfg_vk" : "lsfg_vk";
     }
@@ -228,53 +229,14 @@ public class Container {
         putExtra("frameGenBackend", backend != null && !backend.isEmpty() ? backend : "lsfg_vk");
     }
 
-    public int getBionicFgMultiplier() {
-        String value = getExtra("bionicFgMultiplier", "0");
-        try {
-            int parsed = Integer.parseInt(value);
-            if (parsed == 0) return 0;
-            return Math.max(2, Math.min(4, parsed));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    public void setBionicFgMultiplier(int multiplier) {
-        putExtra("bionicFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
-    }
-
-    public float getBionicFgFlowScale() {
-        String value = getExtra("bionicFgFlowScale", "0.80");
-        try {
-            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
-        } catch (NumberFormatException e) {
-            return 0.80f;
-        }
-    }
-
-    public void setBionicFgFlowScale(float flowScale) {
-        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
-        putExtra("bionicFgFlowScale", String.format(Locale.US, "%.2f", clamped));
-    }
-
-    public int getBionicFgModel() {
-        String value = getExtra("bionicFgModel", "0");
-        try {
-            int model = Integer.parseInt(value);
-            return Math.max(0, Math.min(4, model));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    public void setBionicFgModel(int model) {
-        putExtra("bionicFgModel", String.valueOf(Math.max(0, Math.min(4, model))));
-    }
-
     public int getWinFgMultiplier() {
-        String value = getExtra("winFgMultiplier", "0");
+        String value = getExtra("winFgMultiplier", null);
+        if ((value == null || value.isEmpty())
+                && "bionic_fg".equalsIgnoreCase(getExtra("frameGenBackend", ""))) {
+            value = getExtra("bionicFgMultiplier", "0");
+        }
         try {
-            int parsed = Integer.parseInt(value);
+            int parsed = Integer.parseInt(value == null ? "0" : value);
             return parsed < 2 ? 0 : 2;
         } catch (NumberFormatException e) {
             return 0;
@@ -286,8 +248,13 @@ public class Container {
     }
 
     public float getWinFgFlowScale() {
+        String value = getExtra("winFgFlowScale", null);
+        if ((value == null || value.isEmpty())
+                && "bionic_fg".equalsIgnoreCase(getExtra("frameGenBackend", ""))) {
+            value = getExtra("bionicFgFlowScale", "0.80");
+        }
         try {
-            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(getExtra("winFgFlowScale", "0.80"))));
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value == null ? "0.80" : value)));
         } catch (NumberFormatException e) {
             return 0.80f;
         }
@@ -298,8 +265,13 @@ public class Container {
     }
 
     public int getWinFgModel() {
+        String value = getExtra("winFgModel", null);
+        if ((value == null || value.isEmpty())
+                && "bionic_fg".equalsIgnoreCase(getExtra("frameGenBackend", ""))) {
+            value = getExtra("bionicFgModel", "3");
+        }
         try {
-            return Math.max(3, Math.min(4, Integer.parseInt(getExtra("winFgModel", "3"))));
+            return Math.max(3, Math.min(4, Integer.parseInt(value == null ? "3" : value)));
         } catch (NumberFormatException e) {
             return 3;
         }

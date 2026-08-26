@@ -321,7 +321,7 @@
                     android:layout_height="wrap_content" />
 
                 <LinearLayout
-                    android:id="@+id/GroupBionicFgModel"
+                    android:id="@+id/GroupFrameGenModel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -335,7 +335,7 @@
                         android:paddingBottom="8dp"/>
 
                     <Spinner
-                        android:id="@+id/SPBionicFgModel"
+                        android:id="@+id/SPFrameGenModel"
                         style="@style/ComboBoxCompact"
                         android:background="@drawable/combo_box_no_arrow_dark"
                         android:layout_width="match_parent"
