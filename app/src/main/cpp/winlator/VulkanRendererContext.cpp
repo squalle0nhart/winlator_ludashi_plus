@@ -14,10 +14,6 @@
 #include "window_legacy_upscale_frag.h"
 #include "window_stretch_frag.h"
 #include "window_postfx_frag.h"
-#include "framegen_vert.h"
-#include "framegen_motion_comp.h"
-#include "framegen_flowfix_comp.h"
-#include "framegen_interpolate_frag.h"
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH, void* aHandle)
     : window(win), surfaceWidth(cW), surfaceHeight(cH), containerWidth(cW), containerHeight(cH),
@@ -28,7 +24,6 @@ VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH,
     createPipeline(true, pipeline);
     createFramebuffers(); createCmdPool(); createSampler();
     createWinTexPool(); createCursorDS(); createCmdBufs(); createSyncObjects();
-    createFrameGenPipelines();
     isRunning = true;
     renderThread = std::thread(&VulkanRendererContext::renderLoop, this);
 }
@@ -49,7 +44,6 @@ VulkanRendererContext::~VulkanRendererContext() {
         if (wt.stg  != VK_NULL_HANDLE) { vk_.DestroyBuffer(device, wt.stg, nullptr); vk_.FreeMemory(device, wt.stgMem, nullptr); }
     }
     deleteQueue.clear();
-    destroyFrameGenResources();
     cleanupSwapchain(); cleanupCursorTex();
 
     vk_.DestroySampler(device, sampler, nullptr);
@@ -59,14 +53,6 @@ VulkanRendererContext::~VulkanRendererContext() {
     if (legacyUpscalePipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, legacyUpscalePipeline, nullptr);
     if (stretchPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, stretchPipeline, nullptr);
     if (postfxPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, postfxPipeline, nullptr);
-    if (frameGenMotionPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenMotionPipeline, nullptr);
-    if (frameGenFlowFixPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenFlowFixPipeline, nullptr);
-    if (frameGenInterpPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, frameGenInterpPipeline, nullptr);
-    if (frameGenMotionPipeLayout != VK_NULL_HANDLE) vk_.DestroyPipelineLayout(device, frameGenMotionPipeLayout, nullptr);
-    if (frameGenInterpPipeLayout != VK_NULL_HANDLE) vk_.DestroyPipelineLayout(device, frameGenInterpPipeLayout, nullptr);
-    if (frameGenMotionLayout != VK_NULL_HANDLE) vk_.DestroyDescriptorSetLayout(device, frameGenMotionLayout, nullptr);
-    if (frameGenInterpLayout != VK_NULL_HANDLE) vk_.DestroyDescriptorSetLayout(device, frameGenInterpLayout, nullptr);
-    if (frameGenHistoryPass != VK_NULL_HANDLE) vk_.DestroyRenderPass(device, frameGenHistoryPass, nullptr);
     vk_.DestroyPipeline(device, pipeline, nullptr);
     vk_.DestroyPipelineLayout(device, pipeLayout, nullptr);
     vk_.DestroyDescriptorSetLayout(device, dsLayout, nullptr);
@@ -145,7 +131,6 @@ void VulkanRendererContext::loadDeviceDispatch() {
     LOAD_D2(CreateShaderModule);
     LOAD_D2(DestroyShaderModule);
     LOAD_D2(CreateGraphicsPipelines);
-    LOAD_D2(CreateComputePipelines);
     LOAD_D2(DestroyPipeline);
     LOAD_D2(CreateCommandPool);
     LOAD_D2(DestroyCommandPool);
@@ -159,7 +144,6 @@ void VulkanRendererContext::loadDeviceDispatch() {
     LOAD_D2(CmdBindPipeline);
     LOAD_D2(CmdBindDescriptorSets);
     LOAD_D2(CmdDraw);
-    LOAD_D2(CmdDispatch);
     LOAD_D2(CmdPushConstants);
     LOAD_D2(CmdSetViewport);
     LOAD_D2(CmdSetScissor);
@@ -529,439 +513,6 @@ void VulkanRendererContext::createPostFXPipeline() {
     RLOG("createPostFXPipeline: done");
 }
 
-void VulkanRendererContext::createFrameGenPipelines() {
-    if (frameGenMotionPipeline != VK_NULL_HANDLE &&
-        frameGenFlowFixPipeline != VK_NULL_HANDLE &&
-        frameGenInterpPipeline != VK_NULL_HANDLE) return;
-
-    VkAttachmentDescription historyAttachment{};
-    historyAttachment.format = swapchainFmt;
-    historyAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    historyAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    historyAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    historyAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    historyAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    historyAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    historyAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    VkAttachmentReference historyRef{0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkSubpassDescription historySubpass{};
-    historySubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    historySubpass.colorAttachmentCount = 1;
-    historySubpass.pColorAttachments = &historyRef;
-    VkSubpassDependency historyDependencies[2]{};
-    historyDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    historyDependencies[0].dstSubpass = 0;
-    historyDependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    historyDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    historyDependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    historyDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    historyDependencies[1].srcSubpass = 0;
-    historyDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    historyDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    historyDependencies[1].dstStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    historyDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    historyDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    VkRenderPassCreateInfo historyPassInfo{};
-    historyPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    historyPassInfo.attachmentCount = 1;
-    historyPassInfo.pAttachments = &historyAttachment;
-    historyPassInfo.subpassCount = 1;
-    historyPassInfo.pSubpasses = &historySubpass;
-    historyPassInfo.dependencyCount = 2;
-    historyPassInfo.pDependencies = historyDependencies;
-    if (vk_.CreateRenderPass(device, &historyPassInfo, nullptr, &frameGenHistoryPass) != VK_SUCCESS)
-        throw std::runtime_error("framegen history renderpass");
-
-    VkDescriptorSetLayoutBinding motionBindings[4]{};
-    for (uint32_t i = 0; i < 3; i++) {
-        motionBindings[i].binding = i;
-        motionBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        motionBindings[i].descriptorCount = 1;
-        motionBindings[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    }
-    motionBindings[3].binding = 3;
-    motionBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    motionBindings[3].descriptorCount = 1;
-    motionBindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    VkDescriptorSetLayoutCreateInfo motionLayoutInfo{};
-    motionLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    motionLayoutInfo.bindingCount = 4;
-    motionLayoutInfo.pBindings = motionBindings;
-    if (vk_.CreateDescriptorSetLayout(device, &motionLayoutInfo, nullptr, &frameGenMotionLayout) != VK_SUCCESS)
-        throw std::runtime_error("framegen motion layout");
-
-    VkDescriptorSetLayoutBinding interpBindings[4]{};
-    for (uint32_t i = 0; i < 4; i++) {
-        interpBindings[i].binding = i;
-        interpBindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        interpBindings[i].descriptorCount = 1;
-        interpBindings[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    }
-    VkDescriptorSetLayoutCreateInfo interpLayoutInfo{};
-    interpLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    interpLayoutInfo.bindingCount = 4;
-    interpLayoutInfo.pBindings = interpBindings;
-    if (vk_.CreateDescriptorSetLayout(device, &interpLayoutInfo, nullptr, &frameGenInterpLayout) != VK_SUCCESS)
-        throw std::runtime_error("framegen interp layout");
-
-    VkPushConstantRange motionPush{VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(FrameGenMotionPush)};
-    VkPipelineLayoutCreateInfo motionPipeLayoutInfo{};
-    motionPipeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    motionPipeLayoutInfo.setLayoutCount = 1;
-    motionPipeLayoutInfo.pSetLayouts = &frameGenMotionLayout;
-    motionPipeLayoutInfo.pushConstantRangeCount = 1;
-    motionPipeLayoutInfo.pPushConstantRanges = &motionPush;
-    if (vk_.CreatePipelineLayout(device, &motionPipeLayoutInfo, nullptr, &frameGenMotionPipeLayout) != VK_SUCCESS)
-        throw std::runtime_error("framegen motion pipeline layout");
-
-    VkPushConstantRange interpPush{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(FrameGenInterpPush)};
-    VkPipelineLayoutCreateInfo interpPipeLayoutInfo{};
-    interpPipeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    interpPipeLayoutInfo.setLayoutCount = 1;
-    interpPipeLayoutInfo.pSetLayouts = &frameGenInterpLayout;
-    interpPipeLayoutInfo.pushConstantRangeCount = 1;
-    interpPipeLayoutInfo.pPushConstantRanges = &interpPush;
-    if (vk_.CreatePipelineLayout(device, &interpPipeLayoutInfo, nullptr, &frameGenInterpPipeLayout) != VK_SUCCESS)
-        throw std::runtime_error("framegen interp pipeline layout");
-
-    VkShaderModule motionShader = makeShader(framegen_motion_comp_code, sizeof(framegen_motion_comp_code));
-    VkPipelineShaderStageCreateInfo motionStage{};
-    motionStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    motionStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    motionStage.module = motionShader;
-    motionStage.pName = "main";
-    VkComputePipelineCreateInfo motionPipelineInfo{};
-    motionPipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    motionPipelineInfo.stage = motionStage;
-    motionPipelineInfo.layout = frameGenMotionPipeLayout;
-    if (vk_.CreateComputePipelines(device, VK_NULL_HANDLE, 1, &motionPipelineInfo, nullptr,
-                                   &frameGenMotionPipeline) != VK_SUCCESS) {
-        vk_.DestroyShaderModule(device, motionShader, nullptr);
-        throw std::runtime_error("framegen motion pipeline");
-    }
-    vk_.DestroyShaderModule(device, motionShader, nullptr);
-
-    VkShaderModule flowFixShader = makeShader(
-        framegen_flowfix_comp_code, sizeof(framegen_flowfix_comp_code));
-    VkPipelineShaderStageCreateInfo flowFixStage{};
-    flowFixStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    flowFixStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    flowFixStage.module = flowFixShader;
-    flowFixStage.pName = "main";
-    VkComputePipelineCreateInfo flowFixPipelineInfo{};
-    flowFixPipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    flowFixPipelineInfo.stage = flowFixStage;
-    flowFixPipelineInfo.layout = frameGenMotionPipeLayout;
-    if (vk_.CreateComputePipelines(device, VK_NULL_HANDLE, 1, &flowFixPipelineInfo, nullptr,
-                                   &frameGenFlowFixPipeline) != VK_SUCCESS) {
-        vk_.DestroyShaderModule(device, flowFixShader, nullptr);
-        throw std::runtime_error("framegen flow-fix pipeline");
-    }
-    vk_.DestroyShaderModule(device, flowFixShader, nullptr);
-
-    VkShaderModule vertexShader = makeShader(framegen_vert_code, sizeof(framegen_vert_code));
-    VkShaderModule interpShader = makeShader(framegen_interpolate_frag_code, sizeof(framegen_interpolate_frag_code));
-    VkPipelineShaderStageCreateInfo stages[2]{};
-    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    stages[0].module = vertexShader;
-    stages[0].pName = "main";
-    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = interpShader;
-    stages[1].pName = "main";
-    VkPipelineVertexInputStateCreateInfo vertexInput{};
-    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    VkPipelineInputAssemblyStateCreateInfo assembly{};
-    assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynamic{};
-    dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamic.dynamicStateCount = 2;
-    dynamic.pDynamicStates = dynamicStates;
-    VkPipelineViewportStateCreateInfo viewport{};
-    viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewport.viewportCount = 1;
-    viewport.scissorCount = 1;
-    VkPipelineRasterizationStateCreateInfo raster{};
-    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    raster.polygonMode = VK_POLYGON_MODE_FILL;
-    raster.lineWidth = 1.0f;
-    raster.cullMode = VK_CULL_MODE_NONE;
-    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    VkPipelineMultisampleStateCreateInfo multisample{};
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    VkPipelineColorBlendAttachmentState blendAttachment{};
-    blendAttachment.colorWriteMask = 0xf;
-    VkPipelineColorBlendStateCreateInfo blend{};
-    blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend.attachmentCount = 1;
-    blend.pAttachments = &blendAttachment;
-    VkGraphicsPipelineCreateInfo interpPipelineInfo{};
-    interpPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    interpPipelineInfo.stageCount = 2;
-    interpPipelineInfo.pStages = stages;
-    interpPipelineInfo.pVertexInputState = &vertexInput;
-    interpPipelineInfo.pInputAssemblyState = &assembly;
-    interpPipelineInfo.pViewportState = &viewport;
-    interpPipelineInfo.pRasterizationState = &raster;
-    interpPipelineInfo.pMultisampleState = &multisample;
-    interpPipelineInfo.pColorBlendState = &blend;
-    interpPipelineInfo.pDynamicState = &dynamic;
-    interpPipelineInfo.layout = frameGenInterpPipeLayout;
-    interpPipelineInfo.renderPass = renderPass;
-    if (vk_.CreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &interpPipelineInfo, nullptr,
-                                    &frameGenInterpPipeline) != VK_SUCCESS) {
-        vk_.DestroyShaderModule(device, interpShader, nullptr);
-        vk_.DestroyShaderModule(device, vertexShader, nullptr);
-        throw std::runtime_error("framegen interp pipeline");
-    }
-    vk_.DestroyShaderModule(device, interpShader, nullptr);
-    vk_.DestroyShaderModule(device, vertexShader, nullptr);
-    RLOG("Native Framegen pipelines created");
-}
-
-bool VulkanRendererContext::createFrameGenImage(FrameGenImage& out, uint32_t width, uint32_t height,
-                                                VkFormat format, VkImageUsageFlags usage,
-                                                bool needsFramebuffer) {
-    VkImageCreateInfo imageInfo{};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent = {width, height, 1};
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
-    imageInfo.format = format;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (vk_.CreateImage(device, &imageInfo, nullptr, &out.image) != VK_SUCCESS) return false;
-    VkMemoryRequirements requirements{};
-    vk_.GetImageMemoryRequirements(device, out.image, &requirements);
-    VkMemoryAllocateInfo allocation{};
-    allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocation.allocationSize = requirements.size;
-    allocation.memoryTypeIndex = findMemType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    if (vk_.AllocateMemory(device, &allocation, nullptr, &out.memory) != VK_SUCCESS) return false;
-    if (vk_.BindImageMemory(device, out.image, out.memory, 0) != VK_SUCCESS) return false;
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = out.image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    if (vk_.CreateImageView(device, &viewInfo, nullptr, &out.view) != VK_SUCCESS) return false;
-    if (needsFramebuffer) {
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = frameGenHistoryPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = &out.view;
-        framebufferInfo.width = width;
-        framebufferInfo.height = height;
-        framebufferInfo.layers = 1;
-        if (vk_.CreateFramebuffer(device, &framebufferInfo, nullptr, &out.framebuffer) != VK_SUCCESS) return false;
-    }
-    return true;
-}
-
-bool VulkanRendererContext::createFrameGenResources() {
-    if (frameGenResourcesBuilt) return true;
-    if (swapchainExt.width == 0 || swapchainExt.height == 0) return false;
-    destroyFrameGenResources();
-
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    if (vk_.CreateSampler(device, &samplerInfo, nullptr, &frameGenSampler) != VK_SUCCESS) return false;
-
-    if (!createFrameGenImage(frameGenHistory[0], swapchainExt.width, swapchainExt.height, swapchainFmt,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true) ||
-        !createFrameGenImage(frameGenHistory[1], swapchainExt.width, swapchainExt.height, swapchainFmt,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true) ||
-        !createFrameGenImage(frameGenHistory[2], swapchainExt.width, swapchainExt.height, swapchainFmt,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, true) ||
-        !createFrameGenImage(frameGenMotion, std::max(1u, swapchainExt.width / 2),
-            std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false) ||
-        !createFrameGenImage(frameGenFixed[0], std::max(1u, swapchainExt.width / 2),
-            std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false) ||
-        !createFrameGenImage(frameGenFixed[1], std::max(1u, swapchainExt.width / 2),
-            std::max(1u, swapchainExt.height / 2), VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, false)) {
-        destroyFrameGenResources();
-        return false;
-    }
-
-    VkCommandBufferAllocateInfo commandInfo{};
-    commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandInfo.commandPool = cmdPool;
-    commandInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandInfo.commandBufferCount = 1;
-    if (vk_.AllocateCommandBuffers(device, &commandInfo, &frameGenStageCmd) != VK_SUCCESS) {
-        destroyFrameGenResources();
-        return false;
-    }
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    if (vk_.CreateFence(device, &fenceInfo, nullptr, &frameGenStageFence) != VK_SUCCESS) {
-        destroyFrameGenResources();
-        return false;
-    }
-
-    VkCommandBuffer transitionCmd = beginOneTime();
-    transition(transitionCmd, frameGenMotion.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-               0, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    for (FrameGenImage& fixed : frameGenFixed) {
-        transition(transitionCmd, fixed.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-                   0, VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    }
-    endOneTime(transitionCmd);
-
-    auto allocateSet = [&](VkDescriptorSetLayout layout, VkDescriptorSet& set) {
-        VkDescriptorSetAllocateInfo allocationInfo{};
-        allocationInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocationInfo.descriptorPool = winTexPool;
-        allocationInfo.descriptorSetCount = 1;
-        allocationInfo.pSetLayouts = &layout;
-        return vk_.AllocateDescriptorSets(device, &allocationInfo, &set) == VK_SUCCESS;
-    };
-
-    for (uint32_t current = 0; current < 3; current++) {
-        uint32_t previous = (current + 2u) % 3u;
-        if (!allocateSet(frameGenMotionLayout, frameGenMotionSets[current])) {
-            destroyFrameGenResources();
-            return false;
-        }
-        VkDescriptorImageInfo prevInfo{frameGenSampler, frameGenHistory[previous].view,
-                                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-        VkDescriptorImageInfo currInfo{frameGenSampler, frameGenHistory[current].view,
-                                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-        VkDescriptorImageInfo motionStorage{VK_NULL_HANDLE, frameGenMotion.view, VK_IMAGE_LAYOUT_GENERAL};
-        VkDescriptorImageInfo motionSample{frameGenSampler, frameGenMotion.view, VK_IMAGE_LAYOUT_GENERAL};
-        VkDescriptorImageInfo fixedCoarse{frameGenSampler, frameGenFixed[0].view, VK_IMAGE_LAYOUT_GENERAL};
-        VkWriteDescriptorSet motionWrites[4]{};
-        VkDescriptorImageInfo* motionInfos[] = {
-            &prevInfo, &currInfo, &fixedCoarse, &motionStorage};
-        for (uint32_t i = 0; i < 4; i++) {
-            motionWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            motionWrites[i].dstSet = frameGenMotionSets[current];
-            motionWrites[i].dstBinding = i;
-            motionWrites[i].descriptorCount = 1;
-            motionWrites[i].descriptorType = i == 3 ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
-                                                    : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            motionWrites[i].pImageInfo = motionInfos[i];
-        }
-        vk_.UpdateDescriptorSets(device, 4, motionWrites, 0, nullptr);
-
-        for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++) {
-            if (!allocateSet(frameGenMotionLayout, frameGenFlowFixSets[current][frame]) ||
-                !allocateSet(frameGenInterpLayout, frameGenInterpSets[current][frame])) {
-                destroyFrameGenResources();
-                return false;
-            }
-            VkDescriptorImageInfo fixedStorage{
-                VK_NULL_HANDLE, frameGenFixed[frame].view, VK_IMAGE_LAYOUT_GENERAL};
-            VkDescriptorImageInfo fixedSample{
-                frameGenSampler, frameGenFixed[frame].view, VK_IMAGE_LAYOUT_GENERAL};
-            VkDescriptorImageInfo* fixInfos[] = {
-                &prevInfo, &currInfo, &motionSample, &fixedStorage};
-            VkWriteDescriptorSet fixWrites[4]{};
-            for (uint32_t i = 0; i < 4; i++) {
-                fixWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                fixWrites[i].dstSet = frameGenFlowFixSets[current][frame];
-                fixWrites[i].dstBinding = i;
-                fixWrites[i].descriptorCount = 1;
-                fixWrites[i].descriptorType = i == 3 ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
-                                                     : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                fixWrites[i].pImageInfo = fixInfos[i];
-            }
-            vk_.UpdateDescriptorSets(device, 4, fixWrites, 0, nullptr);
-
-            VkDescriptorImageInfo* interpInfos[] = {
-                &prevInfo, &currInfo, &fixedSample, &fixedSample};
-            VkWriteDescriptorSet interpWrites[4]{};
-            for (uint32_t i = 0; i < 4; i++) {
-                interpWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                interpWrites[i].dstSet = frameGenInterpSets[current][frame];
-                interpWrites[i].dstBinding = i;
-                interpWrites[i].descriptorCount = 1;
-                interpWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                interpWrites[i].pImageInfo = interpInfos[i];
-            }
-            vk_.UpdateDescriptorSets(device, 4, interpWrites, 0, nullptr);
-        }
-    }
-
-    frameGenHistoryCurrent = 0;
-    frameGenHistoryCount = 0;
-    frameGenMotionValid = false;
-    for (VkFence& fence : frameGenHistoryFences) fence = VK_NULL_HANDLE;
-    frameGenResourcesBuilt = true;
-    RLOG("Native Framegen resources created: %ux%u", swapchainExt.width, swapchainExt.height);
-    return true;
-}
-
-void VulkanRendererContext::destroyFrameGenResources() {
-    frameGenResourcesBuilt = false;
-    frameGenHistoryCount = 0;
-    frameGenMotionValid = false;
-    if (device == VK_NULL_HANDLE) return;
-    if (frameGenStageFence != VK_NULL_HANDLE) {
-        vk_.DestroyFence(device, frameGenStageFence, nullptr);
-        frameGenStageFence = VK_NULL_HANDLE;
-    }
-    if (frameGenStageCmd != VK_NULL_HANDLE && cmdPool != VK_NULL_HANDLE) {
-        vk_.FreeCommandBuffers(device, cmdPool, 1, &frameGenStageCmd);
-        frameGenStageCmd = VK_NULL_HANDLE;
-    }
-    for (uint32_t i = 0; i < 3; i++) {
-        if (frameGenMotionSets[i] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
-            vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenMotionSets[i]);
-        frameGenMotionSets[i] = VK_NULL_HANDLE;
-        frameGenHistoryFences[i] = VK_NULL_HANDLE;
-        for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++) {
-            if (frameGenFlowFixSets[i][frame] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
-                vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenFlowFixSets[i][frame]);
-            if (frameGenInterpSets[i][frame] != VK_NULL_HANDLE && winTexPool != VK_NULL_HANDLE)
-                vk_.FreeDescriptorSets(device, winTexPool, 1, &frameGenInterpSets[i][frame]);
-            frameGenFlowFixSets[i][frame] = VK_NULL_HANDLE;
-            frameGenInterpSets[i][frame] = VK_NULL_HANDLE;
-        }
-    }
-    auto destroyImage = [&](FrameGenImage& image) {
-        if (image.framebuffer != VK_NULL_HANDLE) vk_.DestroyFramebuffer(device, image.framebuffer, nullptr);
-        if (image.view != VK_NULL_HANDLE) vk_.DestroyImageView(device, image.view, nullptr);
-        if (image.image != VK_NULL_HANDLE) vk_.DestroyImage(device, image.image, nullptr);
-        if (image.memory != VK_NULL_HANDLE) vk_.FreeMemory(device, image.memory, nullptr);
-        image = {};
-    };
-    destroyImage(frameGenHistory[0]);
-    destroyImage(frameGenHistory[1]);
-    destroyImage(frameGenHistory[2]);
-    destroyImage(frameGenMotion);
-    for (FrameGenImage& fixed : frameGenFixed) destroyImage(fixed);
-    if (frameGenSampler != VK_NULL_HANDLE) {
-        vk_.DestroySampler(device, frameGenSampler, nullptr);
-        frameGenSampler = VK_NULL_HANDLE;
-    }
-}
-
 void VulkanRendererContext::setPostFXMode(int mode) {
     RLOG("setPostFXMode: %d -> %d", postFXMode, mode);
     if (postFXMode == mode) return;
@@ -980,7 +531,6 @@ void VulkanRendererContext::setPostFXMode(int mode) {
             RLOG("setPostFXMode: postfxPipeline destruído");
         }
     }
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -988,7 +538,6 @@ void VulkanRendererContext::setSharpness(float s) {
     float clamped = std::clamp(s, 0.0f, 1.0f);
     if (sharpness == clamped) return;
     sharpness = clamped;
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -1057,7 +606,6 @@ void VulkanRendererContext::createSyncObjects() {
 }
 
 void VulkanRendererContext::cleanupSwapchain() {
-    destroyFrameGenResources();
     for (auto fb:swapchainFBs) vk_.DestroyFramebuffer(device,fb,nullptr); swapchainFBs.clear();
     for (auto iv:swapchainViews) vk_.DestroyImageView(device,iv,nullptr); swapchainViews.clear();
     if (!cmdBufs.empty()){vk_.FreeCommandBuffers(device,cmdPool,(uint32_t)cmdBufs.size(),cmdBufs.data());cmdBufs.clear();}
@@ -1512,8 +1060,7 @@ void VulkanRendererContext::renderLoop() {
           dirtyCV.wait(lk,[this]{
               return !isRunning || cursorMoved.load() ||
                   (!surfaceDetached.load() &&
-                   (needsRender.load() || fbResized.load() ||
-                    (frameGenMultiplier.load() >= 2 && frameGenContentDirty.load()))); }); }
+                   (needsRender.load() || fbResized.load())); }); }
         if (!isRunning) break;
 
         if (swapchain == VK_NULL_HANDLE || cmdBufs.empty()) continue;
@@ -1534,352 +1081,6 @@ void VulkanRendererContext::flushDeleteQueue() {
         if (wt.stg !=VK_NULL_HANDLE){vk_.DestroyBuffer(device,wt.stg,nullptr);vk_.FreeMemory(device,wt.stgMem,nullptr);}
     }
     deleteQueue.clear();
-}
-
-void VulkanRendererContext::setFrameGenerationMultiplier(int multiplier) {
-    int sanitized = multiplier < 2 ? 0 : std::min(4, multiplier);
-    int previous = frameGenMultiplier.exchange(sanitized);
-    if (previous != sanitized) {
-        invalidateFrameGenHistory();
-        needsRender.store(true, std::memory_order_relaxed);
-        dirtyCV.notify_one();
-        RLOG("Native Framegen multiplier: %s", sanitized == 0
-            ? "Off" : (std::to_string(sanitized) + "x").c_str());
-    }
-}
-
-void VulkanRendererContext::setFrameGenerationSmoothing(float smoothing) {
-    float sanitized = std::clamp(smoothing, 0.0f, 1.0f);
-    float previous = frameGenSmoothing.exchange(sanitized);
-    if (previous != sanitized) {
-        needsRender.store(true, std::memory_order_relaxed);
-        dirtyCV.notify_one();
-        RLOG("Native Framegen smoothness: %.2f", sanitized);
-    }
-}
-
-void VulkanRendererContext::invalidateFrameGenHistory(bool contentDirty) {
-    frameGenResetRequested.store(true, std::memory_order_release);
-    if (contentDirty) frameGenContentDirty.store(true, std::memory_order_release);
-}
-
-bool VulkanRendererContext::stageFrameGenHistory(const std::vector<DrawEntry>& draws,
-    VkBuffer cursorUpload, bool hasCursorUpload,
-    float ox, float oy, float sx, float sy, float cw, float ch,
-    short ptrX, short ptrY, short curHotX, short curHotY,
-    short curW, short curH, bool curVis, VkRect2D scissorRect) {
-    if (!createFrameGenResources()) return false;
-    if (frameGenResetRequested.exchange(false)) {
-        for (VkFence fence : inFlightFences) {
-            if (fence != VK_NULL_HANDLE)
-                vk_.WaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-        }
-        for (VkFence& fence : frameGenHistoryFences) fence = VK_NULL_HANDLE;
-        frameGenHistoryCount = 0;
-        frameGenMotionValid = false;
-    }
-
-    vk_.WaitForFences(device, 1, &frameGenStageFence, VK_TRUE, UINT64_MAX);
-    vk_.ResetFences(device, 1, &frameGenStageFence);
-    vk_.ResetCommandBuffer(frameGenStageCmd, 0);
-
-    uint32_t next = frameGenHistoryCount == 0 ? 1u : (frameGenHistoryCurrent + 1u) % 3u;
-    VkFence slotFence = frameGenHistoryFences[next];
-    if (slotFence != VK_NULL_HANDLE &&
-        (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, slotFence) == VK_NOT_READY)) {
-        vk_.WaitForFences(device, 1, &slotFence, VK_TRUE, UINT64_MAX);
-    }
-    recordCmdBuf(frameGenStageCmd, frameGenHistoryPass, frameGenHistory[next].framebuffer, draws,
-        frameAhbTransitions, framePreUpload, framePostUpload,
-        cursorUpload, hasCursorUpload,
-        ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH, curVis,
-        scissorRect);
-
-    VkSubmitInfo submit{};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &frameGenStageCmd;
-    if (vk_.QueueSubmit(graphicsQueue, 1, &submit, frameGenStageFence) != VK_SUCCESS) return false;
-    vk_.WaitForFences(device, 1, &frameGenStageFence, VK_TRUE, UINT64_MAX);
-
-    frameGenHistoryCurrent = next;
-    frameGenMotionValid = false;
-    if (frameGenHistoryCount == 0) {
-        uint32_t clone = (next + 2u) % 3u;
-        VkCommandBuffer copyCmd = beginOneTime();
-        transition(copyCmd, frameGenHistory[next].image,
-                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT,
-                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-        transition(copyCmd, frameGenHistory[clone].image,
-                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-        VkImageCopy copyRegion{};
-        copyRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        copyRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        copyRegion.extent = {swapchainExt.width, swapchainExt.height, 1};
-        vk_.CmdCopyImage(copyCmd,
-                         frameGenHistory[next].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                         frameGenHistory[clone].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                         1, &copyRegion);
-        transition(copyCmd, frameGenHistory[next].image,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                   VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-        transition(copyCmd, frameGenHistory[clone].image,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                   VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT,
-                   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-        endOneTime(copyCmd);
-        frameGenHistoryCount = 2;
-    } else {
-        frameGenHistoryCount = std::min(2u, frameGenHistoryCount + 1u);
-    }
-    return true;
-}
-
-bool VulkanRendererContext::presentFrameGenPhase(float phase,
-    VkBuffer cursorUpload, bool hasCursorUpload,
-    float ox, float oy, float sx, float sy, float cw, float ch,
-    short ptrX, short ptrY, short curHotX, short curHotY,
-    short curW, short curH, bool curVis, VkRect2D scissorRect) {
-    if (!frameGenResourcesBuilt || frameGenHistoryCount < 2 || surfaceDetached.load()) return false;
-    if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return false;
-
-    bool currentFenceWaited = false;
-    if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
-        vk_.WaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-        currentFenceWaited = true;
-    }
-    uint32_t imageIndex = 0;
-    VkResult result = vk_.AcquireNextImageKHR(device, swapchain, UINT64_MAX,
-                                               imgAvailSems[currentFrame], VK_NULL_HANDLE, &imageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_ERROR_SURFACE_LOST_KHR) {
-        fbResized.store(true);
-        return false;
-    }
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) return false;
-    if (imageIndex >= swapchainFBs.size()) return false;
-
-    if (imgInFlight.size() != swapchainImages.size()) imgInFlight.assign(swapchainImages.size(), VK_NULL_HANDLE);
-    if (imgInFlight[imageIndex] != VK_NULL_HANDLE &&
-        (!currentFenceWaited || imgInFlight[imageIndex] != inFlightFences[currentFrame])) {
-        if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, imgInFlight[imageIndex]) == VK_NOT_READY)
-            vk_.WaitForFences(device, 1, &imgInFlight[imageIndex], VK_TRUE, UINT64_MAX);
-    }
-    imgInFlight[imageIndex] = inFlightFences[currentFrame];
-
-    VkCommandBuffer command = cmdBufs[currentFrame];
-    vk_.ResetCommandBuffer(command, 0);
-    VkCommandBufferBeginInfo begin{};
-    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    if (vk_.BeginCommandBuffer(command, &begin) != VK_SUCCESS) return false;
-
-    bool hasCursorCopy = hasCursorUpload && cursorImg != VK_NULL_HANDLE &&
-                         cursorUpload != VK_NULL_HANDLE && curW > 0 && curH > 0;
-    if (hasCursorCopy) {
-        VkImageMemoryBarrier cursorToCopy{};
-        cursorToCopy.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        cursorToCopy.oldLayout = cursorImageInitialized
-            ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-        cursorToCopy.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        cursorToCopy.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        cursorToCopy.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        cursorToCopy.image = cursorImg;
-        cursorToCopy.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        cursorToCopy.srcAccessMask = cursorImageInitialized ? VK_ACCESS_SHADER_READ_BIT : 0;
-        cursorToCopy.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        vk_.CmdPipelineBarrier(command,
-            cursorImageInitialized ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-            0, nullptr, 0, nullptr, 1, &cursorToCopy);
-        VkBufferImageCopy copy{};
-        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        copy.imageExtent = {(uint32_t)curW, (uint32_t)curH, 1};
-        vk_.CmdCopyBufferToImage(command, cursorUpload, cursorImg,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-        VkImageMemoryBarrier cursorReady = cursorToCopy;
-        cursorReady.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        cursorReady.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        cursorReady.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        cursorReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                               0, nullptr, 0, nullptr, 1, &cursorReady);
-        cursorImageInitialized = true;
-    }
-
-    uint32_t parity = frameGenHistoryCurrent;
-    if (!frameGenMotionValid) {
-        VkImageMemoryBarrier prepareMotion{};
-        prepareMotion.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        prepareMotion.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-        prepareMotion.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        prepareMotion.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        prepareMotion.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        prepareMotion.image = frameGenMotion.image;
-        prepareMotion.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        prepareMotion.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-        prepareMotion.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        vk_.CmdPipelineBarrier(command,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
-            0, nullptr, 0, nullptr, 1, &prepareMotion);
-        vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, frameGenMotionPipeline);
-        vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                  frameGenMotionPipeLayout, 0, 1,
-                                  &frameGenMotionSets[parity], 0, nullptr);
-        uint32_t motionWidth = std::max(1u, swapchainExt.width / 2);
-        uint32_t motionHeight = std::max(1u, swapchainExt.height / 2);
-        FrameGenMotionPush motionPush{
-            (int32_t)motionWidth, (int32_t)motionHeight,
-            1.0f / (float)motionWidth, 1.0f / (float)motionHeight,
-            1.0f, 2.0f, 0.0f, 0.0f
-        };
-        vk_.CmdPushConstants(command, frameGenMotionPipeLayout, VK_SHADER_STAGE_COMPUTE_BIT,
-                             0, sizeof(motionPush), &motionPush);
-        vk_.CmdDispatch(command, (motionWidth + 7u) / 8u, (motionHeight + 7u) / 8u, 1);
-        VkImageMemoryBarrier motionReady = prepareMotion;
-        motionReady.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        motionReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-                                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                               0, nullptr, 0, nullptr, 1, &motionReady);
-        frameGenMotionValid = true;
-    }
-
-    uint32_t fixedWidth = std::max(1u, swapchainExt.width / 2);
-    uint32_t fixedHeight = std::max(1u, swapchainExt.height / 2);
-    VkImageMemoryBarrier prepareFixed{};
-    prepareFixed.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prepareFixed.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    prepareFixed.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    prepareFixed.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prepareFixed.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prepareFixed.image = frameGenFixed[currentFrame].image;
-    prepareFixed.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    prepareFixed.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    prepareFixed.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    vk_.CmdPipelineBarrier(command,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0,
-        0, nullptr, 0, nullptr, 1, &prepareFixed);
-    vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_COMPUTE, frameGenFlowFixPipeline);
-    vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_COMPUTE,
-                              frameGenMotionPipeLayout, 0, 1,
-                              &frameGenFlowFixSets[parity][currentFrame], 0, nullptr);
-    FrameGenMotionPush flowFixPush{
-        (int32_t)fixedWidth, (int32_t)fixedHeight,
-        1.0f / (float)fixedWidth, 1.0f / (float)fixedHeight,
-        1.0f, 2.0f, 0.0f, std::clamp(phase, 0.0f, 1.0f)
-    };
-    vk_.CmdPushConstants(command, frameGenMotionPipeLayout, VK_SHADER_STAGE_COMPUTE_BIT,
-                         0, sizeof(flowFixPush), &flowFixPush);
-    vk_.CmdDispatch(command, (fixedWidth + 7u) / 8u, (fixedHeight + 7u) / 8u, 1);
-    VkImageMemoryBarrier fixedReady = prepareFixed;
-    fixedReady.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    fixedReady.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    vk_.CmdPipelineBarrier(command, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                           0, nullptr, 0, nullptr, 1, &fixedReady);
-
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapchainFBs[imageIndex];
-    renderPassInfo.renderArea = {{0, 0}, swapchainExt};
-    VkClearValue clear = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clear;
-    vk_.CmdBeginRenderPass(command, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    VkViewport viewport{0, 0, (float)swapchainExt.width, (float)swapchainExt.height, 0, 1};
-    VkRect2D scissor{{0, 0}, swapchainExt};
-    vk_.CmdSetViewport(command, 0, 1, &viewport);
-    vk_.CmdSetScissor(command, 0, 1, &scissor);
-    vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, frameGenInterpPipeline);
-    vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              frameGenInterpPipeLayout, 0, 1,
-                              &frameGenInterpSets[parity][currentFrame], 0, nullptr);
-    FrameGenInterpPush interpPush{
-        (float)swapchainExt.width, (float)swapchainExt.height,
-        std::clamp(phase, 0.0f, 1.0f),
-        frameGenSmoothing.load(std::memory_order_relaxed), 0.33f, 0.0f
-    };
-    vk_.CmdPushConstants(command, frameGenInterpPipeLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                         0, sizeof(interpPush), &interpPush);
-    vk_.CmdDraw(command, 3, 1, 0, 0);
-
-    // The hardware cursor is an overlay, not game content. Keeping it out of
-    // both history images prevents cursor motion/redraws from corrupting flow.
-    if (curVis && cursorImageInitialized && cursorImg != VK_NULL_HANDLE &&
-        cursorDS != VK_NULL_HANDLE && curW > 0 && curH > 0 && cw > 0.f && ch > 0.f) {
-        int32_t scissorX = std::max(0, scissorRect.offset.x);
-        int32_t scissorY = std::max(0, scissorRect.offset.y);
-        uint32_t maxW = swapchainExt.width > (uint32_t)scissorX
-            ? swapchainExt.width - (uint32_t)scissorX : 0u;
-        uint32_t maxH = swapchainExt.height > (uint32_t)scissorY
-            ? swapchainExt.height - (uint32_t)scissorY : 0u;
-        VkRect2D cursorScissor{{scissorX, scissorY},
-            {std::min(scissorRect.extent.width, maxW),
-             std::min(scissorRect.extent.height, maxH)}};
-        vk_.CmdSetScissor(command, 0, 1, &cursorScissor);
-        vk_.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        vk_.CmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                  pipeLayout, 0, 1, &cursorDS, 0, nullptr);
-        float cursorX = (float)std::max(0, (int)ptrX - curHotX);
-        float cursorY = (float)std::max(0, (int)ptrY - curHotY);
-        WindowPushConstants cursorPush{};
-        cursorPush.ndcX0 = (ox + cursorX * sx) / cw * 2.f - 1.f;
-        cursorPush.ndcY0 = (oy + cursorY * sy) / ch * 2.f - 1.f;
-        cursorPush.ndcX1 = (ox + (cursorX + curW) * sx) / cw * 2.f - 1.f;
-        cursorPush.ndcY1 = (oy + (cursorY + curH) * sy) / ch * 2.f - 1.f;
-        cursorPush.useTexAlpha = 1;
-        vk_.CmdPushConstants(command, pipeLayout,
-                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                             0, sizeof(cursorPush), &cursorPush);
-        vk_.CmdDraw(command, 4, 1, 0, 0);
-    }
-    vk_.CmdEndRenderPass(command);
-    if (vk_.EndCommandBuffer(command) != VK_SUCCESS) return false;
-
-    VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit{};
-    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.waitSemaphoreCount = 1;
-    submit.pWaitSemaphores = &imgAvailSems[currentFrame];
-    submit.pWaitDstStageMask = &waitStage;
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &command;
-    submit.signalSemaphoreCount = 1;
-    submit.pSignalSemaphores = &renderDoneSems[currentFrame];
-    // Fence handles are recycled with the frame slot. Remove stale history
-    // ownership before resetting one, then attach it only to the pair sampled
-    // by this submission.
-    for (VkFence& historyFence : frameGenHistoryFences) {
-        if (historyFence == inFlightFences[currentFrame]) historyFence = VK_NULL_HANDLE;
-    }
-    vk_.ResetFences(device, 1, &inFlightFences[currentFrame]);
-    if (vk_.QueueSubmit(graphicsQueue, 1, &submit, inFlightFences[currentFrame]) != VK_SUCCESS) {
-        frameGenMotionValid = false;
-        return false;
-    }
-    frameGenHistoryFences[parity] = inFlightFences[currentFrame];
-    frameGenHistoryFences[(parity + 2u) % 3u] = inFlightFences[currentFrame];
-    VkPresentInfoKHR present{};
-    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &renderDoneSems[currentFrame];
-    present.swapchainCount = 1;
-    present.pSwapchains = &swapchain;
-    present.pImageIndices = &imageIndex;
-    result = vk_.QueuePresentKHR(graphicsQueue, &present);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_ERROR_SURFACE_LOST_KHR) fbResized.store(true);
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    return result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR;
 }
 
 void VulkanRendererContext::renderFrame() {
@@ -1914,8 +1115,6 @@ ok=true;}catch(...){}
         if (ok) fbResized.store(false);
         return;
     }
-
-    bool frameGenHasNewContent = frameGenContentDirty.exchange(false, std::memory_order_acq_rel);
 
     float ox,oy,sx,sy,cw,ch;
     short ptrX,ptrY,curHotX,curHotY,curW,curH; bool curVis;
@@ -1975,30 +1174,6 @@ ok=true;}catch(...){}
         memcpy(cursorStgP, cursorPixels.data(), cursorUploadSize);
 
     bool effectiveCurVis = curVis && !scanoutActive.load();
-    int multiplier = frameGenMultiplier.load(std::memory_order_relaxed);
-    if (multiplier >= 2 && !scanoutActive.load()) {
-        bool historyReady = frameGenHistoryCount >= 2;
-        if (frameGenHasNewContent || !historyReady) {
-            historyReady = stageFrameGenHistory(frameDraws, curUpload, hasCurUpload,
-                ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
-                false, effectiveScissor);
-            // Cursor upload was recorded into the history command, but curVis=false
-            // guarantees that cursor pixels never become part of either history frame.
-            hasCurUpload = false;
-        }
-        if (historyReady) {
-            int firstPhase = frameGenHasNewContent ? 1 : multiplier;
-            for (int generatedIndex = firstPhase; generatedIndex <= multiplier; generatedIndex++) {
-                if (!presentFrameGenPhase((float)generatedIndex / (float)multiplier,
-                    curUpload, hasCurUpload,
-                    ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH,
-                    effectiveCurVis, effectiveScissor)) break;
-                hasCurUpload = false;
-            }
-            return;
-        }
-    }
-
     if (currentFrame >= cmdBufs.size() || cmdBufs[currentFrame] == VK_NULL_HANDLE) return;
     bool currentFenceWaited = false;
     if (!vk_.GetFenceStatus || vk_.GetFenceStatus(device, inFlightFences[currentFrame]) == VK_NOT_READY) {
@@ -2059,7 +1234,6 @@ void VulkanRendererContext::onSurfaceResized(int w, int h) {
     std::lock_guard<std::mutex> lk(renderMutex);
     if (w==0||h==0) return;
     surfaceWidth=w; surfaceHeight=h;
-    invalidateFrameGenHistory();
     fbResized.store(true); dirtyCV.notify_one();
 }
 
@@ -2114,7 +1288,6 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
 
         surfaceDetached.store(false, std::memory_order_release);
     }
-    invalidateFrameGenHistory();
     needsRender.store(true, std::memory_order_release);
     dirtyCV.notify_all();
     __android_log_print(ANDROID_LOG_DEBUG, "Winlator_Renderer", "reattachSurface: OK");
@@ -2122,11 +1295,8 @@ bool VulkanRendererContext::reattachSurface(ANativeWindow* newWindow) {
 }
 
 void VulkanRendererContext::setTransform(float ox, float oy, float sx, float sy) {
-    bool changed;
     { std::lock_guard<std::mutex> lk(renderMutex);
-      changed = sceneOffsetX != ox || sceneOffsetY != oy || sceneScaleX != sx || sceneScaleY != sy;
       sceneOffsetX=ox;sceneOffsetY=oy;sceneScaleX=sx;sceneScaleY=sy; }
-    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2183,7 +1353,6 @@ void VulkanRendererContext::updateWindowContent(int64_t id, void* px, short w, s
         auto it=texMap.find(id);
         if (it!=texMap.end()) it->second.dirty=true;
     }
-    frameGenContentDirty.store(true, std::memory_order_release);
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2221,24 +1390,13 @@ void VulkanRendererContext::updateWindowContentAHB(int64_t id, AHardwareBuffer* 
         wt.needsTransition  = true;
         src.needsTransition = false;
     }
-    frameGenContentDirty.store(true, std::memory_order_release);
     needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::setRenderList(const int64_t* ids, const int* xs, const int* ys, int count) {
     std::lock_guard<std::mutex> lk(renderMutex);
-    bool changed = (int)renderList.size() != count;
-    if (!changed) {
-        for (int i=0;i<count;i++) {
-            if (renderList[i].id != ids[i] || renderList[i].x != xs[i] || renderList[i].y != ys[i]) {
-                changed = true;
-                break;
-            }
-        }
-    }
     renderList.resize(count);
     for (int i=0;i<count;i++) renderList[i]={ids[i],xs[i],ys[i]};
-    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2269,7 +1427,6 @@ void VulkanRendererContext::removeWindow(int64_t id) {
 
     renderList.erase(std::remove_if(renderList.begin(),renderList.end(),
         [id](const RenderEntry& e){return e.id==id;}),renderList.end());
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2345,7 +1502,6 @@ void VulkanRendererContext::setFilterMode(int mode) {
 
     for (auto& [ahb,wt]:ahbImportCache) updateDS(wt.ds, wt.view);
     if (cursorDS!=VK_NULL_HANDLE&&cursorView!=VK_NULL_HANDLE) updateDS(cursorDS, cursorView);
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2354,7 +1510,6 @@ void VulkanRendererContext::setStretchMode(int mode) {
     if (stretchMode == mode) return;
     stretchMode = mode;
     if (mode == 1 && stretchPipeline == VK_NULL_HANDLE) createStretchPipeline();
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2362,7 +1517,6 @@ void VulkanRendererContext::setSwapRB(bool enabled) {
     if (swapRB == enabled) return;
     swapRB = enabled;
     RLOG("setSwapRB: %d", (int)swapRB);
-    invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
@@ -2386,21 +1540,14 @@ std::vector<int> VulkanRendererContext::getSupportedPresentModes() const {
 void VulkanRendererContext::setCustomScissor(int x, int y, int w, int h) {
     std::lock_guard<std::mutex> lk(renderMutex);
     VkRect2D updated = {{x, y}, {(uint32_t)std::max(0, w), (uint32_t)std::max(0, h)}};
-    bool changed = !hasCustomScissor || customScissor.offset.x != updated.offset.x ||
-        customScissor.offset.y != updated.offset.y ||
-        customScissor.extent.width != updated.extent.width ||
-        customScissor.extent.height != updated.extent.height;
     customScissor = updated;
     hasCustomScissor = true;
-    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 
 void VulkanRendererContext::clearCustomScissor() {
     std::lock_guard<std::mutex> lk(renderMutex);
-    bool changed = hasCustomScissor;
     hasCustomScissor = false;
-    if (changed) invalidateFrameGenHistory();
     needsRender.store(true); dirtyCV.notify_one();
 }
 

@@ -149,8 +149,9 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
 
         String configuredRenderer = shortcut.getRenderer();
         boolean legacyDisplayXRenderer = "displayx".equalsIgnoreCase(configuredRenderer);
+        boolean legacySurfaceFlingerRenderer = "surfaceflinger".equalsIgnoreCase(configuredRenderer);
         final String[] rendererTypeHolder = new String[] {
-                legacyDisplayXRenderer ? "vulkan" : configuredRenderer };
+                legacyDisplayXRenderer || legacySurfaceFlingerRenderer ? "vulkan" : configuredRenderer };
         final Spinner sDisplayDriver = findViewById(R.id.SDisplayDriver);
         final View vDisplayDriverConfig = findViewById(R.id.BTDisplayDriverConfig);
         String currentDisplayDriver = legacyDisplayXRenderer ? "displayx" : shortcut.getDisplayDriver();
@@ -180,8 +181,10 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
         syncDisplayDriverUi.run();
-        final boolean[] rendererNativeHolder = new boolean[] { shortcut.getRendererNative() };
-        final String[] rendererNativeBackendHolder = new String[] { shortcut.getRendererNativeBackend() };
+        final boolean[] rendererNativeHolder = new boolean[] {
+                legacySurfaceFlingerRenderer || shortcut.getRendererNative() };
+        final String[] rendererNativeBackendHolder = new String[] {
+                legacySurfaceFlingerRenderer ? "asr" : shortcut.getRendererNativeBackend() };
         final String[] rendererPresentModeHolder = new String[] { shortcut.getRendererPresentMode() };
         final String[] rendererDriverHolder = new String[] { shortcut.getRendererDriverId() };
         final int[] rendererFilterHolder = new int[] { shortcut.getRendererFilterMode() };
@@ -191,7 +194,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         final android.widget.TextView tvRendererMode = findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererTypeHolder[0]) ? "OpenGL"
-                    : "surfaceflinger".equalsIgnoreCase(rendererTypeHolder[0]) ? "SurfaceFlinger" : "Vulkan");
+                    : "Vulkan");
         }
         View btRendererOptions = findViewById(R.id.BTRendererOptions);
         View rendererTrigger = findViewById(R.id.TVRendererMode);
@@ -201,7 +204,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                     rendererTypeHolder[0] = val;
                     if (tvRendererMode != null) {
                         tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                                : "Vulkan");
                     }
                 }
                 public boolean getRendererNative() { return rendererNativeHolder[0]; }
@@ -263,10 +266,6 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
                 public void setWinFgFlowScale(float val) { shortcut.setWinFgFlowScale(val); }
                 public int getWinFgModel() { return shortcut.getWinFgModel(); }
                 public void setWinFgModel(int val) { shortcut.setWinFgModel(val); }
-                public int getNativeFgMultiplier() { return shortcut.getNativeFgMultiplier(); }
-                public void setNativeFgMultiplier(int val) { shortcut.setNativeFgMultiplier(val); }
-                public float getNativeFgSmoothing() { return shortcut.getNativeFgSmoothing(); }
-                public void setNativeFgSmoothing(float val) { shortcut.setNativeFgSmoothing(val); }
             }, rendererNativeHolder[0]).show();
         if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
         if (rendererTrigger != null) rendererTrigger.setOnClickListener(openRendererOptions);
@@ -701,8 +700,7 @@ public class ShortcutSettingsDialog extends ContentDialog implements DXVKConfigD
         applyDarkThemeToEditText(view.findViewById(R.id.ETScreenWidth), isDarkMode);
         applyDarkThemeToEditText(view.findViewById(R.id.ETScreenHeight), isDarkMode);
 
-        ArrayList<String> items = new ArrayList<>(Arrays.asList(context.getResources().getStringArray(R.array.screen_size_entries)));
-        sScreenSize.setAdapter(ThemeUtils.createSpinnerAdapter(context, items));
+        sScreenSize.setAdapter(ThemeUtils.createSpinnerAdapter(context, AppUtils.getScreenSizeEntries(context)));
 
         sScreenSize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override

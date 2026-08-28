@@ -16,7 +16,6 @@ import android.os.Looper;
 import android.os.Process;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 
 import com.winlator.cmod.core.CPUStatus;
@@ -29,8 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class WinlatorHUD extends View {
     private static final String PREFS    = "winlator_hud";
-    private static final String KEY_X    = "hud_x";
-    private static final String KEY_Y    = "hud_y";
     private static final String KEY_VIS  = "hud_vis";
     private static final String KEY_SHOW = "hud_show";
     private static final String KEY_SCALE= "hud_scale";
@@ -105,11 +102,6 @@ public class WinlatorHUD extends View {
     private volatile boolean userEnabled = false;
     private boolean vertical = false;
 
-    private float touchX, touchY, startX, startY;
-    private boolean dragging = false;
-    private static final float DRAG_THRESH = 10f;
-    private long touchDownMs = 0;
-
     private boolean redrawScheduled = false;
 
     private HandlerThread statsThread = null;
@@ -168,7 +160,6 @@ public class WinlatorHUD extends View {
         initPaints();
         detectGpuPathOnce();
         loadPrefs();
-        setLayerType(LAYER_TYPE_HARDWARE, null);
     }
 
     private void detectGpuPathOnce() {
@@ -218,8 +209,7 @@ public class WinlatorHUD extends View {
     }
 
     public void onFrame() {
-
-        if (!rendererActive && !userEnabled) return;
+        if (!userEnabled) return;
         frameAccum.incrementAndGet();
     }
 
@@ -551,40 +541,6 @@ public class WinlatorHUD extends View {
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent e) {
-        switch (e.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                if (e.getPointerCount() > 1) return true;
-                touchX = e.getRawX(); touchY = e.getRawY();
-                startX = getX();      startY = getY();
-                dragging = false;
-                touchDownMs = System.currentTimeMillis();
-                return true;
-            case MotionEvent.ACTION_MOVE:
-                float dx = e.getRawX() - touchX, dy = e.getRawY() - touchY;
-                if (!dragging && Math.hypot(dx, dy) > DRAG_THRESH) dragging = true;
-                if (dragging) { setX(startX + dx); setY(startY + dy); }
-                return true;
-            case MotionEvent.ACTION_POINTER_UP:
-            case MotionEvent.ACTION_CANCEL:
-                dragging = false; touchDownMs = 0; return true;
-            case MotionEvent.ACTION_UP:
-                if (e.getPointerCount() > 1) { dragging = false; return true; }
-                if (dragging) {
-                    savePosition();
-                } else if (touchDownMs > 0 && System.currentTimeMillis() - touchDownMs < 300) {
-                    vertical = !vertical;
-                    prefs.edit().putBoolean(KEY_VERT, vertical).apply();
-                    try { requestLayout(); invalidate(); } catch (Exception ignored) {}
-                    uiHandler.postDelayed(this::ensureVisible, 250);
-                }
-                dragging = false;
-                return true;
-        }
-        return false;
-    }
-
-    @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
 
@@ -626,13 +582,10 @@ public class WinlatorHUD extends View {
     private void ensureVisible() {
 
         if (userEnabled) {
+            bringToFront();
             if (getVisibility() != VISIBLE) setVisibility(VISIBLE);
             scheduleRedraw();
         }
-    }
-
-    private void savePosition() {
-        prefs.edit().putFloat(KEY_X, getX()).putFloat(KEY_Y, getY()).apply();
     }
 
     private void scheduleRedraw() {
@@ -667,12 +620,14 @@ public class WinlatorHUD extends View {
 
     private void loadPrefs() {
         showMask = prefs.getInt(KEY_SHOW, SHOW_DEFAULT);
+        if (showMask == 0) showMask = SHOW_DEFAULT;
         hudAlpha = prefs.getInt(KEY_ALPHA, 100) / 100f;
-        vertical = prefs.getBoolean(KEY_VERT, false);
-        float scale = prefs.getFloat(KEY_SCALE, 1f);
+        vertical = false;
+        float scale = Math.max(0.5f, Math.min(2f, prefs.getFloat(KEY_SCALE, 1f)));
+        setPivotX(0f); setPivotY(0f);
         setScaleX(scale); setScaleY(scale);
-        setX(prefs.getFloat(KEY_X, 16f));
-        setY(prefs.getFloat(KEY_Y, 16f));
+        setX(0f);
+        setY(0f);
         userEnabled = false;
         setVisibility(GONE);
     }
@@ -692,6 +647,7 @@ public class WinlatorHUD extends View {
         uiHandler.removeCallbacks(redrawRunnable);
         redrawScheduled = false;
         startStatsThread();
+        bringToFront();
         setVisibility(VISIBLE);
         scheduleRedraw();
     }
@@ -806,6 +762,7 @@ public class WinlatorHUD extends View {
     public void setDataSource(Object dataSource) {}
 
     public void setHudScale(float scale) {
+        scale = Math.max(0.5f, Math.min(2f, scale));
         setScaleX(scale); setScaleY(scale);
         prefs.edit().putFloat(KEY_SCALE, scale).apply();
     }
@@ -829,11 +786,24 @@ public class WinlatorHUD extends View {
             uiHandler.removeCallbacks(redrawRunnable);
             redrawScheduled = false;
             frameAccum.set(0); snapFps = 0; lastFpsNs = 0;
-            dragging = false; touchDownMs = 0;
+            showMask = SHOW_DEFAULT;
+            hudAlpha = 1f;
+            vertical = false;
+            setScaleX(1f); setScaleY(1f);
+            setX(0f); setY(0f);
+            layoutDirty = true;
             rendererActive = true; userEnabled = true;
-            prefs.edit().putBoolean(KEY_VIS, true).apply();
+            prefs.edit()
+                    .putBoolean(KEY_VIS, true)
+                    .putInt(KEY_SHOW, SHOW_DEFAULT)
+                    .putInt(KEY_ALPHA, 100)
+                    .putBoolean(KEY_VERT, false)
+                    .putFloat(KEY_SCALE, 1f)
+                    .apply();
             startStatsThread();
+            bringToFront();
             setVisibility(VISIBLE);
+            requestLayout();
             scheduleRedraw();
         });
     }

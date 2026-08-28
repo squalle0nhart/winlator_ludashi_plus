@@ -161,7 +161,7 @@ class JNICache {
             LOAD_FIELD_ID(gpuImageHardwareBufferPtr, env, gpuImageClass, "hardwareBufferPtr", "J");
             LOAD_FIELD_ID(gpuImageFormat, env, gpuImageClass, "format", "I");
 
-            LOAD_METHOD_ID(updateFrameRating, env, xserverDisplayActivityClass, "updateFrameRating", "(Lcom/winlator/cmod/xserver/Window;)V");
+            LOAD_METHOD_ID(updateFrameRating, env, xserverDisplayActivityClass, "updateFrameRating", "(Lcom/winlator/cmod/xserver/Window;Z)V");
             LOAD_METHOD_ID(getRefreshRate, env, xserverDisplayActivityClass, "getRefreshRate", "()F");
             LOAD_FIELD_ID(performanceMode, env, xserverDisplayActivityClass, "performanceMode", "Z");
             LOAD_FIELD_ID(presentRR, env, xserverDisplayActivityClass, "presentRR", "Z");

@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -146,7 +147,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -166,7 +166,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private static final String WRAPPER_DEFAULT_BUNDLE_VERSION = "stable-2005169d";
     private static final String WRAPPER_GAMENATIVE_BUNDLE_VERSION = "20260724";
     private static final String WRAPPER_PIPETTO_BUNDLE_VERSION = "2d9f62bf-20260813";
-    private static final String EXTRA_LIBS_BUNDLE_VERSION = "displayx-arm64ec-swapchain-restored-20260813";
+    private static final String EXTRA_LIBS_BUNDLE_VERSION = "pipetto-zink-dri-3510a514";
     private static final int[] VULKAN_UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
     private static final String GRAPHICS_SIDEBAR_SCALING_MODE_KEY = "graphicsSidebarScalingMode";
     private static final int GRAPHICS_SCALING_NONE = 0;
@@ -184,6 +184,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     public static String NOTIFICATION_CHANNEL_ID = "Winlator";
     private XServerView xServerView;
+    private volatile View shortcutLaunchCover;
     private InputControlsView inputControlsView;
     private TouchpadView touchpadView;
     private XEnvironment environment;
@@ -229,6 +230,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String activeFrameGenBackend;
     private int activeFrameGenMultiplier;
     private boolean activeExternalFrameGenLayerLoaded;
+    private volatile RuntimeBackendProbe.Snapshot runtimeSnapshot = RuntimeBackendProbe.Snapshot.EMPTY;
+    private volatile boolean runtimeStatusProbeRunning;
+    private volatile boolean runtimeStatusProbeStopped;
+    private static final int DISPLAYX_STATUS_OFF = 0;
+    private static final int DISPLAYX_STATUS_WAITING = 1;
+    private static final int DISPLAYX_STATUS_DRI3 = 2;
+    private static final int DISPLAYX_STATUS_TRUE = 3;
+    private volatile int displayXRuntimeStatus = DISPLAYX_STATUS_OFF;
     private Runnable updateSidebarPresentModeUi;
     private Handler lsfgVsyncHandler;
     private ExecutorService lsfgVsyncExecutor;
@@ -1116,6 +1125,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        runtimeStatusProbeStopped = true;
         stopLsfgVsyncClock();
         if (lsfgVsyncExecutor != null) {
             lsfgVsyncExecutor.shutdownNow();
@@ -1439,15 +1449,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             activeFrameGenBackend = shortcut != null
                     ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container);
             activeFrameGenMultiplier = getFrameGenMultiplier(activeFrameGenBackend);
-            activeExternalFrameGenLayerLoaded = isExternalFrameGenBackend(activeFrameGenBackend)
-                    && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
-                            || activeFrameGenMultiplier >= 2)
-                    && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
-        }
-        if (FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend)
-                && activeExternalFrameGenLayerLoaded) {
-            lastCommittedLsfgLevel = activeFrameGenMultiplier >= 2 ? activeFrameGenMultiplier : 0;
-            if (activeFrameGenMultiplier >= 2) startLsfgVsyncClock();
+            activeExternalFrameGenLayerLoaded = false;
         }
         String rendererType = getEffectiveHostRendererType();
         performanceMode = xServer.isDisplayX()
@@ -1456,6 +1458,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 && getLaunchGraphicsBoolean("displayxPresentRR", false);
         xServerView.initRenderer(rendererType);
         final HostRenderer renderer = xServerView.getRenderer();
+        displayXRuntimeStatus = renderer instanceof DisplayXRenderer
+                ? DISPLAYX_STATUS_WAITING : DISPLAYX_STATUS_OFF;
         if (!(renderer instanceof DisplayXRenderer)) {
             renderer.setHudFrameTick(this::driveHudFrameTick);
         }
@@ -1522,6 +1526,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         xServer.setRenderer(renderer);
         rootView.addView(xServerView);
+        if (shortcut != null && renderer instanceof DisplayXRenderer) {
+            shortcutLaunchCover = new View(this);
+            shortcutLaunchCover.setBackgroundColor(android.graphics.Color.BLACK);
+            rootView.addView(shortcutLaunchCover, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
 
         globalCursorSpeed = preferences.getFloat("cursor_speed", 1.0f);
         touchpadView = new TouchpadView(this, xServer, timeoutHandler, hideControlsRunnable);
@@ -1574,7 +1584,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
                 modernHud = new WinlatorHUD(this);
                 modernHud.setVisibility(View.GONE);
-                rootView.addView(modernHud);
+                rootView.addView(modernHud, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP | Gravity.START));
                 modernHud.enableByUser();
                 renderer.setFrameRating(modernHud);
                 modernHud.setRenderer(rendererLabel);
@@ -1604,47 +1616,162 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
-        setupRuntimeBackendIndicator();
+        setupRuntimeStatusSection();
     }
 
-    private void setupRuntimeBackendIndicator() {
-        TextView indicator = findViewById(R.id.TVRuntimeBackend);
-        if (indicator == null || wineInfo == null) return;
+    private void setupRuntimeStatusSection() {
+        runtimeStatusProbeStopped = false;
+        updateRuntimeStatusUi(runtimeSnapshot);
+        requestRuntimeStatusProbe();
+    }
+
+    private void requestRuntimeStatusProbe() {
+        if (runtimeStatusProbeRunning || runtimeStatusProbeStopped || container == null) return;
+        runtimeStatusProbeRunning = true;
+        Thread probe = new Thread(() -> {
+            try {
+                for (int i = 0; i < 15 && !runtimeStatusProbeStopped; i++) {
+                    RuntimeBackendProbe.Snapshot detected = RuntimeBackendProbe.detect(
+                            GuestProgramLauncherComponent.getPid(), container.getRootDir());
+                    runtimeSnapshot = detected;
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed()) updateRuntimeStatusUi(detected);
+                    });
+
+                    boolean fexReady = wineInfo == null || !wineInfo.isArm64EC()
+                            || detected.fexMode != RuntimeBackendProbe.FexMode.NA;
+                    boolean frameGenExpected = !isTrueDisplayXLaunch()
+                            && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                                    || activeFrameGenMultiplier >= 2);
+                    boolean frameGenReady = !frameGenExpected
+                            || (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                                    ? detected.winFgLoaded : detected.lsfgLoaded);
+                    if (fexReady && frameGenReady) break;
+                    Thread.sleep(1000L);
+                }
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                runtimeStatusProbeRunning = false;
+            }
+        }, "runtime-status-probe");
+        probe.setDaemon(true);
+        probe.start();
+    }
+
+    private void updateRuntimeStatusUi(RuntimeBackendProbe.Snapshot snapshot) {
+        if (wineInfo == null) return;
+        int normal = ThemeUtils.getColorAttr(this, R.attr.colorOnSurfaceVariant);
+        int active = android.graphics.Color.rgb(76, 175, 80);
+        int warning = android.graphics.Color.rgb(255, 152, 0);
+
+        String effectiveRenderer = getEffectiveHostRendererType();
+        String requestedRenderer = getEffectiveNonDisplayXHostRendererType();
+        HostRenderer hostRenderer = xServerView != null ? xServerView.getRenderer() : null;
+        boolean rendererActive = !(hostRenderer instanceof ASurfaceRenderer)
+                || ((ASurfaceRenderer) hostRenderer).isActive();
+        String rendererValue = rendererLabel(effectiveRenderer);
+        if (!effectiveRenderer.equalsIgnoreCase(requestedRenderer)) {
+            rendererValue += " · overrides " + rendererLabel(requestedRenderer);
+        }
+        if (!rendererActive) rendererValue += " · not initialized";
+        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", rendererValue,
+                rendererActive ? active : warning);
+
+        String displayXValue;
+        int displayXColor;
+        if (!(hostRenderer instanceof DisplayXRenderer)) {
+            displayXValue = "Off";
+            displayXColor = normal;
+        } else if (displayXRuntimeStatus == DISPLAYX_STATUS_TRUE) {
+            displayXValue = "True DisplayX active";
+            displayXColor = active;
+        } else if (displayXRuntimeStatus == DISPLAYX_STATUS_DRI3) {
+            displayXValue = getLaunchGraphicsBoolean("displayxTrue", false)
+                    ? "DRI3 fallback active" : "DRI3 active";
+            displayXColor = getLaunchGraphicsBoolean("displayxTrue", false) ? warning : active;
+        } else {
+            displayXValue = getLaunchGraphicsBoolean("displayxTrue", false)
+                    ? "True DisplayX requested · waiting for frame"
+                    : "DRI3 requested · waiting for frame";
+            displayXColor = warning;
+        }
+        setRuntimeStatus(R.id.TVRuntimeDisplayXStatus, "DisplayX", displayXValue, displayXColor);
+
+        boolean frameGenLoaded = FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                ? snapshot.winFgLoaded : snapshot.lsfgLoaded;
+        activeExternalFrameGenLayerLoaded = frameGenLoaded;
+        if (frameGenLoaded && FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend)) {
+            lastCommittedLsfgLevel = activeFrameGenMultiplier >= 2 ? activeFrameGenMultiplier : 0;
+            if (activeFrameGenMultiplier >= 2) startLsfgVsyncClock();
+        } else if (FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend)) {
+            stopLsfgVsyncClock();
+        }
+        String frameGenName = FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
+                ? "win-fg" : "LSFG-VK";
+        String frameGenValue;
+        int frameGenColor;
+        if (isTrueDisplayXLaunch()) {
+            frameGenValue = "Off · disabled for True DisplayX launch";
+            frameGenColor = normal;
+        } else if (activeFrameGenMultiplier < 2) {
+            frameGenValue = "Off" + (frameGenLoaded ? " · " + frameGenName + " loaded" : "");
+            frameGenColor = normal;
+        } else if (frameGenLoaded) {
+            frameGenValue = "Active · " + frameGenName
+                    + (FrameGenManager.BACKEND_LSFG_VK.equals(activeFrameGenBackend)
+                            ? " " + activeFrameGenMultiplier + "x" : "");
+            frameGenColor = active;
+        } else {
+            frameGenValue = "Requested · " + frameGenName + " layer not loaded";
+            frameGenColor = warning;
+        }
+        setRuntimeStatus(R.id.TVRuntimeFrameGenStatus, "Frame generation", frameGenValue, frameGenColor);
 
         boolean arm64ec = wineInfo.isArm64EC();
-        String arch = arm64ec ? "arm64ec" : "x86-64";
+        boolean arm64ecDetected = !arm64ec || snapshot.fexMode != RuntimeBackendProbe.FexMode.NA;
+        setRuntimeStatus(R.id.TVRuntimeBackend, "Architecture",
+                arm64ec ? "ARM64EC " + (arm64ecDetected ? "active" : "not detected") : "x86-64",
+                arm64ecDetected ? active : warning);
         String normalizedEmulator = emulator == null ? "" : emulator.toLowerCase(java.util.Locale.ROOT);
         String translator = !arm64ec ? "Box64"
                 : normalizedEmulator.contains("wowbox64") ? "wowbox64" : "FEXCore";
-        String baseLabel = arch + " · " + translator;
+        if (arm64ec && container != null) {
+            String version = shortcut != null
+                    ? shortcut.getExtra("fexcoreVersion", container.getFEXCoreVersion())
+                    : container.getFEXCoreVersion();
+            if (version != null && !version.isEmpty()) translator += " " + version;
+        }
+        boolean translatorDetected = !arm64ec || snapshot.fexMode != RuntimeBackendProbe.FexMode.NA;
+        setRuntimeStatus(R.id.TVRuntimeTranslatorStatus, "Translator",
+                translator + (translatorDetected ? " active" : " not detected"),
+                translatorDetected ? active : warning);
 
-        indicator.setText(baseLabel + (arm64ec ? " · N/A" : ""));
-        indicator.setVisibility(View.VISIBLE);
-        if (!arm64ec) return;
+        String unixLibsValue = !arm64ec ? "Not applicable"
+                : snapshot.fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? "Active"
+                : snapshot.fexMode == RuntimeBackendProbe.FexMode.DLL ? "Off · DLL mode"
+                : "Not detected";
+        setRuntimeStatus(R.id.TVRuntimeUnixLibsStatus, "Unixlibs", unixLibsValue,
+                snapshot.fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? active
+                        : snapshot.fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal);
+    }
 
-        new Thread(() -> {
-            RuntimeBackendProbe.FexMode mode = RuntimeBackendProbe.FexMode.NA;
-            for (int i = 0; i < 15 && mode == RuntimeBackendProbe.FexMode.NA; i++) {
-                try {
-                    Thread.sleep(1500);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                mode = RuntimeBackendProbe.detect(GuestProgramLauncherComponent.getPid());
-            }
+    private void setRuntimeStatus(int viewId, String label, String value, int color) {
+        TextView view = findViewById(viewId);
+        if (view == null) return;
+        view.setText(label + ": " + value);
+        view.setTextColor(color);
+    }
 
-            RuntimeBackendProbe.FexMode detectedMode = mode;
-            runOnUiThread(() -> {
-                if (isFinishing() || isDestroyed()) return;
-                String modeLabel = detectedMode == RuntimeBackendProbe.FexMode.UNIXLIB
-                        ? "unixlib" : detectedMode == RuntimeBackendProbe.FexMode.DLL ? "DLL" : "N/A";
-                indicator.setText(baseLabel + " · " + modeLabel);
-                indicator.setTextColor(detectedMode == RuntimeBackendProbe.FexMode.UNIXLIB
-                        ? android.graphics.Color.rgb(76, 175, 80)
-                        : ThemeUtils.getColorAttr(this, R.attr.colorOnSurfaceVariant));
-            });
-        }, "fex-runtime-probe").start();
+    private String rendererLabel(String rendererType) {
+        return "gl".equalsIgnoreCase(rendererType) ? "OpenGL"
+                : "surfaceflinger".equalsIgnoreCase(rendererType) ? "SurfaceFlinger"
+                : "displayx".equalsIgnoreCase(rendererType) ? "DisplayX" : "Vulkan";
+    }
+
+    private boolean isTrueDisplayXLaunch() {
+        return "displayx".equalsIgnoreCase(getEffectiveHostRendererType())
+                && getLaunchGraphicsBoolean("displayxTrue", false);
     }
 
     private void applyScreenEffects(GLRenderer renderer, float brightness, float contrast, float gamma,
@@ -1979,6 +2106,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
         }
         setSidebarActiveItem(parentId);
+        if (parentId == R.id.BTItemGraphics) requestRuntimeStatusProbe();
         if (parentId != R.id.BTItemMouse && parentId != R.id.BTItemPause) {
             activeSidebarItemId = parentId;
             activeSidebarPanelId = subId;
@@ -2164,7 +2292,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (modernHud == null) {
                 modernHud = new WinlatorHUD(this);
                 modernHud.setVisibility(View.GONE);
-                rootView.addView(modernHud);
+                rootView.addView(modernHud, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP | Gravity.START));
                 if (renderer != null) renderer.setFrameRating(modernHud);
                 if (rendererAlreadyActive) {
 
@@ -2921,23 +3051,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (activeFrameGenBackend == null) {
             activeFrameGenBackend = selectedBackend[0];
             activeFrameGenMultiplier = selectedMultiplier[0];
-            activeExternalFrameGenLayerLoaded = isExternalFrameGenBackend(activeFrameGenBackend)
-                    && (FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend)
-                            || activeFrameGenMultiplier >= 2)
-                    && isExternalFrameGenRuntimeAvailable(activeFrameGenBackend);
+            activeExternalFrameGenLayerLoaded = false;
         }
         TextView status = findViewById(R.id.TVFrameGenStatus);
         View modelGroup = findViewById(R.id.GroupFrameGenModel);
         TextView modelGroupLabel = findViewById(R.id.TVFrameGenModelLabel);
 
         Runnable updateUi = () -> {
-            boolean nativeBackend = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
             boolean winBackend = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
-            boolean selectedBackendAvailable = nativeBackend
-                    ? vkRenderer != null : externalFrameGenAvailable;
+            boolean selectedBackendAvailable = externalFrameGenAvailable;
             setEnabledIfPresent(R.id.BTFrameGenLsfg, externalFrameGenAvailable);
             setEnabledIfPresent(R.id.BTFrameGenWin, externalFrameGenAvailable);
-            setEnabledIfPresent(R.id.BTFrameGenNative, vkRenderer != null);
             setEnabledIfPresent(R.id.BTFrameGenOff, selectedBackendAvailable);
             setEnabledIfPresent(R.id.BTFrameGen2x, selectedBackendAvailable);
             setEnabledIfPresent(R.id.BTFrameGen3x, selectedBackendAvailable);
@@ -2945,7 +3069,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setEnabledIfPresent(R.id.BTFrameGenAdvanced, externalFrameGenAvailable);
             setSelectedModeButton(R.id.BTFrameGenLsfg, FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]));
             setSelectedModeButton(R.id.BTFrameGenWin, winBackend);
-            setSelectedModeButton(R.id.BTFrameGenNative, nativeBackend);
             setSelectedModeButton(R.id.BTFrameGenOff, selectedMultiplier[0] < 2);
             setSelectedModeButton(R.id.BTFrameGen2x, selectedMultiplier[0] == 2);
             setSelectedModeButton(R.id.BTFrameGen3x, selectedMultiplier[0] == 3);
@@ -2978,17 +3101,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             setSelectedModeButton(R.id.BTFrameGenModelFsr3Plus, selectedModel[0] == 4);
             if (status != null) {
                 if (!selectedBackendAvailable) {
-                    status.setText(nativeBackend
-                            ? R.string.frame_generation_requires_vulkan
-                            : R.string.frame_generation_requires_vulkan_or_surfaceflinger);
-                } else if (nativeBackend) {
-                    boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
-                            || activeFrameGenMultiplier < 2;
-                    status.setText(vkRenderer == null
-                            ? "Native Framegen requires the Vulkan renderer."
-                            : canApplyLive
-                                    ? "Native optical-flow frame generation applies immediately."
-                                    : "Relaunch to switch from the active external framegen layer.");
+                    status.setText(R.string.frame_generation_requires_vulkan_or_surfaceflinger);
                 } else if (winBackend) {
                     boolean settingsApplyLive = activeExternalFrameGenLayerLoaded
                             && FrameGenManager.BACKEND_WIN_FG.equals(activeFrameGenBackend);
@@ -3007,14 +3120,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                             : "Import Lossless.dll before enabling LSFG-VK.");
                 }
             }
-            if (vkRenderer != null) {
-                boolean canApplyLive = FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
-                        || activeFrameGenMultiplier < 2;
-                float nativeSmoothing = shortcut != null
-                        ? shortcut.getNativeFgSmoothing() : container.getNativeFgSmoothing();
-                vkRenderer.setFrameGenerationSmoothing(nativeSmoothing);
-                vkRenderer.setFrameGenerationMultiplier(nativeBackend && canApplyLive ? selectedMultiplier[0] : 0);
-            }
             if (updateSidebarPresentModeUi != null) updateSidebarPresentModeUi.run();
             setEnabledIfPresent(R.id.BTFrameGenModelDefault, false);
             setEnabledIfPresent(R.id.BTFrameGenModelTraced, false);
@@ -3025,16 +3130,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         View.OnClickListener backendListener = view -> {
             String backend = view.getId() == R.id.BTFrameGenWin
-                            ? FrameGenManager.BACKEND_WIN_FG
-                    : view.getId() == R.id.BTFrameGenNative
-                            ? FrameGenManager.BACKEND_NATIVE_FG
-                            : FrameGenManager.BACKEND_LSFG_VK;
-            boolean backendAvailable = FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
-                    ? vkRenderer != null : externalFrameGenAvailable;
-            if (!backendAvailable) {
-                AppUtils.showToast(this, getString(FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
-                        ? R.string.frame_generation_requires_vulkan
-                        : R.string.frame_generation_requires_vulkan_or_surfaceflinger));
+                    ? FrameGenManager.BACKEND_WIN_FG : FrameGenManager.BACKEND_LSFG_VK;
+            if (!externalFrameGenAvailable) {
+                AppUtils.showToast(this, getString(R.string.frame_generation_requires_vulkan_or_surfaceflinger));
                 return;
             }
             boolean changed = !backend.equals(selectedBackend[0]);
@@ -3043,27 +3141,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
             selectedModel[0] = getFrameGenModel(backend);
             persistFrameGenSelection(backend, selectedMultiplier[0], selectedModel[0]);
             updateUi.run();
-            boolean needsRelaunch = changed && (!FrameGenManager.BACKEND_NATIVE_FG.equals(backend)
-                    || (!FrameGenManager.BACKEND_NATIVE_FG.equals(activeFrameGenBackend)
-                            && activeFrameGenMultiplier >= 2));
-            if (needsRelaunch) {
+            if (changed) {
                 AppUtils.showToast(this, "Framegen backend changed. Relaunch the game to apply it.");
             }
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenLsfg, backendListener);
         setOnClickListenerIfPresent(R.id.BTFrameGenWin, backendListener);
-        setOnClickListenerIfPresent(R.id.BTFrameGenNative, backendListener);
 
         View.OnClickListener multiplierListener = view -> {
             int multiplier = view.getId() == R.id.BTFrameGen2x ? 2
                     : view.getId() == R.id.BTFrameGen3x ? 3
                     : view.getId() == R.id.BTFrameGen4x ? 4 : 0;
-            boolean selectedBackendAvailable = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
-                    ? vkRenderer != null : externalFrameGenAvailable;
-            if (!selectedBackendAvailable) {
-                AppUtils.showToast(this, getString(FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
-                        ? R.string.frame_generation_requires_vulkan
-                        : R.string.frame_generation_requires_vulkan_or_surfaceflinger));
+            if (!externalFrameGenAvailable) {
+                AppUtils.showToast(this, getString(R.string.frame_generation_requires_vulkan_or_surfaceflinger));
                 return;
             }
             if (multiplier >= 2 && FrameGenManager.BACKEND_LSFG_VK.equals(selectedBackend[0]) && !dllAvailable) {
@@ -3080,15 +3170,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 applyEffectivePresentMode(vkRenderer);
             }
             updateUi.run();
-            if (!FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
-                AppUtils.showToast(this, externalAppliesLive
-                        ? (multiplier >= 2
-                                ? "Frame generation set to " + multiplier + "x"
-                                : "Frame generation disabled")
-                        : (multiplier >= 2
-                                ? "Framegen set to " + multiplier + "x. Relaunch the game to apply it."
-                                : "Frame generation disabled after relaunch"));
-            }
+            AppUtils.showToast(this, externalAppliesLive
+                    ? (multiplier >= 2
+                            ? "Frame generation set to " + multiplier + "x"
+                            : "Frame generation disabled")
+                    : (multiplier >= 2
+                            ? "Framegen set to " + multiplier + "x. Relaunch the game to apply it."
+                            : "Frame generation disabled after relaunch"));
         };
         setOnClickListenerIfPresent(R.id.BTFrameGenOff, multiplierListener);
         setOnClickListenerIfPresent(R.id.BTFrameGen2x, multiplierListener);
@@ -3140,8 +3228,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
                 : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
         HostRenderer hostRenderer = xServerView != null ? xServerView.getRenderer() : null;
-        boolean nativeAvailable = hostRenderer instanceof VulkanRenderer;
-        boolean externalFrameGenAvailable = nativeAvailable || hostRenderer instanceof ASurfaceRenderer;
+        boolean externalFrameGenAvailable = hostRenderer instanceof VulkanRenderer
+                || hostRenderer instanceof ASurfaceRenderer;
 
         FrameGenQuickMenuHelper.Settings currentSettings = shortcut != null
                 ? FrameGenQuickMenuHelper.readSettings(shortcut)
@@ -3159,10 +3247,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 ? shortcut.getWinFgFlowScale() : container.getWinFgFlowScale()};
         final int[] selectedWinModel = {shortcut != null
                 ? shortcut.getWinFgModel() : container.getWinFgModel()};
-        final int[] selectedNativeMultiplier = {shortcut != null
-                ? shortcut.getNativeFgMultiplier() : container.getNativeFgMultiplier()};
-        final float[] selectedNativeSmoothing = {shortcut != null
-                ? shortcut.getNativeFgSmoothing() : container.getNativeFgSmoothing()};
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -3177,17 +3261,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Spinner backendSpinner = new Spinner(this);
         ArrayAdapter<String> backendAdapter = ThemeUtils.createSpinnerAdapter(
                 this,
-                new String[]{"LSFG-VK", "win-fg", "Native Framegen"});
+                new String[]{"LSFG-VK", "win-fg"});
         backendSpinner.setAdapter(backendAdapter);
         ThemeUtils.applySpinnerTheme(backendSpinner);
         backendSpinner.setBackgroundResource(R.drawable.framegen_spinner_background);
         backendSpinner.setPadding(padding / 2, 0, padding / 2, 0);
         backendSpinner.setMinimumHeight(padding * 3);
-        int initialBackendPosition = FrameGenManager.BACKEND_WIN_FG.equals(currentSettings.backend) ? 1
-                : FrameGenManager.BACKEND_NATIVE_FG.equals(currentSettings.backend) ? 2 : 0;
-        if (initialBackendPosition == 2 && !nativeAvailable && externalFrameGenAvailable) {
-            initialBackendPosition = 0;
-        }
+        int initialBackendPosition = FrameGenManager.BACKEND_WIN_FG.equals(currentSettings.backend) ? 1 : 0;
         backendSpinner.setSelection(initialBackendPosition);
         backendSpinner.setEnabled(externalFrameGenAvailable);
         layout.addView(backendSpinner);
@@ -3255,26 +3335,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
             int backendPosition = backendSpinner.getSelectedItemPosition();
             selectedBackend[0] = backendPosition == 1
                     ? FrameGenManager.BACKEND_WIN_FG
-                    : backendPosition == 2
-                            ? FrameGenManager.BACKEND_NATIVE_FG
-                            : FrameGenManager.BACKEND_LSFG_VK;
+                    : FrameGenManager.BACKEND_LSFG_VK;
             boolean useWinFg = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0]);
-            boolean useNativeFg = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0]);
-            boolean backendAvailable = useNativeFg ? nativeAvailable
-                    : externalFrameGenAvailable && (useWinFg || dllAvailable);
+            boolean backendAvailable = externalFrameGenAvailable && (useWinFg || dllAvailable);
 
             status.setText(useWinFg
                     ? "Bundled clean-room win-fg with device-proven presentation and live config reload."
-                    : useNativeFg
-                            ? (nativeAvailable
-                                    ? "Native frame generation can apply live with the Vulkan renderer."
-                                    : "Native frame generation requires the Vulkan renderer.")
-                            : (dllAvailable
-                                    ? "LSFG-VK uses the imported Lossless.dll."
-                                    : "Import Lossless.dll before enabling LSFG-VK."));
+                    : (dllAvailable
+                            ? "LSFG-VK uses the imported Lossless.dll."
+                            : "Import Lossless.dll before enabling LSFG-VK."));
 
-            int selectedMultiplier = useNativeFg ? selectedNativeMultiplier[0]
-                    : useWinFg ? selectedWinMultiplier[0]
+            int selectedMultiplier = useWinFg ? selectedWinMultiplier[0]
                     : selectedLsfgMultiplier[0];
             for (int i = 0; i < multiplierGroup.getChildCount(); i++) {
                 View child = multiplierGroup.getChildAt(i);
@@ -3294,13 +3365,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             flowLabel.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
             flowSeekBar.setVisibility(showWinFgTuning ? View.VISIBLE : View.GONE);
             flowSeekBar.setEnabled(backendAvailable);
-            flowSeekBar.setMax(useNativeFg ? 100 : 75);
-            flowSeekBar.setProgress(useNativeFg
-                    ? Math.round(selectedNativeSmoothing[0] * 100.0f)
-                    : Math.round((flowScale - 0.25f) * 100.0f));
-            flowLabel.setText(useNativeFg
-                    ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
-                    : String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
+            flowSeekBar.setMax(75);
+            flowSeekBar.setProgress(Math.round((flowScale - 0.25f) * 100.0f));
+            flowLabel.setText(String.format(java.util.Locale.US, "Flow scale: %.2f", flowScale));
             modelLabel.setText("win-fg Model");
             modelLabel.setVisibility(useWinFg && showWinFgTuning ? View.VISIBLE : View.GONE);
             modelSpinner.setVisibility(useWinFg && showWinFgTuning ? View.VISIBLE : View.GONE);
@@ -3309,7 +3376,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     new String[]{"Optical flow", "Optical flow · bidirectional"}));
             ThemeUtils.applySpinnerTheme(modelSpinner);
             modelSpinner.setSelection(Math.max(0, Math.min(1, selectedWinModel[0] - 3)));
-            performanceMode.setVisibility(useWinFg || useNativeFg ? View.GONE : View.VISIBLE);
+            performanceMode.setVisibility(useWinFg ? View.GONE : View.VISIBLE);
             performanceMode.setEnabled(dllAvailable);
             syncingUi[0] = false;
         };
@@ -3317,12 +3384,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
         backendSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position == 2 && !nativeAvailable) {
-                    AppUtils.showToast(XServerDisplayActivity.this,
-                            getString(R.string.frame_generation_requires_vulkan));
-                    backendSpinner.setSelection(0);
-                    return;
-                }
                 syncUi.run();
             }
 
@@ -3334,9 +3395,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             View checkedView = group.findViewById(checkedId);
             Object tag = checkedView != null ? checkedView.getTag() : null;
             if (!(tag instanceof Integer)) return;
-            if (FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
-                selectedNativeMultiplier[0] = (Integer) tag;
-            } else if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
+            if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
                 selectedWinMultiplier[0] = (Integer) tag;
             } else {
                 selectedLsfgMultiplier[0] = (Integer) tag;
@@ -3347,12 +3406,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
                 if (syncingUi[0]) return;
-                if (FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])) {
-                    selectedNativeSmoothing[0] = Math.max(0.0f, Math.min(1.0f, progress / 100.0f));
-                    flowLabel.setText("Smoothness: "
-                            + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%");
-                    return;
-                }
                 float value = FrameGenQuickMenuHelper.sanitizeFlowScale(0.25f + progress / 100.0f);
                 if (FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])) {
                     selectedWinFlowScale[0] = value;
@@ -3398,10 +3451,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 dialogHeight));
         frameGenDialog.setTitle("Framegen Advanced");
         frameGenDialog.setOnConfirmCallback(() -> {
-                    int selectedMultiplier = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
-                            ? selectedNativeMultiplier[0]
-                            : FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])
-                                    ? selectedWinMultiplier[0] : selectedLsfgMultiplier[0];
+                    int selectedMultiplier = FrameGenManager.BACKEND_WIN_FG.equals(selectedBackend[0])
+                            ? selectedWinMultiplier[0] : selectedLsfgMultiplier[0];
                     if (shortcut != null) {
                         shortcut.setFrameGenBackend(selectedBackend[0]);
                         shortcut.setLsfgMultiplier(selectedLsfgMultiplier[0]);
@@ -3412,8 +3463,6 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         shortcut.setWinFgMultiplier(selectedWinMultiplier[0]);
                         shortcut.setWinFgFlowScale(selectedWinFlowScale[0]);
                         shortcut.setWinFgModel(selectedWinModel[0]);
-                        shortcut.setNativeFgMultiplier(selectedNativeMultiplier[0]);
-                        shortcut.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         shortcut.saveData();
                         if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, shortcut);
                         FrameGenManager.writeConfig(shortcut);
@@ -3427,20 +3476,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         container.setWinFgMultiplier(selectedWinMultiplier[0]);
                         container.setWinFgFlowScale(selectedWinFlowScale[0]);
                         container.setWinFgModel(selectedWinModel[0]);
-                        container.setNativeFgMultiplier(selectedNativeMultiplier[0]);
-                        container.setNativeFgSmoothing(selectedNativeSmoothing[0]);
                         container.saveData();
                         if (selectedMultiplier >= 2) FrameGenManager.ensureRuntimeInstalled(this, container);
                         FrameGenManager.writeConfig(container);
                     }
                     if (onSaved != null) onSaved.run();
-                    if (xServerView != null && xServerView.getRenderer() instanceof VulkanRenderer) {
-                        ((VulkanRenderer) xServerView.getRenderer())
-                                .setFrameGenerationSmoothing(selectedNativeSmoothing[0]);
-                    }
-                    boolean appliesLive = FrameGenManager.BACKEND_NATIVE_FG.equals(selectedBackend[0])
-                            || (activeExternalFrameGenLayerLoaded
-                                    && selectedBackend[0].equals(activeFrameGenBackend));
+                    boolean appliesLive = activeExternalFrameGenLayerLoaded
+                            && selectedBackend[0].equals(activeFrameGenBackend);
                     AppUtils.showToast(this, appliesLive
                             ? "Framegen advanced settings saved"
                             : "Framegen settings saved. Relaunch the game to apply them.");
@@ -3451,11 +3493,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private int getFrameGenMultiplier(String backend) {
         if (container == null) return 0;
         if (shortcut != null) {
-            if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return shortcut.getNativeFgMultiplier();
             if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return shortcut.getWinFgMultiplier();
             return shortcut.getLsfgMultiplier();
         }
-        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) return container.getNativeFgMultiplier();
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return container.getWinFgMultiplier();
         return container.getLsfgMultiplier();
     }
@@ -3473,23 +3513,19 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 || FrameGenManager.BACKEND_LSFG_VK.equals(backend);
     }
 
-    private boolean isExternalFrameGenRuntimeAvailable(String backend) {
-        if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) return true;
-        if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) return false;
-        return shortcut != null
-                ? LsfgVkManager.containerDllPath(shortcut) != null || LsfgVkManager.isGlobalDllAvailable(this)
-                : LsfgVkManager.containerDllPath(container) != null || LsfgVkManager.isGlobalDllAvailable(this);
-    }
-
     private void applyLiveExternalFrameGenChange(String backend, int multiplier) {
         activeFrameGenMultiplier = multiplier;
-        if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) return;
+        if (!FrameGenManager.BACKEND_LSFG_VK.equals(backend)) {
+            updateRuntimeStatusUi(runtimeSnapshot);
+            return;
+        }
 
         int newLevel = multiplier >= 2 ? multiplier : 0;
         if (newLevel >= 2) startLsfgVsyncClock(); else stopLsfgVsyncClock();
         boolean changed = lastCommittedLsfgLevel >= 0 && newLevel != lastCommittedLsfgLevel;
         lastCommittedLsfgLevel = newLevel;
         if (changed) triggerLsfgPresentationReset();
+        updateRuntimeStatusUi(runtimeSnapshot);
     }
 
     private void startLsfgVsyncClock() {
@@ -3930,7 +3966,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
 
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
-        envVars.put("GALLIUM_DRIVER", "zink");
+        envVars.put("MESA_LOADER_DRIVER_OVERRIDE", "zink");
 
         if (firstTimeBoot || forceGraphicsDriverExtraction) {
             String graphicsDriverArchive = resolveGraphicsDriverArchiveName();
@@ -4104,23 +4140,34 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
         envVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
         boolean bypassRequested = getLaunchGraphicsBoolean("displayxTrue", false);
-        if (bypassRequested && wineInfo != null && wineInfo.isArm64EC()) {
-            envVars.remove("VK_INSTANCE_LAYERS");
-            envVars.put("ENABLE_DISPLAYX", "1");
-            envVars.remove("DISABLE_DISPLAYX");
-            Log.i("XServerDisplayActivity",
-                    "True DisplayX enabled through the ARM64EC implicit Vulkan layer");
-        } else if (bypassRequested) {
-            envVars.put("VK_INSTANCE_LAYERS", "VK_LAYER_DISPLAYX_display_x");
+        if (bypassRequested) {
+            setDisplayXInstanceLayerEnabled(true);
             envVars.remove("ENABLE_DISPLAYX");
-            envVars.put("DISABLE_DISPLAYX", "1");
+            envVars.remove("DISABLE_DISPLAYX");
         } else {
-            if (envVars.get("VK_INSTANCE_LAYERS").contains("VK_LAYER_DISPLAYX_display_x")) {
-                envVars.remove("VK_INSTANCE_LAYERS");
-            }
+            setDisplayXInstanceLayerEnabled(false);
             envVars.remove("ENABLE_DISPLAYX");
             envVars.put("DISABLE_DISPLAYX", "1");
         }
+    }
+
+    private void setDisplayXInstanceLayerEnabled(boolean enabled) {
+        final String displayXLayer = "VK_LAYER_DISPLAYX_display_x";
+        String current = envVars.get("VK_INSTANCE_LAYERS");
+        StringBuilder layers = new StringBuilder();
+        if (current != null && !current.isEmpty()) {
+            for (String layer : current.split(":")) {
+                if (layer.isEmpty() || displayXLayer.equals(layer)) continue;
+                if (layers.length() > 0) layers.append(':');
+                layers.append(layer);
+            }
+        }
+        if (enabled) {
+            if (layers.length() > 0) layers.append(':');
+            layers.append(displayXLayer);
+        }
+        if (layers.length() > 0) envVars.put("VK_INSTANCE_LAYERS", layers.toString());
+        else envVars.remove("VK_INSTANCE_LAYERS");
     }
 
     private boolean isPipettoDirectRgbaMode() {
@@ -4133,7 +4180,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     private String getEffectiveHostRendererType() {
-        String requestedRenderer = getLaunchRendererType();
+        String requestedRenderer = getEffectiveNonDisplayXHostRendererType();
         if ("displayx".equalsIgnoreCase(getLaunchDisplayDriver())) {
             String effectiveRenderer = android.os.Build.VERSION.SDK_INT >= 29 ? "displayx" : "vulkan";
             if (!effectiveRenderer.equalsIgnoreCase(requestedRenderer)) {
@@ -4142,6 +4189,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
             return effectiveRenderer;
         }
+        return requestedRenderer;
+    }
+
+    private String getEffectiveNonDisplayXHostRendererType() {
+        String requestedRenderer = getLaunchRendererType();
         if ("vulkan".equalsIgnoreCase(requestedRenderer)
                 && getLaunchRendererNative()
                 && getLaunchScalingMode() < GRAPHICS_SCALING_SGSR
@@ -4208,11 +4260,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         return display != null ? display.getRefreshRate() : 60.0f;
     }
 
-    public void updateFrameRating(Window window) {
-        // This callback is emitted only for a submitted True DisplayX swapchain image.
+    public void updateFrameRating(Window window, boolean trueDisplayXFrame) {
         // Wine/DXVK can put the _MESA_DRV properties and Vulkan surface on unrelated
-        // reparented X11 windows, so X11 window identity is not a reliable FPS filter.
+        // reparented X11 windows, so the submitted drawable is the authoritative path signal.
         if (window == null) return;
+        int nextStatus = trueDisplayXFrame ? DISPLAYX_STATUS_TRUE : DISPLAYX_STATUS_DRI3;
+        if (displayXRuntimeStatus != nextStatus) {
+            displayXRuntimeStatus = nextStatus;
+            runOnUiThread(() -> updateRuntimeStatusUi(runtimeSnapshot));
+        }
+        View cover = shortcutLaunchCover;
+        if (cover != null) {
+            shortcutLaunchCover = null;
+            cover.post(() -> cover.setVisibility(View.GONE));
+        }
         recordHudFrame();
     }
 
@@ -4462,11 +4523,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             String wincomponents = shortcut != null ? shortcut.getExtra("wincomponents", container.getWinComponents())
                     : container.getWinComponents();
 
-            Iterator<String[]> oldWinComponentsIter = new KeyValueSet(
-                    container.getExtra("wincomponents", Container.FALLBACK_WINCOMPONENTS)).iterator();
+            KeyValueSet oldWinComponents = new KeyValueSet(
+                    container.getExtra("wincomponents", Container.FALLBACK_WINCOMPONENTS));
 
             for (String[] wincomponent : new KeyValueSet(wincomponents)) {
-                if (wincomponent[1].equals(oldWinComponentsIter.next()[1]) && !firstTimeBoot)
+                if (wincomponent[1].equals(oldWinComponents.get(wincomponent[0])) && !firstTimeBoot)
                     continue;
                 String identifier = wincomponent[0];
                 boolean useNative = wincomponent[1].equals("1");

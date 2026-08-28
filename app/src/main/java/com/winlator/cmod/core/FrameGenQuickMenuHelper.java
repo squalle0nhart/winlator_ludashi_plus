@@ -45,10 +45,6 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static Settings readSettings(Container container) {
         String backend = FrameGenManager.getBackend(container);
-        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
-            return new Settings(backend, container.getNativeFgMultiplier(), container.getLsfgFlowScale(),
-                    container.getLsfgPerformanceMode(), 3);
-        }
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
             return new Settings(backend, container.getWinFgMultiplier(), container.getWinFgFlowScale(),
                     container.getLsfgPerformanceMode(), container.getWinFgModel());
@@ -59,10 +55,6 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static Settings readSettings(Shortcut shortcut) {
         String backend = FrameGenManager.getBackend(shortcut);
-        if (FrameGenManager.BACKEND_NATIVE_FG.equals(backend)) {
-            return new Settings(backend, shortcut.getNativeFgMultiplier(), shortcut.getLsfgFlowScale(),
-                    shortcut.getLsfgPerformanceMode(), 3);
-        }
         if (FrameGenManager.BACKEND_WIN_FG.equals(backend)) {
             return new Settings(backend, shortcut.getWinFgMultiplier(), shortcut.getWinFgFlowScale(),
                     shortcut.getLsfgPerformanceMode(), shortcut.getWinFgModel());
@@ -73,10 +65,7 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static void applySettings(Container container, Settings settings) {
         container.setFrameGenBackend(settings.backend);
-        if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
-            container.setNativeFgMultiplier(settings.multiplier);
-            container.setLsfgEnabled(false);
-        } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
+        if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
             container.setWinFgMultiplier(settings.multiplier);
             container.setWinFgFlowScale(settings.flowScale);
             container.setWinFgModel(settings.model);
@@ -92,10 +81,7 @@ public abstract class FrameGenQuickMenuHelper {
 
     public static void applySettings(Shortcut shortcut, Settings settings) {
         shortcut.setFrameGenBackend(settings.backend);
-        if (FrameGenManager.BACKEND_NATIVE_FG.equals(settings.backend)) {
-            shortcut.setNativeFgMultiplier(settings.multiplier);
-            shortcut.setLsfgEnabled(false);
-        } else if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
+        if (FrameGenManager.BACKEND_WIN_FG.equals(settings.backend)) {
             shortcut.setWinFgMultiplier(settings.multiplier);
             shortcut.setWinFgFlowScale(settings.flowScale);
             shortcut.setWinFgModel(settings.model);

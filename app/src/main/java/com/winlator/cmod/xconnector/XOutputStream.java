@@ -46,6 +46,11 @@ public class XOutputStream {
         buffer.putInt(value);
     }
 
+    public void writeIntPair(int first, int second) {
+        writeInt(first);
+        writeInt(second);
+    }
+
     public void writeLong(long value) {
         ensureSpaceIsAvailable(8);
         buffer.putLong(value);

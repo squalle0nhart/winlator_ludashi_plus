@@ -15,7 +15,6 @@ import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.UnitUtils;
-import com.winlator.cmod.renderer.ASurfaceRenderer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,10 +89,6 @@ public class RendererOptionsDialog extends ContentDialog {
         int getWinFgModel();
         void setWinFgModel(int v);
 
-        int getNativeFgMultiplier();
-        void setNativeFgMultiplier(int v);
-        float getNativeFgSmoothing();
-        void setNativeFgSmoothing(float v);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"fifo", "mailbox", "immediate"};
@@ -108,8 +103,8 @@ public class RendererOptionsDialog extends ContentDialog {
         "Nearest neighbor",
         "Snapdragon Super Resolution"
     };
-    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "win_fg", "native_fg"};
-    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "win-fg", "Native Framegen"};
+    private static final String[] FRAME_GEN_BACKEND_IDS = {"lsfg_vk", "win_fg"};
+    private static final String[] FRAME_GEN_BACKEND_LABELS = {"LSFG-VK", "win-fg"};
     private static final String[] NATIVE_BACKEND_IDS = {"auto", "asr", "flip"};
     private static final String[] UPSCALER_LABELS = {"SGSR", "FSR / FidelityFX-CAS", "DLS", "NVScaler"};
     private static final int[] UPSCALER_FILTER_VALUES = {2, 4, 5, 3};
@@ -178,14 +173,11 @@ public class RendererOptionsDialog extends ContentDialog {
         rendererLabels.add("OpenGL");
         rendererIds.add("vulkan");
         rendererLabels.add("Vulkan");
-        if (ASurfaceRenderer.isSupported()) {
-            rendererIds.add("surfaceflinger");
-            rendererLabels.add("SurfaceFlinger");
-        }
         setAmoledAdapter(ctx, spRenderer, rendererLabels);
         int rendererSel = 1;
         String currentRenderer = config.getRenderer();
-        if ("displayx".equalsIgnoreCase(currentRenderer)) currentRenderer = "vulkan";
+        boolean legacySurfaceFlinger = "surfaceflinger".equalsIgnoreCase(currentRenderer);
+        if ("displayx".equalsIgnoreCase(currentRenderer) || legacySurfaceFlinger) currentRenderer = "vulkan";
         for (int i = 0; i < rendererIds.size(); i++) {
             if (rendererIds.get(i).equalsIgnoreCase(currentRenderer)) {
                 rendererSel = i;
@@ -194,18 +186,13 @@ public class RendererOptionsDialog extends ContentDialog {
         }
         spRenderer.setSelection(rendererSel);
 
-        final boolean[] isVulkanRendererSelected = {true};
         final boolean[] isExternalFrameGenRendererSelected = {true};
         final Runnable[] syncFrameGenUiRef = new Runnable[1];
         Runnable syncRendererUi = () -> {
             int rendererPosition = spRenderer.getSelectedItemPosition();
             boolean isVulkanRenderer = rendererPosition == 1;
-            isVulkanRendererSelected[0] = isVulkanRenderer;
             boolean isGlRenderer = rendererPosition == 0;
-            boolean isSurfaceFlingerRenderer = rendererPosition >= 0
-                    && rendererPosition < rendererIds.size()
-                    && "surfaceflinger".equalsIgnoreCase(rendererIds.get(rendererPosition));
-            isExternalFrameGenRendererSelected[0] = isVulkanRenderer || isSurfaceFlingerRenderer;
+            isExternalFrameGenRendererSelected[0] = isVulkanRenderer;
             setGroupVisibility(R.id.GroupDriver, isVulkanRenderer ? View.VISIBLE : View.GONE);
             setGroupVisibility(R.id.GroupFilter, View.VISIBLE);
             if (cbDefaultSupersampling != null) cbDefaultSupersampling.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
@@ -215,9 +202,9 @@ public class RendererOptionsDialog extends ContentDialog {
             if (cbNativeRendering != null) cbNativeRendering.setVisibility(
                     isGlRenderer || isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (groupNativeBackend != null) groupNativeBackend.setVisibility(
-                    isVulkanRenderer && cbNativeRendering.isChecked() ? View.VISIBLE : View.GONE);
+                    isVulkanRenderer ? View.VISIBLE : View.GONE);
             if (cbSwapRB != null) cbSwapRB.setVisibility((isVulkanRenderer || isGlRenderer) ? View.VISIBLE : View.GONE);
-            if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(isSurfaceFlingerRenderer ? View.VISIBLE : View.GONE);
+            if (cbSfCompatMode != null) cbSfCompatMode.setVisibility(View.GONE);
             if (cbLegacyScanout != null) cbLegacyScanout.setVisibility(View.GONE);
             if (syncFrameGenUiRef[0] != null) syncFrameGenUiRef[0].run();
         };
@@ -261,13 +248,13 @@ public class RendererOptionsDialog extends ContentDialog {
         // Texture Filter
         setAmoledAdapter(ctx, spFilter, FILTER_LABELS);
         spFilter.setSelection(config.getRendererFilterMode());
-        cbNativeRendering.setChecked(isNativeMode);
+        cbNativeRendering.setChecked(isNativeMode || legacySurfaceFlinger);
         setAmoledAdapter(ctx, spNativeBackend, new String[] {
                 ctx.getString(R.string.renderer_native_backend_auto),
                 ctx.getString(R.string.renderer_native_backend_asr),
                 ctx.getString(R.string.renderer_native_backend_flip)
         });
-        String nativeBackend = config.getRendererNativeBackend();
+        String nativeBackend = legacySurfaceFlinger ? "asr" : config.getRendererNativeBackend();
         int nativeBackendSelection = 0;
         for (int i = 0; i < NATIVE_BACKEND_IDS.length; i++) {
             if (NATIVE_BACKEND_IDS[i].equalsIgnoreCase(nativeBackend)) {
@@ -311,9 +298,6 @@ public class RendererOptionsDialog extends ContentDialog {
             final int[] selectedWinMultiplier = {config.getWinFgMultiplier()};
             final float[] selectedWinFlowScale = {sanitizeFlowScale(config.getWinFgFlowScale())};
             final int[] selectedWinModel = {Math.max(3, Math.min(4, config.getWinFgModel()))};
-            final int[] selectedNativeMultiplier = {config.getNativeFgMultiplier()};
-            final float[] selectedNativeSmoothing = {
-                    Math.max(0.0f, Math.min(1.0f, config.getNativeFgSmoothing()))};
             final boolean[] syncingFrameGenUi = {false};
 
             int backendSelection = 0;
@@ -329,33 +313,20 @@ public class RendererOptionsDialog extends ContentDialog {
             Runnable syncFrameGenUi = () -> {
                 syncingFrameGenUi[0] = true;
                 int backendPosition = spFrameGenBackend.getSelectedItemPosition();
-                boolean useNativeFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("native_fg");
-                if (useNativeFg && !isVulkanRendererSelected[0]
-                        && isExternalFrameGenRendererSelected[0]) {
-                    backendPosition = 0;
-                    spFrameGenBackend.setSelection(backendPosition);
-                }
                 boolean useWinFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("win_fg");
-                useNativeFg = FRAME_GEN_BACKEND_IDS[backendPosition].equals("native_fg");
-                boolean frameGenAvailable = useNativeFg
-                        ? isVulkanRendererSelected[0] : isExternalFrameGenRendererSelected[0];
-                boolean dllAvailable = !useWinFg && !useNativeFg && config.isLsfgDllAvailable();
-                int multiplier = useNativeFg ? selectedNativeMultiplier[0]
-                        : useWinFg ? selectedWinMultiplier[0]
+                boolean frameGenAvailable = isExternalFrameGenRendererSelected[0];
+                boolean dllAvailable = !useWinFg && config.isLsfgDllAvailable();
+                int multiplier = useWinFg ? selectedWinMultiplier[0]
                         : selectedLsfgMultiplier[0];
                 float flowScale = useWinFg ? selectedWinFlowScale[0] : selectedLsfgFlowScale[0];
 
                 tvLsfgStatus.setText(!frameGenAvailable
-                        ? ctx.getString(useNativeFg
-                                ? R.string.frame_generation_requires_vulkan
-                                : R.string.frame_generation_requires_vulkan_or_surfaceflinger)
-                        : (useNativeFg
-                                ? "Open optical-flow interpolation in the native Vulkan compositor."
-                                : (useWinFg
-                                        ? "Clean-room win-fg Vulkan layer with live model and flow-scale updates. On uses 2x frame generation."
-                                        : (dllAvailable
-                                                ? "Experimental LSFG-VK will use the imported Lossless.dll at launch."
-                                                : "Import Lossless.dll in app settings before enabling LSFG-VK."))));
+                        ? ctx.getString(R.string.frame_generation_requires_vulkan_or_surfaceflinger)
+                        : (useWinFg
+                                ? "Clean-room win-fg Vulkan layer with live model and flow-scale updates. On uses 2x frame generation."
+                                : (dllAvailable
+                                        ? "Experimental LSFG-VK will use the imported Lossless.dll at launch."
+                                        : "Import Lossless.dll in app settings before enabling LSFG-VK.")));
 
                 int multiplierSelection = 0;
                 int[] multiplierValues = useWinFg ? WIN_FG_MULTIPLIER_VALUES : LSFG_MULTIPLIER_VALUES;
@@ -368,22 +339,18 @@ public class RendererOptionsDialog extends ContentDialog {
                     }
                 }
                 spLsfgMultiplier.setSelection(multiplierSelection);
-                sbLsfgFlowScale.setMax(useNativeFg ? 100 : 75);
-                sbLsfgFlowScale.setProgress(useNativeFg
-                        ? Math.round(selectedNativeSmoothing[0] * 100.0f)
-                        : Math.round((flowScale - 0.25f) * 100.0f));
-                tvLsfgFlowScale.setText(useNativeFg
-                        ? "Smoothness: " + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%"
-                        : String.format(Locale.US, "%.2f", flowScale));
+                sbLsfgFlowScale.setMax(75);
+                sbLsfgFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100.0f));
+                tvLsfgFlowScale.setText(String.format(Locale.US, "%.2f", flowScale));
                 cbLsfgPerformanceMode.setChecked(selectedLsfgPerformanceMode[0]);
                 groupFrameGenModel.setVisibility(useWinFg ? View.VISIBLE : View.GONE);
                 spFrameGenModel.setSelection(selectedWinModel[0] - 3);
-                cbLsfgPerformanceMode.setVisibility(useWinFg || useNativeFg ? View.GONE : View.VISIBLE);
+                cbLsfgPerformanceMode.setVisibility(useWinFg ? View.GONE : View.VISIBLE);
                 spFrameGenBackend.setEnabled(isExternalFrameGenRendererSelected[0]);
-                spLsfgMultiplier.setEnabled(frameGenAvailable && (useWinFg || useNativeFg || dllAvailable));
+                spLsfgMultiplier.setEnabled(frameGenAvailable && (useWinFg || dllAvailable));
                 sbLsfgFlowScale.setVisibility(View.VISIBLE);
                 tvLsfgFlowScale.setVisibility(View.VISIBLE);
-                sbLsfgFlowScale.setEnabled(frameGenAvailable && (useNativeFg || useWinFg || dllAvailable));
+                sbLsfgFlowScale.setEnabled(frameGenAvailable && (useWinFg || dllAvailable));
                 cbLsfgPerformanceMode.setEnabled(frameGenAvailable && dllAvailable);
                 spFrameGenModel.setEnabled(frameGenAvailable && useWinFg);
                 if (presentModeNote != null) presentModeNote.setVisibility(View.GONE);
@@ -405,12 +372,10 @@ public class RendererOptionsDialog extends ContentDialog {
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     if (syncingFrameGenUi[0]) return;
                     boolean useWinFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("win_fg");
-                    boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
                     int multiplier = useWinFg
                             ? WIN_FG_MULTIPLIER_VALUES[Math.min(position, WIN_FG_MULTIPLIER_VALUES.length - 1)]
                             : LSFG_MULTIPLIER_VALUES[Math.min(position, LSFG_MULTIPLIER_VALUES.length - 1)];
-                    if (useNativeFg) selectedNativeMultiplier[0] = multiplier;
-                    else if (useWinFg) selectedWinMultiplier[0] = multiplier;
+                    if (useWinFg) selectedWinMultiplier[0] = multiplier;
                     else selectedLsfgMultiplier[0] = multiplier;
                 }
 
@@ -421,13 +386,6 @@ public class RendererOptionsDialog extends ContentDialog {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                     if (syncingFrameGenUi[0]) return;
-                    boolean useNativeFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("native_fg");
-                    if (useNativeFg) {
-                        selectedNativeSmoothing[0] = Math.max(0.0f, Math.min(1.0f, progress / 100.0f));
-                        tvLsfgFlowScale.setText("Smoothness: "
-                                + Math.round(selectedNativeSmoothing[0] * 100.0f) + "%");
-                        return;
-                    }
                     float value = sanitizeFlowScale(0.25f + (progress / 100.0f));
                     boolean useWinFg = FRAME_GEN_BACKEND_IDS[spFrameGenBackend.getSelectedItemPosition()].equals("win_fg");
                     if (useWinFg) selectedWinFlowScale[0] = value;
@@ -482,8 +440,6 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setWinFgMultiplier(selectedWinMultiplier[0]);
                 config.setWinFgFlowScale(selectedWinFlowScale[0]);
                 config.setWinFgModel(selectedWinModel[0]);
-                config.setNativeFgMultiplier(selectedNativeMultiplier[0]);
-                config.setNativeFgSmoothing(selectedNativeSmoothing[0]);
             });
             return;
         }

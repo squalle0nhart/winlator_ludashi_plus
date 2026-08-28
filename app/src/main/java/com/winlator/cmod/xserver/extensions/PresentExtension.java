@@ -223,7 +223,7 @@ public class PresentExtension implements Extension {
             out.writeShort(client.getSequenceNumber());
             out.writeInt(0);
             out.writeInt(1);
-            out.writeInt(0);
+            out.writeInt(2);
             out.writePad(16);
         }
     }

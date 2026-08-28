@@ -140,7 +140,12 @@ public final class DisplayXRenderer implements HostRenderer,
 
     @Override public void onModifyWindowProperty(Window window, Property property) {
         if ("WM_CLASS".equals(property.nameAsString())) {
-            xServerView.nativeSetWindowClassName(window.id, property.toString());
+            String className = property.toString();
+            xServerView.nativeSetWindowClassName(window.id, className);
+            if (unviewableWMClass != null && className.contains(unviewableWMClass)) {
+                window.disableAllDescendants();
+                xServerView.nativeUnmapWindow(window.id);
+            }
         }
     }
 

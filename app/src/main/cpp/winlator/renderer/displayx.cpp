@@ -592,7 +592,8 @@ void DisplayX::presentThreadLoop() {
                 pfnASurfaceTransactionSetBuffer(presentTransaction, window->control, drawable->ahb, presentRequest->sync_fence);
                 if (drawable->isDisplayX || drawable->isDirectContent) pfnASurfaceTransactionSetBufferTransparency(presentTransaction, window->control, ASURFACE_TRANSACTION_TRANSPARENCY_OPAQUE);
                 if (drawable->isDisplayX || drawable->isDirectContent)
-                    env->CallVoidMethod(xServer->xserverDisplayActivity, cache->updateFrameRating, window->windowObj);
+                    env->CallVoidMethod(xServer->xserverDisplayActivity, cache->updateFrameRating,
+                            window->windowObj, drawable->isDisplayX ? JNI_TRUE : JNI_FALSE);
                 if (drawable->isDisplayX) {
                    completeContext->requests.push_back(std::move(presentRequest));
                 }
@@ -604,8 +605,9 @@ void DisplayX::presentThreadLoop() {
         pfnASurfaceTransactionApply(presentTransaction);
     }
 
-    if (isPerformanceHintAPIAvailable()) {
+    if (performanceHintSession) {
         pfnAPerformanceHintCloseSession(performanceHintSession);
+        performanceHintSession = nullptr;
     }
 }
 

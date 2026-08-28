@@ -83,6 +83,7 @@ public class ASurfaceRenderer implements HostRenderer,
     private float sharpness = 0.5f;
     public void setSfCompatMode(boolean enabled) { this.sfCompatMode = enabled; }
     public boolean isSfCompatMode() { return sfCompatMode; }
+    public boolean isActive() { return surfaceInitialized; }
     public void setDirectRgbaGameFrames(boolean enabled) { this.directRgbaGameFrames = enabled; }
 
     // #1644: CPU-drawn chrome is scanned out at half the rate of the game frame; this counter

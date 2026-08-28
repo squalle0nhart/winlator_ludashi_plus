@@ -59,7 +59,6 @@ struct VkTable {
     PFN_vkCreateShaderModule CreateShaderModule;
     PFN_vkDestroyShaderModule DestroyShaderModule;
     PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines;
-    PFN_vkCreateComputePipelines CreateComputePipelines;
     PFN_vkDestroyPipeline DestroyPipeline;
     PFN_vkCreateCommandPool CreateCommandPool;
     PFN_vkDestroyCommandPool DestroyCommandPool;
@@ -73,7 +72,6 @@ struct VkTable {
     PFN_vkCmdBindPipeline CmdBindPipeline;
     PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
     PFN_vkCmdDraw CmdDraw;
-    PFN_vkCmdDispatch CmdDispatch;
     PFN_vkCmdPushConstants CmdPushConstants;
     PFN_vkCmdSetViewport CmdSetViewport;
     PFN_vkCmdSetScissor CmdSetScissor;
@@ -182,9 +180,6 @@ public:
     void setSharpness(float s);      
     void setSwapRB(bool enabled);
     void setPresentMode(VkPresentModeKHR mode);
-    void setFrameGenerationMultiplier(int multiplier);
-    void setFrameGenerationSmoothing(float smoothing);
-    int getFrameGenerationMultiplier() const { return frameGenMultiplier.load(); }
     std::vector<int> getSupportedPresentModes() const;
     VkExtent2D getSwapchainExtent() const { return swapchainExt; }
 
@@ -192,24 +187,6 @@ public:
     void clearCustomScissor();
 
 private:
-    struct FrameGenImage {
-        VkImage image = VK_NULL_HANDLE;
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkImageView view = VK_NULL_HANDLE;
-        VkFramebuffer framebuffer = VK_NULL_HANDLE;
-    };
-
-    struct FrameGenMotionPush {
-        int32_t mvW, mvH;
-        float invMvW, invMvH;
-        float mvScale, minStep, pad1, pad2;
-    };
-
-    struct FrameGenInterpPush {
-        float width, height;
-        float phase, smoothing, confidenceScale, mode;
-    };
-
     struct WinTex {
         VkImage              img            = VK_NULL_HANDLE;
         VkDeviceMemory       mem            = VK_NULL_HANDLE;
@@ -349,35 +326,6 @@ private:
     VkPipeline            stretchPipeline= VK_NULL_HANDLE;
     VkPipeline            postfxPipeline = VK_NULL_HANDLE;
 
-    VkRenderPass          frameGenHistoryPass = VK_NULL_HANDLE;
-    VkDescriptorSetLayout frameGenMotionLayout = VK_NULL_HANDLE;
-    VkDescriptorSetLayout frameGenInterpLayout = VK_NULL_HANDLE;
-    VkPipelineLayout      frameGenMotionPipeLayout = VK_NULL_HANDLE;
-    VkPipelineLayout      frameGenInterpPipeLayout = VK_NULL_HANDLE;
-    VkPipeline            frameGenMotionPipeline = VK_NULL_HANDLE;
-    VkPipeline            frameGenFlowFixPipeline = VK_NULL_HANDLE;
-    VkPipeline            frameGenInterpPipeline = VK_NULL_HANDLE;
-    VkSampler             frameGenSampler = VK_NULL_HANDLE;
-    FrameGenImage         frameGenHistory[3];
-    FrameGenImage         frameGenMotion;
-    FrameGenImage         frameGenFixed[MAX_FRAMES_IN_FLIGHT];
-    VkDescriptorSet       frameGenMotionSets[3] = {
-        VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
-    VkDescriptorSet       frameGenFlowFixSets[3][MAX_FRAMES_IN_FLIGHT]{};
-    VkDescriptorSet       frameGenInterpSets[3][MAX_FRAMES_IN_FLIGHT]{};
-    VkFence               frameGenHistoryFences[3] = {
-        VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE};
-    VkCommandBuffer       frameGenStageCmd = VK_NULL_HANDLE;
-    VkFence               frameGenStageFence = VK_NULL_HANDLE;
-    std::atomic<int>      frameGenMultiplier{0};
-    std::atomic<float>    frameGenSmoothing{0.75f};
-    std::atomic<bool>     frameGenResetRequested{false};
-    std::atomic<bool>     frameGenContentDirty{true};
-    uint32_t              frameGenHistoryCurrent = 0;
-    uint32_t              frameGenHistoryCount = 0;
-    bool                  frameGenMotionValid = false;
-    bool                  frameGenResourcesBuilt = false;
-
     VkCommandPool                cmdPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> cmdBufs;
 
@@ -415,11 +363,6 @@ private:
     void createLegacyUpscalePipeline();
     void createStretchPipeline();
     void createPostFXPipeline();
-    void createFrameGenPipelines();
-    bool createFrameGenResources();
-    void destroyFrameGenResources();
-    bool createFrameGenImage(FrameGenImage& image, uint32_t width, uint32_t height,
-                             VkFormat format, VkImageUsageFlags usage, bool framebuffer);
     void createFramebuffers();
     void createCmdPool();
     void createSampler();
@@ -451,18 +394,6 @@ private:
         VkRect2D scissorRect);
     void renderLoop();
     void renderFrame();
-    bool stageFrameGenHistory(const std::vector<DrawEntry>& draws,
-        VkBuffer cursorUpload, bool hasCursorUpload,
-        float ox, float oy, float sx, float sy, float cw, float ch,
-        short ptrX, short ptrY, short curHotX, short curHotY,
-        short curW, short curH, bool curVis, VkRect2D scissorRect);
-    bool presentFrameGenPhase(float phase,
-        VkBuffer cursorUpload, bool hasCursorUpload,
-        float ox, float oy, float sx, float sy, float cw, float ch,
-        short ptrX, short ptrY, short curHotX, short curHotY,
-        short curW, short curH, bool curVis, VkRect2D scissorRect);
-    void invalidateFrameGenHistory(bool contentDirty = true);
-
     uint32_t        findMemType(uint32_t filter, VkMemoryPropertyFlags props);
     void            createBuffer(VkDeviceSize sz, VkBufferUsageFlags usage,
                                  VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& mem);

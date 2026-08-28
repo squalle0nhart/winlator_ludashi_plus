@@ -397,7 +397,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         });
         if (btWineVersionOptions != null) btWineVersionOptions.setOnClickListener(v -> showWineVersionDownloadPopup(v, sWineVersion, refreshWineVersion));
 
-        loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize() : Container.DEFAULT_SCREEN_SIZE);
+        loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize() : AppUtils.getDefaultScreenSize(context));
 
         final Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
 
@@ -418,6 +418,11 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                 : new com.winlator.cmod.container.Container(-1);
         boolean legacyDisplayXRenderer = "displayx".equalsIgnoreCase(rendererCfgHolder.getRenderer());
         if (legacyDisplayXRenderer) rendererCfgHolder.setRenderer("vulkan");
+        if ("surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer())) {
+            rendererCfgHolder.setRenderer("vulkan");
+            rendererCfgHolder.setRendererNative(true);
+            rendererCfgHolder.setRendererNativeBackend("asr");
+        }
         final Spinner sDisplayDriver = view.findViewById(R.id.SDisplayDriver);
         final View vDisplayDriverConfig = view.findViewById(R.id.BTDisplayDriverConfig);
         String currentDisplayDriver = legacyDisplayXRenderer
@@ -456,7 +461,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         final android.widget.TextView tvRendererMode = view.findViewById(R.id.TVRendererMode);
         if (tvRendererMode != null) {
             tvRendererMode.setText("gl".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "OpenGL"
-                    : "surfaceflinger".equalsIgnoreCase(rendererCfgHolder.getRenderer()) ? "SurfaceFlinger" : "Vulkan");
+                    : "Vulkan");
         }
         View btRendererOptions = view.findViewById(R.id.BTRendererOptions);
         View rendererTrigger = view.findViewById(R.id.TVRendererMode);
@@ -472,7 +477,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 rendererCfgHolder.setRenderer(val);
                                 if (tvRendererMode != null) {
                                     tvRendererMode.setText("gl".equalsIgnoreCase(val) ? "OpenGL"
-                                            : "surfaceflinger".equalsIgnoreCase(val) ? "SurfaceFlinger" : "Vulkan");
+                                            : "Vulkan");
                                 }
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
@@ -686,23 +691,6 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
-                            public int getNativeFgMultiplier() {
-                                return rendererCfgHolder.getNativeFgMultiplier();
-                            }
-
-                            public void setNativeFgMultiplier(int val) {
-                                rendererCfgHolder.setNativeFgMultiplier(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-
-                            public float getNativeFgSmoothing() {
-                                return rendererCfgHolder.getNativeFgSmoothing();
-                            }
-
-                            public void setNativeFgSmoothing(float val) {
-                                rendererCfgHolder.setNativeFgSmoothing(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
                         }, rendererCfgHolder.isRendererNative()).show();
             };
         if (btRendererOptions != null) btRendererOptions.setOnClickListener(openRendererOptions);
@@ -1224,15 +1212,10 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         return desktopTheme;
     }
 
-    public static String getDeviceScreenSize(Context context) {
-        android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-        int width = metrics.widthPixels;
-        int height = metrics.heightPixels;
-        return width + "x" + height;
-    }
-
     public static void loadScreenSizeSpinner(View view, String selectedValue) {
         final Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
+        sScreenSize.setAdapter(ThemeUtils.createSpinnerAdapter(view.getContext(),
+                AppUtils.getScreenSizeEntries(view.getContext())));
 
         final LinearLayout llCustomScreenSize = view.findViewById(R.id.LLCustomScreenSize);
         sScreenSize.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -1384,7 +1367,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         ViewGroup directxSectionView = tabView.findViewById(R.id.LLWinComponentsDirectX);
         ViewGroup generalSectionView = tabView.findViewById(R.id.LLWinComponentsGeneral);
 
-        for (String[] wincomponent : new KeyValueSet(wincomponents)) {
+        for (String[] wincomponent : new KeyValueSet(Container.normalizeWinComponents(wincomponents))) {
             ViewGroup parent = wincomponent[0].startsWith("direct") ? directxSectionView : generalSectionView;
             View itemView = inflater.inflate(R.layout.wincomponent_list_item, parent, false);
             ((TextView) itemView.findViewById(R.id.TextView)).setText(StringUtils.getString(context, wincomponent[0]));
@@ -1410,7 +1393,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         ViewGroup directxSectionView = tabView.findViewById(R.id.LLWinComponentsDirectX);
         ViewGroup generalSectionView = tabView.findViewById(R.id.LLWinComponentsGeneral);
 
-        for (String[] wincomponent : new KeyValueSet(wincomponents)) {
+        for (String[] wincomponent : new KeyValueSet(Container.normalizeWinComponents(wincomponents))) {
             ViewGroup parent = wincomponent[0].startsWith("direct") ? directxSectionView : generalSectionView;
             View itemView = inflater.inflate(R.layout.wincomponent_list_item, parent, false);
             ((TextView) itemView.findViewById(R.id.TextView)).setText(StringUtils.getString(context, wincomponent[0]));

@@ -67,7 +67,7 @@ public class DRI3Extension implements Extension, XResourceManager.OnResourceLife
             outputStream.writeShort(client.getSequenceNumber());
             outputStream.writeInt(0);
             outputStream.writeInt(1);
-            outputStream.writeInt(0);
+            outputStream.writeInt(2);
             outputStream.writePad(16);
         }
     }

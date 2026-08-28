@@ -8,10 +8,13 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Looper;
 import android.text.Html;
+import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -35,11 +38,14 @@ import com.winlator.cmod.XrActivity;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public abstract class AppUtils {
     private static WeakReference<Toast> globalToastReference = null;
+    private static String defaultScreenSize;
 
     public static void keepScreenOn(Activity activity) {
         activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -121,6 +127,106 @@ public abstract class AppUtils {
 
     public static int getScreenHeight() {
         return Resources.getSystem().getDisplayMetrics().heightPixels;
+    }
+
+    public static String getDefaultScreenSize(Context context) {
+        if (defaultScreenSize != null) return defaultScreenSize;
+
+        int width = 0;
+        int height = 0;
+        try {
+            DisplayManager manager = (DisplayManager)context.getApplicationContext()
+                    .getSystemService(Context.DISPLAY_SERVICE);
+            Display display = manager != null ? manager.getDisplay(Display.DEFAULT_DISPLAY) : null;
+            if (display != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    width = display.getMode().getPhysicalWidth();
+                    height = display.getMode().getPhysicalHeight();
+                } else {
+                    DisplayMetrics metrics = new DisplayMetrics();
+                    display.getRealMetrics(metrics);
+                    width = metrics.widthPixels;
+                    height = metrics.heightPixels;
+                }
+            }
+        } catch (RuntimeException ignored) {}
+
+        if (width <= 0 || height <= 0) {
+            DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            width = metrics.widthPixels;
+            height = metrics.heightPixels;
+        }
+        defaultScreenSize = Math.max(width, height) + "x" + Math.min(width, height);
+        return defaultScreenSize;
+    }
+
+    public static ArrayList<String> getScreenSizeEntries(Context context) {
+        return orderScreenSizeEntries(
+                context.getResources().getStringArray(R.array.screen_size_entries),
+                getDefaultScreenSize(context));
+    }
+
+    public static ArrayList<String> orderScreenSizeEntries(String[] entries, String defaultSize) {
+        int[] device = parseScreenSize(defaultSize);
+        ArrayList<String> items = new ArrayList<>(Arrays.asList(entries));
+        boolean hasExactSize = false;
+        String matchingAspect = null;
+
+        for (String item : items) {
+            int[] size = parseScreenSize(item);
+            if (size == null) continue;
+            if (Arrays.equals(size, device)) hasExactSize = true;
+            if (matchingAspect == null && hasSameAspectRatio(size, device)) matchingAspect = item;
+        }
+
+        if (!hasExactSize && device != null) {
+            int aspectStart = matchingAspect != null ? matchingAspect.indexOf('(') : -1;
+            String aspect = aspectStart >= 0
+                    ? matchingAspect.substring(aspectStart)
+                    : "(" + reducedAspectRatio(device) + ")";
+            items.add(0, defaultSize + " " + aspect);
+        }
+
+        items.sort(Comparator.comparingInt(item -> screenSizeRank(item, device)));
+        return items;
+    }
+
+    private static int screenSizeRank(String value, int[] device) {
+        if (value.equalsIgnoreCase("custom")) return 3;
+        int[] size = parseScreenSize(value);
+        if (Arrays.equals(size, device)) return 0;
+        return hasSameAspectRatio(size, device) ? 1 : 2;
+    }
+
+    private static int[] parseScreenSize(String value) {
+        if (value == null) return null;
+        int separator = value.indexOf('x');
+        if (separator <= 0) return null;
+        int end = value.indexOf(' ', separator);
+        if (end == -1) end = value.length();
+        try {
+            int width = Integer.parseInt(value.substring(0, separator));
+            int height = Integer.parseInt(value.substring(separator + 1, end));
+            return new int[]{Math.max(width, height), Math.min(width, height)};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static boolean hasSameAspectRatio(int[] first, int[] second) {
+        return first != null && second != null
+                && Math.abs((double)first[0] / first[1] - (double)second[0] / second[1]) < 0.02d;
+    }
+
+    private static String reducedAspectRatio(int[] size) {
+        int a = size[0];
+        int b = size[1];
+        while (b != 0) {
+            int remainder = a % b;
+            a = b;
+            b = remainder;
+        }
+        return size[0] / a + ":" + size[1] / a;
     }
 
     public static int getPreferredDialogWidth(Context context) {

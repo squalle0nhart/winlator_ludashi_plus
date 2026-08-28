@@ -40,8 +40,8 @@ public class Container {
     public static final String DEFAULT_GRAPHICSDRIVERCONFIG =
             "vulkanVersion=" + DEFAULT_VULKAN_VERSION + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=immediate" + ";syncFrame=0" + ";disablePresentWait=1" + ";timelineSemaphores=0" + ";tuDebugSysmem=1" + ";mesaGlthread=1" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
     public static final String DEFAULT_DDRAWRAPPER = "none";
-    public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1";
-    public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1";
+    public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1,opengl=0";
+    public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1,opengl=0";
     public static final String DEFAULT_DRIVES = "F:"+Environment.getExternalStorageDirectory().getAbsolutePath()+"D:"+Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     public static final byte STARTUP_SELECTION_NORMAL = 0;
     public static final byte STARTUP_SELECTION_ESSENTIAL = 1;
@@ -281,34 +281,6 @@ public class Container {
         putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
     }
 
-    public int getNativeFgMultiplier() {
-        String value = getExtra("nativeFgMultiplier", "0");
-        try {
-            int parsed = Integer.parseInt(value);
-            return parsed < 2 ? 0 : Math.max(2, Math.min(4, parsed));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
-    public void setNativeFgMultiplier(int multiplier) {
-        putExtra("nativeFgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
-    }
-
-    public float getNativeFgSmoothing() {
-        try {
-            return Math.max(0.0f, Math.min(1.0f,
-                    Float.parseFloat(getExtra("nativeFgSmoothing", "0.75"))));
-        } catch (NumberFormatException e) {
-            return 0.75f;
-        }
-    }
-
-    public void setNativeFgSmoothing(float smoothing) {
-        putExtra("nativeFgSmoothing",
-                String.valueOf(Math.max(0.0f, Math.min(1.0f, smoothing))));
-    }
-
     public String getDXWrapper() {
         return dxwrapper;
     }
@@ -334,11 +306,16 @@ public class Container {
     }
 
     public String getWinComponents() {
-        return wincomponents;
+        return normalizeWinComponents(wincomponents);
     }
 
     public void setWinComponents(String wincomponents) {
-        this.wincomponents = wincomponents;
+        this.wincomponents = normalizeWinComponents(wincomponents);
+    }
+
+    public static String normalizeWinComponents(String wincomponents) {
+        String value = wincomponents == null || wincomponents.isEmpty() ? DEFAULT_WINCOMPONENTS : wincomponents;
+        return value.contains("opengl=") ? value : value + ",opengl=0";
     }
 
     public String getDrives() {

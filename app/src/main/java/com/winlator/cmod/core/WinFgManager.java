@@ -19,7 +19,7 @@ public abstract class WinFgManager {
     private static final String LIB_FILENAME = "libwin_fg.so";
     private static final String MANIFEST_FILENAME = "VkLayer_win_framegen.json";
     private static final String VERSION_FILENAME = ".win_fg_runtime_version";
-    private static final String RUNTIME_VERSION = "bannerlator-5650c7f-win-fg-baa783e";
+    private static final String RUNTIME_VERSION = "bannerlator-68b528d-win-fg-0096525";
 
     private WinFgManager() {}
 
