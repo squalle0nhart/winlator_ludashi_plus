@@ -1,8 +1,29 @@
 #pragma once
 
+#include <memory>
 #include <mutex>
+#include <vulkan/vulkan.h>
 
 #include "renderer_jni.hpp"
+
+struct ComposerTexture {
+    bool sizeChanged;
+    AHardwareBuffer *srcBuffer;
+    VkImage srcImage;
+    VkImageView srcImageView;
+    VkDeviceMemory srcMemory;
+    AHardwareBuffer *dstBuffer;
+    VkImage dstImage;
+    VkImageView dstImageView;
+    VkDeviceMemory dstMemory;
+    VkImageLayout srcImageLayout;
+    VkPipelineStageFlagBits srcPipelineStage;
+    VkAccessFlagBits srcAccessFlags;
+    VkImageLayout dstImageLayout;
+    VkPipelineStageFlagBits dstPipelineStage;
+    VkAccessFlagBits dstAccessFlags;
+    VkDescriptorSet vkDescriptorSet;
+};
 
 struct Drawable {
     int id;
@@ -11,6 +32,7 @@ struct Drawable {
     int height;
     int stride;
     int textureId;
+    std::unique_ptr<ComposerTexture> composerTexture;
     bool isDirty;
     bool sizeChanged;
     bool isDirectContent;

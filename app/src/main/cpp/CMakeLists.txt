@@ -32,9 +32,15 @@ add_library(winlator SHARED
         winlator/renderer/EGL/view_transformation.cpp
         winlator/renderer/EGL/displayx.cpp
         winlator/renderer/EGL/displayx_jni.cpp
+        winlator/renderer/effectcomposer/effect_composer.cpp
 )
 
 target_compile_options(winlator PRIVATE -Wall -Wextra)
+target_include_directories(winlator PRIVATE
+        winlator/renderer
+        winlator/renderer/EGL
+        winlator/renderer/effectcomposer
+)
 
 target_link_libraries(winlator
         log
@@ -46,6 +52,7 @@ target_link_libraries(winlator
         GLESv2
         GLESv3
         adrenotools
+        vulkan
 )
 
 add_library(fakeinput SHARED

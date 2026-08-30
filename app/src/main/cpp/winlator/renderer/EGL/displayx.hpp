@@ -17,6 +17,7 @@
 
 #include "renderer_jni.hpp"
 #include "window.hpp"
+#include "effect_composer.hpp"
 #include "cursor.hpp"
 
 class DisplayX {
@@ -55,6 +56,7 @@ class DisplayX {
 
         struct PresentRequest {
             AHardwareBuffer *buffer = nullptr;
+            Drawable *drawable = nullptr;
             int syncFence = -1;
             uint64_t presentId = UINT64_MAX;
             uint8_t swapchainId = 0;
@@ -163,6 +165,7 @@ class DisplayX {
         CursorManager *cursorManager = nullptr;
         JNIXServer *xServer = nullptr;
         JNICache *cache = nullptr;
+        EffectComposer *effectComposer = nullptr;
 
         bool cursorVisible = false;
 

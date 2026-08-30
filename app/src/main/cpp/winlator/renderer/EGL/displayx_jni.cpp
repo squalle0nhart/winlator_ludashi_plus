@@ -1,4 +1,5 @@
 #include "displayx.hpp"
+#include "effect_composer.hpp"
 #include "stb_image.h"
 #include <cstring>
 
@@ -8,6 +9,7 @@ extern WindowManager windowManager;
 extern CursorManager cursorManager;
 
 DisplayX displayX;
+EffectComposer effectComposer;
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject thiz, jobject context, jobject xServer, jfloat refreshRate, jboolean performanceMode, jboolean presentAtRefreshRate) {
@@ -155,10 +157,16 @@ Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject
     env->DeleteLocalRef(windowManagerObj);
     env->DeleteLocalRef(inputDeviceManagerObj);
 
+    effectComposer.init();
+    if (windowManager.getRootWindow()->drawable->format ==
+        AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM)
+        effectComposer.setColorSwapEnabled(true);
+
     displayX.windowManager = &windowManager;
     displayX.cursorManager = &cursorManager;
     displayX.cache = &cache;
     displayX.xServer = &xserver;
+    displayX.effectComposer = &effectComposer;
 
     displayX.setPerformanceMode(performanceMode);
     displayX.setPresentAtRefreshRate(presentAtRefreshRate);
@@ -257,6 +265,8 @@ Java_com_winlator_cmod_widget_DisplayXServerView_nativeDestroyWindow(JNIEnv *env
     if (!window) return;
 
     displayX.queueEvent([window] {
+        if (window->inputOutput && window->drawable->composerTexture)
+            effectComposer.destroyComposerTexture(window->drawable.get());
         displayX.destroyWindowControl(window);
         windowManager.deleteWindow(nullptr, window);
     });
@@ -363,6 +373,8 @@ Java_com_winlator_cmod_widget_DisplayXServerView_nativeUpdateWindowGeometry(JNIE
         window->drawable->format = env->GetIntField(drawableObj, cache.drawableFormat);
         window->drawable->data = nullptr;
         window->drawable->sizeChanged = true;
+        if (window->drawable->composerTexture)
+            window->drawable->composerTexture->sizeChanged = true;
         env->DeleteLocalRef(drawableObj);
     }
 

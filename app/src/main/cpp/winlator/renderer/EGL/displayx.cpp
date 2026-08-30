@@ -634,8 +634,14 @@ void DisplayX::presentThreadLoop() {
             }
 
             if (window->enabled) {
+                AHardwareBuffer *buffer = request->buffer;
+                if (request->drawable &&
+                    effectComposer->isSuitableForColorSwap(request->drawable)) {
+                    effectComposer->apply(request->drawable);
+                    buffer = request->drawable->composerTexture->dstBuffer;
+                }
                 pSTSetBuffer(presentTransaction, window->control,
-                             request->buffer, request->syncFence);
+                             buffer, request->syncFence);
                 request->fenceSubmitted = true;
                 request->syncFence = -1;
             } else {
@@ -795,6 +801,7 @@ void DisplayX::requestWindowUpdate(Window *window) {
 
     auto request = std::make_unique<PresentRequest>();
     request->buffer = drawable->ahb;
+    request->drawable = drawable;
     AHardwareBuffer_acquire(request->buffer);
     request->windowId = window->id;
     request->directContent = drawable->isDirectContent;

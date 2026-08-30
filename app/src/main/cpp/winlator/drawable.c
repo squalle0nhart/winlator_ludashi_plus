@@ -536,6 +536,7 @@ Java_com_winlator_cmod_xserver_Drawable_allocate(JNIEnv *env, jobject obj, jint 
     desc.usage = AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN |
                  AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
                  AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+                 AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER |
                  AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY;
 
     int ret = AHardwareBuffer_allocate(&desc, &hardwareBuffer);
