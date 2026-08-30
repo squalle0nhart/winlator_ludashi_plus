@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Gamepad body rounded -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M17.5,6.5H6.5C3.5,6.5 1.5,8.5 1.5,11v2C1.5,15.5 3.5,17.5 6.5,17.5h11
+                          C20.5,17.5 22.5,15.5 22.5,13v-2C22.5,8.5 20.5,6.5 17.5,6.5z"/>
+    <!-- Left bumper -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M6.5,6.5C5.2,6.5 4,5.6 4,4.5S5.2,2.5 6.5,2.5S9,3.4 9,4.5S7.8,6.5 6.5,6.5z"/>
+    <!-- Right bumper -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M17.5,6.5C16.2,6.5 15,5.6 15,4.5S16.2,2.5 17.5,2.5S20,3.4 20,4.5S18.8,6.5 17.5,6.5z"/>
+    <!-- D-pad cross (cutout effect via dark color) -->
+    <path android:fillColor="#1A1A2E"
+        android:pathData="M7.5,10h-1v-1h-1v1h-1v1h1v1h1v-1h1z"/>
+    <!-- Face buttons -->
+    <path android:fillColor="#1A1A2E"
+        android:pathData="M17,10.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    <path android:fillColor="#1A1A2E"
+        android:pathData="M19,12.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+    <path android:fillColor="#1A1A2E"
+        android:pathData="M15,12.5m-1,0a1,1 0,1 1,2 0a1,1 0,1 1,-2 0"/>
+</vector>

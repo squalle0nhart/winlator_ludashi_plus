@@ -1,0 +1,53 @@
+workflows:
+  winz-android-build:
+    name: Android Build
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      java: 17
+
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+
+    scripts:
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+
+      - name: Clone libadrenotools specific commit
+        script: |
+          set -e
+          rm -rf app/src/main/cpp/adrenotools
+          git clone https://github.com/Pipetto-crypto/libadrenotools.git \
+            app/src/main/cpp/adrenotools
+          cd app/src/main/cpp/adrenotools
+          git checkout 8483dfdaa2abf97ee89ad0e5f337e7b508550c6b
+
+      - name: Clone linkernsbypass inside adrenotools
+        script: |
+          set -e
+          mkdir -p app/src/main/cpp/adrenotools/lib
+          rm -rf app/src/main/cpp/adrenotools/lib/linkernsbypass
+          git clone https://github.com/Pipetto-crypto/liblinkernsbypass.git \
+            app/src/main/cpp/adrenotools/lib/linkernsbypass
+
+      - name: Install shader compiler
+        script: |
+          if ! command -v glslangValidator >/dev/null 2>&1; then
+            brew install glslang
+          fi
+
+      - name: Grant execute permission for Gradle wrapper
+        script: |
+          chmod +x gradlew
+
+      - name: Build release APK
+        script: |
+          ./gradlew assembleRelease --stacktrace
+
+    artifacts:
+      - app/build/outputs/apk/**/*.apk
+      - app/build/outputs/**/mapping.txt

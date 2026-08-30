@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="60dp"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingStart="10dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="6dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/TextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:paddingEnd="6dp"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/BTHelp"
+            style="@style/HelpButton"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:padding="5dp" />
+
+        <FrameLayout
+            android:layout_width="148dp"
+            android:layout_height="44dp">
+
+            <Spinner
+                android:id="@+id/Spinner"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:visibility="gone" />
+
+            <EditText
+                android:id="@+id/EditText"
+                style="@style/EditText"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:singleLine="true"
+                android:visibility="gone" />
+
+            <ToggleButton
+                android:id="@+id/ToggleButton"
+                android:layout_width="58dp"
+                android:layout_height="32dp"
+                android:layout_gravity="end|center_vertical"
+                android:background="@drawable/toggle_button_selector"
+                android:textOff=""
+                android:textOn=""
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#25262D" />
+</LinearLayout>

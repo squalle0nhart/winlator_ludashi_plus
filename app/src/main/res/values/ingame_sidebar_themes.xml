@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="IngameSidebarTheme_White">
+        <item name="ingameSidebarBackground">#F5F6F8</item>
+        <item name="ingameSidebarSurface">#FFFFFF</item>
+        <item name="ingameSidebarSurfaceVariant">#E8E9ED</item>
+        <item name="ingameSidebarOnSurface">#18191D</item>
+        <item name="ingameSidebarOnSurfaceVariant">#60636B</item>
+        <item name="ingameSidebarPrimary">#23252B</item>
+        <item name="ingameSidebarPrimaryContainer">#E1E3E8</item>
+        <item name="ingameSidebarOutline">#9FA5B1</item>
+        <item name="android:textColorPrimary">#18191D</item>
+        <item name="android:textColorSecondary">#60636B</item>
+        <item name="android:colorAccent">#23252B</item>
+        <item name="colorAccent">#23252B</item>
+        <item name="colorControlNormal">#60636B</item>
+        <item name="colorControlActivated">#23252B</item>
+    </style>
+
+    <style name="IngameSidebarTheme_Black">
+        <item name="ingameSidebarBackground">#0A0A0D</item>
+        <item name="ingameSidebarSurface">#121216</item>
+        <item name="ingameSidebarSurfaceVariant">#1A1A20</item>
+        <item name="ingameSidebarOnSurface">#F2F2F4</item>
+        <item name="ingameSidebarOnSurfaceVariant">#85878C</item>
+        <item name="ingameSidebarPrimary">#D9DDE3</item>
+        <item name="ingameSidebarPrimaryContainer">#1A1B1F</item>
+        <item name="ingameSidebarOutline">#454850</item>
+        <item name="android:textColorPrimary">#F2F2F4</item>
+        <item name="android:textColorSecondary">#85878C</item>
+        <item name="android:colorAccent">#D9DDE3</item>
+        <item name="colorAccent">#D9DDE3</item>
+        <item name="colorControlNormal">#85878C</item>
+        <item name="colorControlActivated">#D9DDE3</item>
+    </style>
+
+    <style name="IngameSidebarTheme_Amoled">
+        <item name="ingameSidebarBackground">#000000</item>
+        <item name="ingameSidebarSurface">#050505</item>
+        <item name="ingameSidebarSurfaceVariant">#0D0D0D</item>
+        <item name="ingameSidebarOnSurface">#F7F7F7</item>
+        <item name="ingameSidebarOnSurfaceVariant">#858585</item>
+        <item name="ingameSidebarPrimary">#EDEDED</item>
+        <item name="ingameSidebarPrimaryContainer">#101010</item>
+        <item name="ingameSidebarOutline">#303030</item>
+        <item name="android:textColorPrimary">#F7F7F7</item>
+        <item name="android:textColorSecondary">#858585</item>
+        <item name="android:colorAccent">#EDEDED</item>
+        <item name="colorAccent">#EDEDED</item>
+        <item name="colorControlNormal">#858585</item>
+        <item name="colorControlActivated">#EDEDED</item>
+    </style>
+
+    <style name="IngameSidebarTheme_Blue">
+        <item name="ingameSidebarBackground">#050A12</item>
+        <item name="ingameSidebarSurface">#0C1320</item>
+        <item name="ingameSidebarSurfaceVariant">#121D2D</item>
+        <item name="ingameSidebarOnSurface">#F2F6FC</item>
+        <item name="ingameSidebarOnSurfaceVariant">#A9B9CD</item>
+        <item name="ingameSidebarPrimary">#9BC8FF</item>
+        <item name="ingameSidebarPrimaryContainer">#173A63</item>
+        <item name="ingameSidebarOutline">#62B0FF</item>
+        <item name="android:textColorPrimary">#F2F6FC</item>
+        <item name="android:textColorSecondary">#A9B9CD</item>
+        <item name="android:colorAccent">#9BC8FF</item>
+        <item name="colorAccent">#9BC8FF</item>
+        <item name="colorControlNormal">#A9B9CD</item>
+        <item name="colorControlActivated">#9BC8FF</item>
+    </style>
+
+    <style name="IngameSidebarTheme_Red">
+        <item name="ingameSidebarBackground">#0C0607</item>
+        <item name="ingameSidebarSurface">#160B0D</item>
+        <item name="ingameSidebarSurfaceVariant">#241214</item>
+        <item name="ingameSidebarOnSurface">#FFF2F2</item>
+        <item name="ingameSidebarOnSurfaceVariant">#CDB0B2</item>
+        <item name="ingameSidebarPrimary">#FFA2A7</item>
+        <item name="ingameSidebarPrimaryContainer">#662128</item>
+        <item name="ingameSidebarOutline">#FF6F79</item>
+        <item name="android:textColorPrimary">#FFF2F2</item>
+        <item name="android:textColorSecondary">#CDB0B2</item>
+        <item name="android:colorAccent">#FFA2A7</item>
+        <item name="colorAccent">#FFA2A7</item>
+        <item name="colorControlNormal">#CDB0B2</item>
+        <item name="colorControlActivated">#FFA2A7</item>
+    </style>
+
+    <style name="IngameSidebarTheme_Purple">
+        <item name="ingameSidebarBackground">#0E0A13</item>
+        <item name="ingameSidebarSurface">#17111E</item>
+        <item name="ingameSidebarSurfaceVariant">#241C2D</item>
+        <item name="ingameSidebarOnSurface">#E9E1EC</item>
+        <item name="ingameSidebarOnSurfaceVariant">#CCC2DC</item>
+        <item name="ingameSidebarPrimary">#D0BCFF</item>
+        <item name="ingameSidebarPrimaryContainer">#4F378B</item>
+        <item name="ingameSidebarOutline">#958DA0</item>
+        <item name="android:textColorPrimary">#E9E1EC</item>
+        <item name="android:textColorSecondary">#CCC2DC</item>
+        <item name="android:colorAccent">#D0BCFF</item>
+        <item name="colorAccent">#D0BCFF</item>
+        <item name="colorControlNormal">#CCC2DC</item>
+        <item name="colorControlActivated">#D0BCFF</item>
+    </style>
+</resources>

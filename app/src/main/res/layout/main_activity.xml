@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/DrawerLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="false">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/ui_glass_background"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/Toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:background="@drawable/ui_glass_background"
+            android:paddingStart="6dp"
+            android:paddingEnd="12dp"
+            app:title="@string/app_name"
+            app:titleTextAppearance="@style/GlassToolbarTitle"
+            app:titleTextColor="@color/ui_text_primary" />
+
+        <FrameLayout
+            android:id="@+id/FLFragmentContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/ui_glass_background" />
+
+        <com.winlator.cmod.ui.WinZBottomNavigationView
+            android:id="@+id/BottomNavigation"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/ui_bottom_nav_shell"
+            app:itemBackground="@drawable/ui_bottom_nav_item_background"
+            app:itemIconSize="23dp"
+            app:itemIconTint="@color/ui_bottom_navigation_item"
+            app:itemRippleColor="#22FFFFFF"
+            app:itemTextColor="@color/ui_bottom_navigation_item"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/enhanced_bottom_navigation" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="310dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@drawable/ui_glass_background"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/NavigationView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/ui_glass_background"
+            android:fitsSystemWindows="false"
+            app:itemBackground="@drawable/ui_nav_item_bg"
+            app:itemHorizontalPadding="20dp"
+            app:itemIconPadding="18dp"
+            app:itemIconTint="@color/ui_accent"
+            app:itemTextColor="@color/ui_text_primary"
+            app:menu="@menu/main_menu" />
+
+        <include layout="@layout/main_menu_storage_footer" />
+    </LinearLayout>
+</androidx.drawerlayout.widget.DrawerLayout>

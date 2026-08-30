@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/ui_glass_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="24dp">
+
+        <LinearLayout style="@style/ModernSettingsCard">
+            <TextView
+                style="@style/ModernSettingsTitle"
+                android:text="@string/profile" />
+
+            <Spinner
+                android:id="@+id/SProfile"
+                style="@style/ComboBox"
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:spinnerMode="dialog" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/BTAddProfile"
+                    style="@style/ListMenuButton"
+                    android:contentDescription="@string/add"
+                    android:src="@drawable/ui_ic_add" />
+
+                <ImageButton
+                    android:id="@+id/BTEditProfile"
+                    style="@style/ListMenuButton"
+                    android:contentDescription="@string/edit"
+                    android:src="@drawable/ui_ic_edit" />
+
+                <ImageButton
+                    android:id="@+id/BTDuplicateProfile"
+                    style="@style/ListMenuButton"
+                    android:contentDescription="@string/duplicate"
+                    android:src="@drawable/ui_ic_copy" />
+
+                <ImageButton
+                    android:id="@+id/BTRemoveProfile"
+                    style="@style/ListMenuButton"
+                    android:contentDescription="@string/remove"
+                    android:src="@drawable/ui_ic_delete" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout style="@style/ModernSettingsCard">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/ModernSettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/overlay_opacity" />
+
+                <TextView
+                    android:id="@+id/TVUiOpacity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ui_text_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <SeekBar
+                android:id="@+id/SBOverlayOpacity"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:max="100"
+                android:min="10"
+                android:progressTint="@color/ui_text_primary"
+                android:thumbTint="@color/ui_text_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/BTImportProfile"
+                style="@style/ButtonNeutral"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1"
+                android:text="@string/import_profile" />
+
+            <Button
+                android:id="@+id/BTExportProfile"
+                style="@style/ButtonNeutral"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="5dp"
+                android:layout_weight="1"
+                android:text="@string/export_profile" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/BTControlsEditor"
+            style="@style/ButtonPositive"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="@string/controls_editor" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/external_controllers"
+            android:textAllCaps="true"
+            android:textColor="@color/ui_text_muted"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/LLExternalControllers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/ui_settings_card"
+            android:orientation="vertical"
+            android:padding="12dp" />
+
+        <TextView
+            android:id="@+id/TVEmptyText"
+            android:layout_width="match_parent"
+            android:layout_height="96dp"
+            android:gravity="center"
+            android:text="@string/no_items_to_display"
+            android:textColor="@color/ui_text_muted"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

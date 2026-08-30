@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="landscape_rail_background">#F4F4F5</color>
+    <color name="landscape_rail_divider">#18000000</color>
+    <color name="landscape_rail_selected">#E2E2E5</color>
+    <color name="landscape_rail_icon">#696970</color>
+    <color name="landscape_rail_icon_selected">#151519</color>
+</resources>

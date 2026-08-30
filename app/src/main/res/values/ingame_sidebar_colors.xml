@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ingame_sidebar_background">#F2F2F4</color>
+    <color name="ingame_sidebar_divider">#22000000</color>
+    <color name="ingame_sidebar_selected_background">#DEDEE2</color>
+    <color name="ingame_sidebar_icon">#6D6D74</color>
+    <color name="ingame_sidebar_icon_selected">#17171B</color>
+    <color name="ingame_sidebar_power">#D94C58</color>
+</resources>

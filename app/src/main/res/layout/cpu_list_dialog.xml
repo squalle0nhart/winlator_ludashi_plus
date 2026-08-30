@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:background="#000000"
+    android:padding="12dp">
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1A3A5C"
+        android:layout_marginBottom="10dp" />
+
+    <com.winlator.cmod.widget.CPUListView
+        android:id="@+id/CPUListView"
+        android:layout_width="360dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:background="#0A1628"
+        android:padding="8dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1A3A5C"
+        android:layout_marginTop="10dp" />
+
+</LinearLayout>

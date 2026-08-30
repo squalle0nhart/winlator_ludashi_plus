@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="62dp"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/sidebar_card"
+    android:paddingStart="12dp"
+    android:paddingEnd="8dp">
+
+    <ImageView
+        android:id="@+id/IVIcon"
+        android:layout_width="24dp"
+        android:layout_height="24dp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/TVName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="?attr/ingameSidebarOnSurface"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/TVPID"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/TVMemoryUsage"
+        android:layout_width="72dp"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:maxLines="1"
+        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+        android:textSize="12sp" />
+
+    <ImageButton
+        android:id="@+id/BTMenu"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="4dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="More options"
+        android:padding="7dp"
+        android:src="@drawable/ui_ic_more"
+        app:tint="?attr/ingameSidebarOnSurfaceVariant" />
+
+</LinearLayout>

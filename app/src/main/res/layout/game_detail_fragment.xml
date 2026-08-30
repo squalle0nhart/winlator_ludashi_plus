@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/ui_glass_background" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <FrameLayout android:layout_width="match_parent" android:layout_height="236dp">
+            <ImageView android:id="@+id/GameArtwork" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="125dp" android:layout_gravity="bottom"
+                android:background="@drawable/gradient_bottom_overlay" android:gravity="bottom" android:orientation="vertical"
+                android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="14dp" android:paddingTop="40dp">
+                <TextView android:id="@+id/GameTitle" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:ellipsize="end" android:maxLines="2" android:textColor="@color/ui_text_primary" android:textSize="23sp" android:textStyle="bold" />
+                <TextView android:id="@+id/GamePlatform" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp" android:background="@drawable/ui_enhanced_action"
+                    android:paddingStart="8dp" android:paddingTop="2dp" android:paddingEnd="8dp" android:paddingBottom="2dp"
+                    android:textColor="@color/ui_text_muted" android:textSize="10sp" />
+            </LinearLayout>
+            <TextView android:id="@+id/BTFavorite" android:layout_width="38dp" android:layout_height="38dp"
+                android:layout_gravity="top|end" android:layout_margin="12dp" android:background="@drawable/ui_enhanced_action"
+                android:gravity="center" android:text="☆" android:textColor="@color/ui_text_primary" android:textSize="21sp" />
+        </FrameLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"
+            android:paddingStart="14dp" android:paddingTop="10dp" android:paddingEnd="14dp" android:paddingBottom="18dp">
+            <TextView android:id="@+id/BTPlay" android:layout_width="match_parent" android:layout_height="50dp"
+                android:background="@drawable/ui_enhanced_primary" android:drawableStart="@drawable/ui_ic_play" android:drawablePadding="10dp"
+                android:gravity="center" android:text="@string/play" android:textColor="@color/ui_text_primary" android:textSize="15sp" android:textStyle="bold" />
+            <TextView android:id="@+id/BTConfigureGame" style="@style/EnhancedSettingsRow" android:layout_marginTop="10dp"
+                android:drawableStart="@drawable/ui_ic_system" android:drawablePadding="13dp" android:text="@string/configure" />
+            <TextView android:id="@+id/BTArguments" style="@style/EnhancedSettingsRow"
+                android:drawableStart="@drawable/ui_ic_edit" android:drawablePadding="13dp" android:text="@string/arguments" />
+            <TextView android:id="@+id/BTGameFolder" style="@style/EnhancedSettingsRow"
+                android:drawableStart="@drawable/ui_ic_storage" android:drawablePadding="13dp" android:text="@string/game_folder" />
+            <TextView android:id="@+id/BTRemoveGame" android:layout_width="match_parent" android:layout_height="62dp"
+                android:background="@drawable/ui_danger_action" android:drawableStart="@drawable/ui_ic_delete" android:drawablePadding="13dp"
+                android:gravity="center_vertical" android:paddingStart="14dp" android:text="@string/remove"
+                android:textColor="@color/ui_danger" android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

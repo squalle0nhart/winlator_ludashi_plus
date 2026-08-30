@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/PreloaderRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:clickable="false"
+    android:focusable="false"
+    android:background="#B3000000">
+
+    <ImageView
+        android:id="@+id/LaunchArtwork"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
+    <View
+        android:id="@+id/LaunchScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/loading_art_scrim"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/LaunchInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
+        android:paddingBottom="22dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/LaunchTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/LaunchStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/LaunchProgress"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_gravity="bottom"
+        android:indeterminate="true"
+        android:visibility="gone"
+        app:trackThickness="4dp" />
+
+    <LinearLayout
+        android:id="@+id/LoadingPanel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="22dp"
+        android:paddingTop="16dp"
+        android:paddingRight="22dp"
+        android:paddingBottom="16dp"
+        android:background="@drawable/loading_panel_amoled">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="16dp"
+            android:indeterminate="true"
+            app:indicatorColor="#FFFFFFFF"
+            app:indicatorSize="44dp"
+            app:trackColor="#334046"
+            app:trackThickness="6dp" />
+
+        <TextView
+            android:id="@+id/TextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#F1F1F3"
+            android:textSize="15sp" />
+    </LinearLayout>
+</FrameLayout>

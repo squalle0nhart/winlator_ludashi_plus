@@ -1,0 +1,152 @@
+package com.winlator.cmod.ui;
+
+import android.content.Context;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.util.AttributeSet;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.Spinner;
+import android.widget.Switch;
+import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+
+import com.winlator.cmod.R;
+
+public class RenderingSidebarPolisherView extends View {
+    private boolean applied;
+
+    public RenderingSidebarPolisherView(Context context) {
+        super(context);
+    }
+
+    public RenderingSidebarPolisherView(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+    }
+
+    public RenderingSidebarPolisherView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        post(this::applyOnce);
+    }
+
+    private void applyOnce() {
+        if (applied) return;
+        applied = true;
+
+        View root = getRootView();
+        int onSurface = resolveColor(R.attr.ingameSidebarOnSurface, Color.WHITE);
+        int onSurfaceVariant = resolveColor(R.attr.ingameSidebarOnSurfaceVariant, Color.LTGRAY);
+        int primary = resolveColor(R.attr.ingameSidebarPrimary, Color.WHITE);
+        int surfaceVariant = resolveColor(R.attr.ingameSidebarSurfaceVariant, 0xFF1A1A20);
+
+        View standard = root.findViewById(R.id.LLStandardOptions);
+        restoreCard(standard, 12);
+
+        View frameGen = root.findViewById(R.id.LLFrameGenOptions);
+        restoreCard(frameGen, 12);
+
+        Switch superResolution = root.findViewById(R.id.SWEnableFSR);
+        if (superResolution != null) {
+            superResolution.setBackground(null);
+            superResolution.setPadding(0, 0, 0, 0);
+            superResolution.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            superResolution.setTextColor(onSurface);
+            ViewGroup.LayoutParams lp = superResolution.getLayoutParams();
+            if (lp != null) {
+                lp.height = dp(48);
+                superResolution.setLayoutParams(lp);
+            }
+
+            int[][] states = new int[][] {
+                    new int[] { android.R.attr.state_checked },
+                    new int[] { }
+            };
+            superResolution.setThumbTintList(new ColorStateList(states,
+                    new int[] { primary, onSurfaceVariant }));
+            superResolution.setTrackTintList(new ColorStateList(states,
+                    new int[] { primary, surfaceVariant }));
+        }
+
+        styleSpinnerRow(root.findViewById(R.id.SPUpscalerMode), onSurface);
+        styleSpinnerRow(root.findViewById(R.id.SPPostFXMode), onSurface);
+
+        TextView sharpnessHeader = root.findViewById(R.id.LBLSharpnessHeader);
+        if (sharpnessHeader != null) {
+            sharpnessHeader.setTextColor(onSurfaceVariant);
+            sharpnessHeader.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            sharpnessHeader.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+            ViewGroup.LayoutParams raw = sharpnessHeader.getLayoutParams();
+            if (raw instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) raw;
+                lp.topMargin = dp(8);
+                sharpnessHeader.setLayoutParams(lp);
+            }
+        }
+
+        if (standard instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) standard;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                ViewGroup.LayoutParams lp = child.getLayoutParams();
+                if (lp != null && lp.height == 1) child.setAlpha(0.65f);
+            }
+        }
+    }
+
+    private void restoreCard(View view, int paddingDp) {
+        if (!(view instanceof ViewGroup)) return;
+        view.setBackgroundResource(R.drawable.sidebar_card);
+        int p = dp(paddingDp);
+        view.setPadding(p, p, p, p);
+    }
+
+    private void styleSpinnerRow(Spinner spinner, int onSurface) {
+        if (spinner == null) return;
+        spinner.setBackgroundColor(Color.TRANSPARENT);
+        spinner.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        spinner.setPadding(dp(8), 0, 0, 0);
+
+        View parent = spinner.getParent() instanceof View ? (View) spinner.getParent() : null;
+        if (parent instanceof LinearLayout) {
+            LinearLayout row = (LinearLayout) parent;
+            row.setBackground(null);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, 0, 0, 0);
+            ViewGroup.LayoutParams rowLp = row.getLayoutParams();
+            if (rowLp != null) {
+                rowLp.height = dp(48);
+                row.setLayoutParams(rowLp);
+            }
+
+            for (int i = 0; i < row.getChildCount(); i++) {
+                View child = row.getChildAt(i);
+                if (child instanceof TextView && child != spinner) {
+                    TextView label = (TextView) child;
+                    label.setTextColor(onSurface);
+                    label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+                    label.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+                }
+            }
+        }
+    }
+
+    private int resolveColor(int attr, int fallback) {
+        TypedValue value = new TypedValue();
+        if (getContext().getTheme().resolveAttribute(attr, value, true)) return value.data;
+        return fallback;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+}

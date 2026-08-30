@@ -1,0 +1,172 @@
+<com.winlator.cmod.ui.theme.ThemedFileManagerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/FileManagerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/FileManagerContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/FileManagerHeader"
+            android:layout_width="270dp"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="14dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/BTUpDir"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="Up Directory"
+                android:padding="11dp"
+                android:src="@drawable/icon_back"
+                app:tint="?android:attr/textColorPrimary" />
+
+            <LinearLayout
+                android:id="@+id/LLDriveSelect"
+                android:layout_width="match_parent"
+                android:layout_height="66dp"
+                android:layout_marginTop="6dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="15dp"
+                android:paddingEnd="13dp">
+
+                <ImageView
+                    android:id="@+id/IVDriveIcon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/ic_internal_storage"
+                    app:tint="?android:attr/textColorPrimary" />
+
+                <TextView
+                    android:id="@+id/TVDriveName"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="Drive D:"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/IVDriveArrow"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@android:drawable/arrow_down_float"
+                    app:tint="?android:attr/textColorSecondary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/DriveOptionsPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:orientation="vertical"
+                android:padding="5dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/FileManagerPathCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:gravity="center_vertical"
+                android:minHeight="50dp"
+                android:padding="13dp">
+
+                <TextView
+                    android:id="@+id/TVCurrentPath"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="middle"
+                    android:maxLines="3"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <LinearLayout
+                android:id="@+id/FileManagerStorageCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="13dp"
+                android:paddingTop="11dp"
+                android:paddingEnd="13dp"
+                android:paddingBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/TVDriveStorageLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Storage"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/TVDriveStorage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 B / 0 B"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ProgressBar
+                    android:id="@+id/PBDriveStorage"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="9dp"
+                    android:max="100"
+                    android:progress="0" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <View
+            android:id="@+id/FileManagerDivider"
+            android:layout_width="1dp"
+            android:layout_height="match_parent" />
+
+        <com.winlator.cmod.ui.theme.LandscapeFileRecyclerView
+            android:id="@+id/RecyclerViewFiles"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingStart="8dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp" />
+    </LinearLayout>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabPaste"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="18dp"
+        android:contentDescription="Paste"
+        android:src="@android:drawable/ic_menu_save"
+        android:visibility="gone" />
+</com.winlator.cmod.ui.theme.ThemedFileManagerLayout>
