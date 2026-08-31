@@ -20,6 +20,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -341,8 +342,25 @@ public class SettingsFragment extends Fragment {
         final CheckBox cbRemoveLoadingBarWhenBootingGames = view.findViewById(R.id.CBRemoveLoadingBarWhenBootingGames);
         cbRemoveLoadingBarWhenBootingGames.setChecked(preferences.getBoolean("remove_loading_bar_when_booting_games", false));
 
+        final Spinner sDownloadableContentsSource = view.findViewById(R.id.SDownloadableContentsSource);
         final EditText etDownloadableContentsURL = view.findViewById(R.id.ETDownloadableContentsURL);
-        etDownloadableContentsURL.setText(preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES));
+        String contentsUrl = preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
+        int contentsSource = ContentsManager.getRemoteProfilesSource(contentsUrl);
+        sDownloadableContentsSource.setSelection(contentsSource);
+        etDownloadableContentsURL.setText(contentsUrl);
+        etDownloadableContentsURL.setEnabled(contentsSource == 3);
+        sDownloadableContentsSource.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View selectedView, int position, long id) {
+                etDownloadableContentsURL.setEnabled(position == 3);
+                if (position == 0) etDownloadableContentsURL.setText(ContentsManager.REMOTE_PROFILES);
+                else if (position == 1) etDownloadableContentsURL.setText(ContentsManager.REMOTE_PROFILES_NICHOLASX417);
+                else if (position == 2) etDownloadableContentsURL.setText(ContentsManager.REMOTE_PROFILES_THE412BANNER);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
 
         view.findViewById(R.id.BTReInstallImagefs).setOnClickListener(v -> {
             ContentDialog.confirm(context, R.string.do_you_want_to_reinstall_imagefs, () -> ImageFsInstaller.installFromAssets((MainActivity) getActivity(), null));
@@ -369,7 +387,22 @@ public class SettingsFragment extends Fragment {
             editor.putBoolean("high_refresh_rate_mode", cbHighRefreshRate.isChecked());
             editor.putBoolean("remove_loading_bar_when_booting_games", cbRemoveLoadingBarWhenBootingGames.isChecked());
 
-            editor.putString("downloadable_contents_url", etDownloadableContentsURL.getText().toString());
+            String selectedContentsUrl;
+            switch (sDownloadableContentsSource.getSelectedItemPosition()) {
+                case 1:
+                    selectedContentsUrl = ContentsManager.REMOTE_PROFILES_NICHOLASX417;
+                    break;
+                case 2:
+                    selectedContentsUrl = ContentsManager.REMOTE_PROFILES_THE412BANNER;
+                    break;
+                case 3:
+                    selectedContentsUrl = etDownloadableContentsURL.getText().toString().trim();
+                    if (selectedContentsUrl.isEmpty()) selectedContentsUrl = ContentsManager.REMOTE_PROFILES;
+                    break;
+                default:
+                    selectedContentsUrl = ContentsManager.REMOTE_PROFILES;
+            }
+            editor.putString("downloadable_contents_url", selectedContentsUrl);
 
             if (!wineDebugChannels.isEmpty()) {
                 editor.putString("wine_debug_channels", String.join(",", wineDebugChannels));

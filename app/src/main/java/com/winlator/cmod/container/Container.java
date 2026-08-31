@@ -19,6 +19,7 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.Iterator;
+import java.util.Locale;
 
 public class Container {
     public enum XrControllerMapping {
@@ -32,8 +33,9 @@ public class Container {
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
     public static final String DEFAULT_DXWRAPPERCONFIG = "version=" + DefaultVersion.DXVK + ",framerate=0,async=0,asyncCache=0,maxFrameLatency=0" + ",vkd3dVersion=" + DefaultVersion.VKD3D + ",vkd3dLevel=12_1" + ",ddrawrapper=" + Container.DEFAULT_DDRAWRAPPER + ",csmt=3" + ",gpuName=NVIDIA GeForce GTX 480" + ",videoMemorySize=2048" + ",strict_shader_math=1" + ",OffscreenRenderingMode=fbo" + ",renderer=gl";
+    public static final String DEFAULT_VULKAN_VERSION = "1.4";
     public static final String DEFAULT_GRAPHICSDRIVERCONFIG =
-            "vulkanVersion=1.3" + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=mailbox" + ";syncFrame=0" + ";disablePresentWait=0" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
+            "vulkanVersion=" + DEFAULT_VULKAN_VERSION + ";version=" + ";blacklistedExtensions=" + ";maxDeviceMemory=0" + ";presentMode=mailbox" + ";syncFrame=0" + ";disablePresentWait=0" + ";timelineSemaphores=0" + ";resourceType=auto" + ";bcnEmulation=auto" + ";bcnEmulationType=compute" + ";bcnEmulationCache=0" + ";gpuName=Device";
     public static final String DEFAULT_DDRAWRAPPER = "none";
     public static final String DEFAULT_WINCOMPONENTS = "direct3d=1,directsound=0,directmusic=0,directshow=0,directplay=0,xaudio=0,vcrun2010=1";
     public static final String FALLBACK_WINCOMPONENTS = "direct3d=1,directsound=1,directmusic=1,directshow=1,directplay=1,xaudio=1,vcrun2010=1";
@@ -183,6 +185,98 @@ public class Container {
     }
     public void setDisplayXPresentAtRefreshRate(boolean v) {
         putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
+    }
+
+    public boolean isLsfgEnabled() {
+        String value = getExtra("lsfgEnabled", "false");
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    public void setLsfgEnabled(boolean enabled) {
+        putExtra("lsfgEnabled", enabled ? "true" : "false");
+    }
+
+    public int getLsfgMultiplier() {
+        try {
+            int value = Integer.parseInt(getExtra("lsfgMultiplier", "0"));
+            return value < 2 ? 0 : Math.max(2, Math.min(4, value));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setLsfgMultiplier(int multiplier) {
+        putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getLsfgFlowScale() {
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(getExtra("lsfgFlowScale", "0.80"))));
+        } catch (NumberFormatException ignored) {
+            return 0.80f;
+        }
+    }
+
+    public void setLsfgFlowScale(float flowScale) {
+        putExtra("lsfgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
+    public boolean getLsfgPerformanceMode() {
+        String value = getExtra("lsfgPerformanceMode", "true");
+        return !"0".equals(value) && !"false".equalsIgnoreCase(value);
+    }
+
+    public void setLsfgPerformanceMode(boolean performanceMode) {
+        putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
+    }
+
+    public String getFrameGenBackend() {
+        String value = getExtra("frameGenBackend", "lsfg_vk");
+        return "bionic_fg".equalsIgnoreCase(value) || "native_fg".equalsIgnoreCase(value)
+                ? "win_fg" : value;
+    }
+
+    public void setFrameGenBackend(String backend) {
+        putExtra("frameGenBackend", backend == null || backend.isEmpty() ? "lsfg_vk" : backend);
+    }
+
+    public int getWinFgMultiplier() {
+        String value = getExtra("winFgMultiplier", getExtra("bionicFgMultiplier", "0"));
+        try {
+            return Integer.parseInt(value) < 2 ? 0 : 2;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public void setWinFgMultiplier(int multiplier) {
+        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
+    }
+
+    public float getWinFgFlowScale() {
+        String value = getExtra("winFgFlowScale", getExtra("bionicFgFlowScale", "0.80"));
+        try {
+            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
+        } catch (NumberFormatException ignored) {
+            return 0.80f;
+        }
+    }
+
+    public void setWinFgFlowScale(float flowScale) {
+        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
+    public int getWinFgModel() {
+        String value = getExtra("winFgModel", getExtra("bionicFgModel", "3"));
+        try {
+            return Math.max(3, Math.min(4, Integer.parseInt(value)));
+        } catch (NumberFormatException ignored) {
+            return 3;
+        }
+    }
+
+    public void setWinFgModel(int model) {
+        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
     }
 
     public String getDXWrapper() {

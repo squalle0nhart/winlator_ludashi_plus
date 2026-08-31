@@ -174,11 +174,12 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
         }
     )
     var driverVersion by mutableStateOf(readConfig(graphicsConfig, "version", ';').ifBlank { defaultDriverVersion })
-    var vulkanVersion by mutableStateOf(readConfig(graphicsConfig, "vulkanVersion", ';').ifBlank { "1.3" })
+    var vulkanVersion by mutableStateOf(readConfig(graphicsConfig, "vulkanVersion", ';').ifBlank { Container.DEFAULT_VULKAN_VERSION })
     var maxMemory by mutableStateOf(readConfig(graphicsConfig, "maxDeviceMemory", ';').ifBlank { "0" })
     var graphicsPresentMode by mutableStateOf(readConfig(graphicsConfig, "presentMode", ';').ifBlank { "mailbox" })
     var syncFrame by mutableStateOf(readConfig(graphicsConfig, "syncFrame", ';') == "1")
     var disablePresentWait by mutableStateOf(readConfig(graphicsConfig, "disablePresentWait", ';') == "1")
+    var timelineSemaphores by mutableStateOf(readConfig(graphicsConfig, "timelineSemaphores", ';') == "1")
     var resourceType by mutableStateOf(readConfig(graphicsConfig, "resourceType", ';').ifBlank { "auto" })
     var bcn by mutableStateOf(readConfig(graphicsConfig, "bcnEmulation", ';').ifBlank { "auto" })
     var bcnType by mutableStateOf(readConfig(graphicsConfig, "bcnEmulationType", ';').ifBlank { "compute" })
@@ -829,7 +830,7 @@ private fun ShortcutCategoryV2(
                     SettingChoice("Rendering Mode", s.renderingMode, listOf("None", "Sysmem", "Gmem", "Autotuner Profiled")) { s.applyRenderingMode(it) }
                 }
                 SettingsDivider()
-                SettingChoice("Vulkan Version", s.vulkanVersion, listOf("1.1", "1.2", "1.3")) { s.vulkanVersion = it; s.graphics("vulkanVersion", it) }
+                SettingChoice("Vulkan Version", s.vulkanVersion, listOf("1.1", "1.2", "1.3", "1.4")) { s.vulkanVersion = it; s.graphics("vulkanVersion", it) }
                 SettingsDivider()
                 SettingChoice("GPU Name", s.gpuName, gpuNames) { s.gpuName = it; s.graphics("gpuName", it) }
                 SettingsDivider()
@@ -844,6 +845,8 @@ private fun ShortcutCategoryV2(
                 SettingToggle("Sync Frame", s.syncFrame) { s.syncFrame = it; s.graphics("syncFrame", if (it) "1" else "0") }
                 SettingsDivider()
                 SettingToggle("Disable Present Wait", s.disablePresentWait) { s.disablePresentWait = it; s.graphics("disablePresentWait", if (it) "1" else "0") }
+                SettingsDivider()
+                SettingToggle("Enable DXVK timeline semaphores", s.timelineSemaphores) { s.timelineSemaphores = it; s.graphics("timelineSemaphores", if (it) "1" else "0") }
                 SettingsDivider()
                 SettingChoice("Resource Type", s.resourceType, listOf("auto", "dmabuf", "ahb", "opaque")) { s.resourceType = it; s.graphics("resourceType", it) }
                 SettingsDivider()

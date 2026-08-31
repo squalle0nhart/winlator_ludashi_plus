@@ -90,6 +90,15 @@ tasks.register("prepareKotlinBuildScriptModel"){}
 downloadProton.dependsOn(downloadImageFS)
 preBuild.dependsOn(downloadProton)
 
+def signingStorePassword = providers.gradleProperty("WINLATOR_STORE_PASSWORD")
+        .orElse(providers.environmentVariable("WINLATOR_STORE_PASSWORD"))
+def signingKeyPassword = providers.gradleProperty("WINLATOR_KEY_PASSWORD")
+        .orElse(providers.environmentVariable("WINLATOR_KEY_PASSWORD"))
+        .orElse(signingStorePassword)
+def signingKeyAlias = providers.gradleProperty("WINLATOR_KEY_ALIAS")
+        .orElse(providers.environmentVariable("WINLATOR_KEY_ALIAS"))
+        .getOrElse("sign_key")
+
 android {
     namespace 'com.winlator.cmod'
     // Keep compileSdk from your current config. If you want to match Termux-X11, you could set to 34.
@@ -132,14 +141,24 @@ android {
         freeCompilerArgs += ['-opt-in=androidx.compose.material3.ExperimentalMaterial3Api']
     }
 
+    signingConfigs {
+        ludashi {
+            storeFile rootProject.file("Untitled.jks")
+            storePassword signingStorePassword.orNull
+            keyAlias signingKeyAlias
+            keyPassword signingKeyPassword.orNull
+        }
+    }
+
     // Keep Winlator’s buildTypes
     buildTypes {
         debug {
             minifyEnabled false
+            signingConfig signingConfigs.ludashi
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.ludashi
             crunchPngs false
         }
     }
@@ -164,6 +183,7 @@ android {
         }
         resources {
             pickFirsts += ["assets/dexopt/baseline.prof", "assets/dexopt/baseline.profm"]
+            excludes += ["META-INF/versions/9/OSGI-INF/MANIFEST.MF"]
         }
     }
 
@@ -205,5 +225,10 @@ dependencies {
     implementation 'com.github.bumptech.glide:glide:4.11.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-common:2.6.0'
     implementation 'com.kohlschutter.junixsocket:junixsocket-native-common:2.6.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'in.dragonbra:javasteam:1.8.0'
+    implementation 'in.dragonbra:javasteam-depotdownloader:1.8.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.11.0'
+    testImplementation 'junit:junit:4.13.2'
 }

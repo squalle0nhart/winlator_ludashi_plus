@@ -415,7 +415,7 @@ void DisplayX::networkThreadLoop() {
                 request->client = swapchainIt->second->client;
 
                 auto lock = presentLock.lock();
-                presentRequests.push(std::move(request));
+                presentRequests.push(request);
                 if (!presentAtRefreshRate) presentLock.notify();
             } else if (requestCode == DESTROY_CLIENT_SWAPCHAIN) {
                 uint8_t id = 0;
@@ -789,7 +789,8 @@ void DisplayX::requestWindowUpdate(Window *window) {
     request->directContent = drawable->isDirectContent;
 
     auto lock = presentLock.lock();
-    presentRequests.push(std::move(request));
+    if (!presentRequests.push(request))
+        releasePresentRequest(std::move(request));
     if (!presentAtRefreshRate) presentLock.notify();
 }
 
@@ -1011,22 +1012,21 @@ void DisplayX::resizeRootWindow() {
     if (!root || !root->control || !windowTransaction ||
         surfaceWidth <= 0 || surfaceHeight <= 0) return;
 
-    viewTransformation.update(surfaceWidth, surfaceHeight,
-                              root->width, root->height);
-    ARect source{};
+    ARect source{0, 0, root->width, root->height};
     ARect destination{};
-    if (fullscreen) {
-        source = {viewTransformation.viewOffsetX,
-                  viewTransformation.viewOffsetY,
-                  viewTransformation.viewOffsetX + viewTransformation.viewWidth,
-                  viewTransformation.viewOffsetY + viewTransformation.viewHeight};
+    if (fullscreenMode == 2) {
         destination = {0, 0, surfaceWidth, surfaceHeight};
     } else {
-        source = {0, 0, surfaceWidth, surfaceHeight};
-        destination = {viewTransformation.viewOffsetX,
-                       viewTransformation.viewOffsetY,
-                       viewTransformation.viewOffsetX + viewTransformation.viewWidth,
-                       viewTransformation.viewOffsetY + viewTransformation.viewHeight};
+        float scaleX = static_cast<float>(surfaceWidth) / root->width;
+        float scaleY = static_cast<float>(surfaceHeight) / root->height;
+        float scale = fullscreenMode == 3 ? std::max(scaleX, scaleY)
+                    : fullscreenMode == 4 ? std::max(1.0f, std::floor(std::min(scaleX, scaleY)))
+                    : std::min(scaleX, scaleY);
+        int width = static_cast<int>(std::ceil(root->width * scale));
+        int height = static_cast<int>(std::ceil(root->height * scale));
+        int left = (surfaceWidth - width) / 2;
+        int top = (surfaceHeight - height) / 2;
+        destination = {left, top, left + width, top + height};
     }
 
     pSTSetGeometry(windowTransaction, root->control, source, destination, 0);
@@ -1056,8 +1056,8 @@ void DisplayX::restoreControlState() {
     }
 }
 
-void DisplayX::toggleFullscreen() {
-    fullscreen = !fullscreen;
+void DisplayX::setFullscreenMode(int mode) {
+    fullscreenMode = mode >= 0 && mode <= 4 ? mode : 0;
     resizeRootWindow();
 }
 

@@ -19,6 +19,7 @@ import com.winlator.cmod.contents.ContentsManager;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.FrameGenManager;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.ProcessHelper;
@@ -492,6 +493,15 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             } else {
                 execEnvVars.remove("VK_INSTANCE_LAYERS");
             }
+        }
+
+        if (shortcut != null) {
+            FrameGenManager.ensureRuntimeInstalled(context, shortcut);
+            FrameGenManager.writeConfig(shortcut);
+            FrameGenManager.applyLaunchEnv(shortcut, execEnvVars);
+        } else {
+            new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json").delete();
+            new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_win_framegen.json").delete();
         }
 
         String emulator = container.getEmulator();

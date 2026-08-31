@@ -22,11 +22,14 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.ui.settings.DownloadableContentsSourceCard
 import com.winlator.cmod.ui.theme.WinlatorThemeChoices
 import com.winlator.cmod.ui.theme.WinlatorThemeManager
 
 @Composable
 internal fun OnboardingThemeScreen(
+    contentsUrl: String,
+    onContentsUrlChanged: (String) -> Unit,
     onBack: (() -> Unit)? = null,
     onContinue: () -> Unit
 ) {
@@ -65,6 +68,7 @@ internal fun OnboardingThemeScreen(
                     selected = current,
                     onSelected = { WinlatorThemeManager.setTheme(context, it) }
                 )
+                DownloadableContentsSourceCard(contentsUrl, onContentsUrlChanged)
                 ThemeNavigationButtons(onBack, onContinue)
             }
         }
@@ -95,6 +99,8 @@ internal fun OnboardingThemeScreen(
                 selected = current,
                 onSelected = { WinlatorThemeManager.setTheme(context, it) }
             )
+            Spacer(Modifier.height(14.dp))
+            DownloadableContentsSourceCard(contentsUrl, onContentsUrlChanged)
             ThemeNavigationButtons(onBack, onContinue)
         }
     }

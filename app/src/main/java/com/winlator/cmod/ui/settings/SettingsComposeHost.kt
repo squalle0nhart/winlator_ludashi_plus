@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.MainActivity
 import com.winlator.cmod.R
+import com.winlator.cmod.contents.ContentsManager
 import com.winlator.cmod.ui.LandscapeMainNavigation
 import com.winlator.cmod.ui.theme.WinZTheme
 import com.winlator.cmod.ui.theme.WinlatorThemePreferenceCard
@@ -289,7 +290,7 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
                     ToggleRow(stringResource(R.string.remove_loading_bar_when_booting_games), model.removeLoadingBar) { callbacks.onBooleanChanged("remove_loading_bar_when_booting_games", it) }
                 }
             }
-            item("contents-url") { EditableValueCard("Downloadable Contents URL", model.contentsUrl, callbacks::onContentsUrlChanged) }
+            item("contents-url") { DownloadableContentsSourceCard(model.contentsUrl, callbacks::onContentsUrlChanged) }
 
             item("imagefs-title") { SectionTitle(stringResource(R.string.imagefs)) }
             item("imagefs") { NavigationRow(Icons.Outlined.Refresh, stringResource(R.string.reinstall_imagefs), null, callbacks::onReinstallImageFs) }
@@ -627,10 +628,28 @@ private fun EditableValueCard(label: String, initial: String, onSave: (String) -
 }
 
 @Composable
-private fun EditableInlineValue(label: String, initial: String, onSave: (String) -> Unit) {
+internal fun DownloadableContentsSourceCard(url: String, onSave: (String) -> Unit) {
+    val sources = listOf("StevenMXZ (Default)", "Nicholasx417 (3.1)", "The412Banner", "Custom")
+    var selected by remember(url) { mutableStateOf(sources[ContentsManager.getRemoteProfilesSource(url)]) }
+    GroupCard {
+        SettingChoice("Downloadable Contents Source", selected, sources) {
+            selected = it
+            when (it) {
+                sources[0] -> onSave(ContentsManager.REMOTE_PROFILES)
+                sources[1] -> onSave(ContentsManager.REMOTE_PROFILES_NICHOLASX417)
+                sources[2] -> onSave(ContentsManager.REMOTE_PROFILES_THE412BANNER)
+            }
+        }
+        GroupDivider()
+        EditableInlineValue("Content URL", url, onSave, selected == sources[3])
+    }
+}
+
+@Composable
+private fun EditableInlineValue(label: String, initial: String, onSave: (String) -> Unit, editable: Boolean = true) {
     var value by remember(initial) { mutableStateOf(initial) }
     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Button(onClick = { onSave(value) }, modifier = Modifier.align(Alignment.End)) { Text("Save") }
+        OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true, readOnly = !editable)
+        if (editable) Button(onClick = { onSave(value) }, modifier = Modifier.align(Alignment.End)) { Text("Save") }
     }
 }

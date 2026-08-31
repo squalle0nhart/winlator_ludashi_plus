@@ -25,6 +25,12 @@
     <string name="unable_to_install_system_files">Unable to install system files</string>
     <string name="keyboard">Keyboard</string>
     <string name="toggle_fullscreen">Toggle Fullscreen</string>
+    <string name="fullscreen_mode">Fullscreen Mode</string>
+    <string name="fullscreen_mode_short_off">Off</string>
+    <string name="fullscreen_mode_short_fit">Fit</string>
+    <string name="fullscreen_mode_short_stretch">Stretch</string>
+    <string name="fullscreen_mode_short_fill">Fill</string>
+    <string name="fullscreen_mode_short_integer">Integer</string>
     <string name="exit">Exit</string>
     <string name="no_control_element_selected">No control element selected</string>
     <string name="scale">Scale</string>
@@ -177,6 +183,9 @@
     <string name="compatibility">Compatibility</string>
     <string name="intermediate">Intermediate</string>
     <string name="performance">Performance</string>
+    <string name="performance_tso">Performance (TSO)</string>
+    <string name="extreme">Extreme</string>
+    <string name="extreme_tso">Extreme TSO</string>
     <string name="preset">Preset</string>
     <string name="you_cannot_remove_this_preset">You cannot remove this preset</string>
     <string name="dxwrapper_help_content"><![CDATA[
@@ -628,6 +637,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="graphics_driver_max_device_memory">Max Device Memory</string>
     <string name="graphics_driver_sync_frame">Sync Every Frame</string>
     <string name="graphics_driver_disable_present_wait">Disable KHR_present_wait</string>
+    <string name="graphics_driver_timeline_semaphores">Enable DXVK timeline semaphores</string>
     <string name="graphics_driver_present_modes">Present Modes</string>
     <string name="graphics_driver_resource_type">Memory Resource Type</string>
     <string name="graphics_driver_vulkan_version">Vulkan Version</string>
@@ -663,6 +673,7 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="proton_package_not_installed">Tap to download and install</string>
     <string name="install">Install</string>
     <string name="select">Select</string>
+    <string name="store_section_title">Store</string>
     <string name="wine_version_locked_for_existing_container">Wine version is locked for existing containers</string>
     <string name="library">Library</string>
     <string name="configure_container">Configure Container</string>

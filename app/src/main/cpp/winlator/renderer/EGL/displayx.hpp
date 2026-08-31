@@ -12,10 +12,10 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "renderer_jni.hpp"
-#include "view_transformation.hpp"
 #include "window.hpp"
 #include "cursor.hpp"
 
@@ -68,16 +68,24 @@ class DisplayX {
         class PresentQueue {
             private:
                 std::queue<std::unique_ptr<PresentRequest>> queue;
+                std::unordered_set<int> pendingWindowUpdates;
 
             public:
-                void push(std::unique_ptr<PresentRequest> request) {
-                    if (request) queue.push(std::move(request));
+                bool push(std::unique_ptr<PresentRequest>& request) {
+                    if (!request) return false;
+                    if (!request->displayXBuffer &&
+                        !pendingWindowUpdates.insert(request->windowId).second)
+                        return false;
+                    queue.push(std::move(request));
+                    return true;
                 }
 
                 std::unique_ptr<PresentRequest> pop() {
                     if (queue.empty()) return nullptr;
                     auto request = std::move(queue.front());
                     queue.pop();
+                    if (!request->displayXBuffer)
+                        pendingWindowUpdates.erase(request->windowId);
                     return request;
                 }
 
@@ -102,7 +110,6 @@ class DisplayX {
         int surfaceWidth = 0;
         int surfaceHeight = 0;
         void *choreographer = nullptr;
-        ViewTransformation viewTransformation;
         ANativeWindow *nativeWindow = nullptr;
 
         void *performanceHintManager = nullptr;
@@ -131,7 +138,7 @@ class DisplayX {
         std::atomic_bool presentAtRefreshRate{true};
 
         bool requestUpdate = false;
-        bool fullscreen = false;
+        int fullscreenMode = 0;
         int eventsPending = 0;
         int networkWakeFd = -1;
 
@@ -181,7 +188,7 @@ class DisplayX {
         void reparentWindow(Window *window, Window *parent);
         void updateCursor(Cursor *cursor);
         void showCursor();
-        void toggleFullscreen();
+        void setFullscreenMode(int mode);
         void setPerformanceMode(bool enabled);
         void setPresentAtRefreshRate(bool enabled);
 };

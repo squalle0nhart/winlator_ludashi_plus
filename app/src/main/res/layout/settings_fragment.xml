@@ -601,13 +601,22 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Downloadable Contents URL" />
+                            android:text="Downloadable Contents Source" />
+
+                        <Spinner
+                            android:id="@+id/SDownloadableContentsSource"
+                            style="@style/ComboBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:entries="@array/downloadable_contents_source_entries" />
 
                         <EditText
+                            android:id="@+id/ETDownloadableContentsURL"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_gravity="left|center"
-                            android:id="@+id/ETDownloadableContentsURL"/>
+                            android:hint="Content URL"
+                            android:inputType="textUri" />
 
                     </LinearLayout>
                 </LinearLayout>

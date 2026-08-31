@@ -17,6 +17,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public class Shortcut {
@@ -349,4 +350,110 @@ public class Shortcut {
         return v != null ? v.equals("1") : container.getRendererSwapRB();
     }
     public void setRendererSwapRB(boolean v) { putExtra("rendererSwapRB", v ? "1" : "0"); }
+
+    public boolean isLsfgEnabled() {
+        String value = getExtra("lsfgEnabled", null);
+        if (value == null || value.isEmpty()) return container.isLsfgEnabled();
+        return value.equals("1") || value.equalsIgnoreCase("true");
+    }
+
+    public void setLsfgEnabled(boolean enabled) {
+        putExtra("lsfgEnabled", enabled ? "true" : "false");
+    }
+
+    public int getLsfgMultiplier() {
+        String value = getExtra("lsfgMultiplier", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? (Integer.parseInt(value) < 2 ? 0 : Math.max(2, Math.min(4, Integer.parseInt(value))))
+                    : container.getLsfgMultiplier();
+        } catch (NumberFormatException e) {
+            return container.getLsfgMultiplier();
+        }
+    }
+
+    public void setLsfgMultiplier(int multiplier) {
+        putExtra("lsfgMultiplier", String.valueOf(multiplier < 2 ? 0 : Math.max(2, Math.min(4, multiplier))));
+    }
+
+    public float getLsfgFlowScale() {
+        String value = getExtra("lsfgFlowScale", null);
+        try {
+            return value != null && !value.isEmpty()
+                    ? Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)))
+                    : container.getLsfgFlowScale();
+        } catch (NumberFormatException e) {
+            return container.getLsfgFlowScale();
+        }
+    }
+
+    public void setLsfgFlowScale(float flowScale) {
+        float clamped = Math.max(0.25f, Math.min(1.0f, flowScale));
+        putExtra("lsfgFlowScale", String.format(Locale.US, "%.2f", clamped));
+    }
+
+    public boolean getLsfgPerformanceMode() {
+        String value = getExtra("lsfgPerformanceMode", null);
+        if (value == null || value.isEmpty()) return container.getLsfgPerformanceMode();
+        return value.equals("1") || value.equalsIgnoreCase("true");
+    }
+
+    public void setLsfgPerformanceMode(boolean performanceMode) {
+        putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
+    }
+
+    public String getFrameGenBackend() {
+        String value = getExtra("frameGenBackend", null);
+        if ("bionic_fg".equalsIgnoreCase(value) || "native_fg".equalsIgnoreCase(value)) return "win_fg";
+        return value == null || value.isEmpty() ? container.getFrameGenBackend() : value;
+    }
+
+    public void setFrameGenBackend(String backend) {
+        putExtra("frameGenBackend", backend == null || backend.isEmpty() ? "lsfg_vk" : backend);
+    }
+
+    public int getWinFgMultiplier() {
+        String value = getExtra("winFgMultiplier", getExtra("bionicFgMultiplier", null));
+        try {
+            return value == null || value.isEmpty()
+                    ? container.getWinFgMultiplier()
+                    : Integer.parseInt(value) < 2 ? 0 : 2;
+        } catch (NumberFormatException ignored) {
+            return container.getWinFgMultiplier();
+        }
+    }
+
+    public void setWinFgMultiplier(int multiplier) {
+        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
+    }
+
+    public float getWinFgFlowScale() {
+        String value = getExtra("winFgFlowScale", getExtra("bionicFgFlowScale", null));
+        try {
+            return value == null || value.isEmpty()
+                    ? container.getWinFgFlowScale()
+                    : Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
+        } catch (NumberFormatException ignored) {
+            return container.getWinFgFlowScale();
+        }
+    }
+
+    public void setWinFgFlowScale(float flowScale) {
+        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
+    }
+
+    public int getWinFgModel() {
+        String value = getExtra("winFgModel", getExtra("bionicFgModel", null));
+        try {
+            return value == null || value.isEmpty()
+                    ? container.getWinFgModel()
+                    : Math.max(3, Math.min(4, Integer.parseInt(value)));
+        } catch (NumberFormatException ignored) {
+            return container.getWinFgModel();
+        }
+    }
+
+    public void setWinFgModel(int model) {
+        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
+    }
 }

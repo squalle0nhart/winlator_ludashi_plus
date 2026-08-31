@@ -183,10 +183,167 @@
                     android:textColor="#FFFFFF"
                     android:textSize="24sp"
                     android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/LLRuntimeStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/sidebar_card"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Runtime Status"
+                        android:textColor="?attr/ingameSidebarOnSurface"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/TVRuntimeRendererStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/TVRuntimeDisplayXStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/TVRuntimeFEXCoreStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/TVRuntimeUnixLibsStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/LLFullscreenModes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/sidebar_card"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/fullscreen_mode"
+                        android:textColor="?attr/ingameSidebarOnSurface"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/BTFullscreenOff"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="@string/fullscreen_mode_short_off"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="12sp" />
+
+                        <Button
+                            android:id="@+id/BTFullscreenFit"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="@string/fullscreen_mode_short_fit"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="12sp" />
+
+                        <Button
+                            android:id="@+id/BTFullscreenStretch"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="@string/fullscreen_mode_short_stretch"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/BTFullscreenFill"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="@string/fullscreen_mode_short_fill"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="12sp" />
+
+                        <Button
+                            android:id="@+id/BTFullscreenInteger"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/sidebar_mode_button_background"
+                            android:maxLines="1"
+                            android:text="@string/fullscreen_mode_short_integer"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="12sp" />
+
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="62dp"
-                    android:layout_marginTop="18dp"
+                    android:layout_marginTop="12dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
                     <TextView

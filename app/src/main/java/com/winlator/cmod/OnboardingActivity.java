@@ -126,7 +126,16 @@ public class OnboardingActivity extends AppCompatActivity {
                 WineRuntimeGuard.isBundledMainInstalled(this),
                 WineRuntimeGuard.isInUse(this, WineInfo.MAIN_WINE_VERSION.identifier()),
                 componentManagerMode,
+                preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES),
                 new OnboardingCallbacks() {
+                    @Override
+                    public void onContentsSourceSelected(@NonNull String url) {
+                        String normalized = url.trim();
+                        if (normalized.isEmpty()) normalized = ContentsManager.REMOTE_PROFILES;
+                        preferences.edit().putString("downloadable_contents_url", normalized).apply();
+                        loadCatalog();
+                    }
+
                     @Override
                     public void onInstall(@NonNull String componentId) {
                         ComponentItem item = findComponent(componentId);
@@ -189,7 +198,7 @@ public class OnboardingActivity extends AppCompatActivity {
         );
 
         syncComposeCatalog();
-        loadCatalog();
+        if (componentManagerMode) loadCatalog();
         loadRemoteDrivers();
         if (!coreReady) startCoreInstallation();
     }

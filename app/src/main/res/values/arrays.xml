@@ -85,6 +85,7 @@
         <item>1.1</item>
         <item>1.2</item>
         <item>1.3</item>
+        <item>1.4</item>
     </string-array>
     <string-array name="bcn_emulation_entries">
         <item>none</item>
@@ -311,6 +312,12 @@
     </string-array>
     <string-array name="wine_entries">
         <item>proton-9.0-arm64ec</item>
+    </string-array>
+    <string-array name="downloadable_contents_source_entries">
+        <item>StevenMXZ (Default)</item>
+        <item>Nicholasx417 (3.1)</item>
+        <item>The412Banner</item>
+        <item>Custom</item>
     </string-array>
     <string-array name="vkbasalt_sharpness_entries">
         <item>None</item>

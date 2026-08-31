@@ -62,6 +62,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.winlator.cmod.container.Container
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.ui.theme.WinZTheme
 
@@ -248,10 +249,11 @@ private fun ContainerSectionScreen(
     var graphicsVersion by remember(initialGraphicsDriverConfig) {
         mutableStateOf(initialGraphicsValues["version"].orEmpty().ifBlank { defaultGraphicsVersion })
     }
-    var vulkanVersion by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["vulkanVersion"] ?: "1.3") }
+    var vulkanVersion by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["vulkanVersion"].orEmpty().ifBlank { Container.DEFAULT_VULKAN_VERSION }) }
     var graphicsPresentMode by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["presentMode"] ?: "mailbox") }
     var syncFrame by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["syncFrame"] == "1") }
     var disablePresentWait by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["disablePresentWait"] == "1") }
+    var timelineSemaphores by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["timelineSemaphores"] == "1") }
     var resourceType by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["resourceType"] ?: "auto") }
     var bcnEmulation by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["bcnEmulation"] ?: "auto") }
     var bcnEmulationType by remember(initialGraphicsDriverConfig) { mutableStateOf(initialGraphicsValues["bcnEmulationType"] ?: "compute") }
@@ -312,6 +314,7 @@ private fun ContainerSectionScreen(
                                     "presentMode" to graphicsPresentMode,
                                     "syncFrame" to if (syncFrame) "1" else "0",
                                     "disablePresentWait" to if (disablePresentWait) "1" else "0",
+                                    "timelineSemaphores" to if (timelineSemaphores) "1" else "0",
                                     "resourceType" to resourceType,
                                     "bcnEmulation" to bcnEmulation,
                                     "bcnEmulationType" to bcnEmulationType,
@@ -459,6 +462,8 @@ private fun ContainerSectionScreen(
                                     onSyncFrame = { syncFrame = it },
                                     disablePresentWait = disablePresentWait,
                                     onDisablePresentWait = { disablePresentWait = it },
+                                    timelineSemaphores = timelineSemaphores,
+                                    onTimelineSemaphores = { timelineSemaphores = it },
                                     resourceType = resourceType,
                                     onResourceType = { resourceType = it },
                                     bcnEmulation = bcnEmulation,
@@ -869,6 +874,8 @@ private fun GraphicsDriverOptionsPanel(
     onSyncFrame: (Boolean) -> Unit,
     disablePresentWait: Boolean,
     onDisablePresentWait: (Boolean) -> Unit,
+    timelineSemaphores: Boolean,
+    onTimelineSemaphores: (Boolean) -> Unit,
     resourceType: String,
     onResourceType: (String) -> Unit,
     bcnEmulation: String,
@@ -896,7 +903,7 @@ private fun GraphicsDriverOptionsPanel(
                 onSelected = onVersion
             )
             ThinDivider()
-            InlineChoice("Vulkan Version", vulkanVersion, arrayOf("1.1", "1.2", "1.3"), onVulkanVersion)
+            InlineChoice("Vulkan Version", vulkanVersion, arrayOf("1.1", "1.2", "1.3", "1.4"), onVulkanVersion)
             ThinDivider()
             InlineChoice("Present Mode", presentMode, arrayOf("mailbox", "fifo", "immediate", "relaxed"), onPresentMode)
             ThinDivider()
@@ -911,6 +918,8 @@ private fun GraphicsDriverOptionsPanel(
             ToggleSetting("Sync Frame", syncFrame, onSyncFrame)
             ThinDivider()
             ToggleSetting("Disable Present Wait", disablePresentWait, onDisablePresentWait)
+            ThinDivider()
+            ToggleSetting("Enable DXVK timeline semaphores", timelineSemaphores, onTimelineSemaphores)
         }
     }
 }

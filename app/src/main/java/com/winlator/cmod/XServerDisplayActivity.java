@@ -75,6 +75,7 @@ import com.winlator.cmod.core.KeyValueSet;
 import com.winlator.cmod.core.OnExtractFileListener;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProcessHelper;
+import com.winlator.cmod.core.RuntimeBackendProbe;
 import com.winlator.cmod.core.StringUtils;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.core.WineInfo;
@@ -82,6 +83,7 @@ import com.winlator.cmod.core.WineRegistryEditor;
 import com.winlator.cmod.core.WineRequestHandler;
 import com.winlator.cmod.core.WineStartMenuCreator;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
@@ -185,6 +187,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private short taskAffinityMaskWoW64 = 0;
     private String wineCpuTopologyValue = "";
     private int frameRatingWindowId = -1;
+    private volatile RuntimeBackendProbe.FexMode runtimeFexMode = RuntimeBackendProbe.FexMode.NA;
+    private volatile boolean runtimeStatusProbeRunning;
+    private volatile boolean runtimeStatusProbeStopped;
 
     private int activeRendererWindowId = -1;
     private String lastRendererName = null;
@@ -221,6 +226,36 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     private GuestProgramLauncherComponent guestProgramLauncherComponent;
     private EnvVars overrideEnvVars;
+
+    private int resolveLaunchFullscreenMode() {
+        String value = shortcut != null ? shortcut.getExtra("fullscreenMode",
+                container != null ? container.getExtra("fullscreenMode") : "")
+                : container != null ? container.getExtra("fullscreenMode") : "";
+        if (!value.isEmpty()) {
+            try {
+                int mode = Integer.parseInt(value);
+                if (mode >= ViewTransformation.FULLSCREEN_OFF
+                        && mode <= ViewTransformation.FULLSCREEN_INTEGER) return mode;
+            } catch (NumberFormatException ignored) {}
+        }
+        String legacy = shortcut != null ? shortcut.getExtra("fullscreenStretched") : "";
+        if (!legacy.isEmpty()) return "1".equals(legacy)
+                ? ViewTransformation.FULLSCREEN_STRETCH : ViewTransformation.FULLSCREEN_OFF;
+        return container != null && container.isFullscreenStretched()
+                ? ViewTransformation.FULLSCREEN_STRETCH : ViewTransformation.FULLSCREEN_OFF;
+    }
+
+    private void persistFullscreenMode(int mode) {
+        if (shortcut != null) {
+            shortcut.putExtra("fullscreenMode", String.valueOf(mode));
+            shortcut.putExtra("fullscreenStretched", null);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.putExtra("fullscreenMode", String.valueOf(mode));
+            container.setFullscreenStretched(mode == ViewTransformation.FULLSCREEN_STRETCH);
+            container.saveData();
+        }
+    }
 
     private void createNotifcationChannel() {
         String name = "Winlator";
@@ -894,6 +929,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        runtimeStatusProbeStopped = true;
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onDestroy();
     }
@@ -1058,6 +1094,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
             if (shortcut != null)
                 envVars.putAll(shortcut.getExtra("envVars"));
+
+            if ("1".equals(graphicsDriverConfig.get("timelineSemaphores")))
+                envVars.remove("DXVK_DISABLE_TIMELINE_SEMAPHORES");
+            else
+                envVars.put("DXVK_DISABLE_TIMELINE_SEMAPHORES", "1");
 
             applyOpenGLDriverEnvVars();
 
@@ -1279,21 +1320,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
         }
 
-        String shortcutFullscreenStretched = shortcut != null ? shortcut.getExtra("fullscreenStretched") : null;
-
-        boolean shouldStretch = false;
-
-        if (shortcut != null && shortcutFullscreenStretched != null) {
-
-            shouldStretch = shortcutFullscreenStretched.equals("1");
-        } else if (container != null && container.isFullscreenStretched()) {
-
-            shouldStretch = true;
-        }
-
-        if (shouldStretch) {
-
+        int fullscreenMode = resolveLaunchFullscreenMode();
+        if (renderer instanceof DisplayXServerView) {
+            renderer.setFullscreenMode(fullscreenMode);
+        } else if (fullscreenMode != ViewTransformation.FULLSCREEN_OFF) {
             renderer.toggleFullscreen();
+        }
+        if (fullscreenMode != ViewTransformation.FULLSCREEN_OFF) {
             touchpadView.toggleFullscreen();
         }
 
@@ -1316,6 +1349,83 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         setupSidebarHudControls();
         setupSidebarGraphicsControls();
+        setupRuntimeStatusSection();
+    }
+
+    private void setupRuntimeStatusSection() {
+        runtimeStatusProbeStopped = false;
+        updateRuntimeStatusUi(runtimeFexMode);
+        requestRuntimeStatusProbe();
+    }
+
+    private void requestRuntimeStatusProbe() {
+        if (runtimeStatusProbeRunning || runtimeStatusProbeStopped || container == null) return;
+        runtimeStatusProbeRunning = true;
+        Thread probe = new Thread(() -> {
+            try {
+                for (int i = 0; i < 15 && !runtimeStatusProbeStopped; i++) {
+                    RuntimeBackendProbe.FexMode detected = RuntimeBackendProbe.detect(container.getRootDir());
+                    runtimeFexMode = detected;
+                    runOnUiThread(() -> {
+                        if (!isFinishing() && !isDestroyed()) updateRuntimeStatusUi(detected);
+                    });
+                    if (wineInfo == null || !wineInfo.isArm64EC()
+                            || !"fexcore".equalsIgnoreCase(emulator)
+                            || detected != RuntimeBackendProbe.FexMode.NA) break;
+                    Thread.sleep(1000L);
+                }
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                runtimeStatusProbeRunning = false;
+            }
+        }, "runtime-status-probe");
+        probe.setDaemon(true);
+        probe.start();
+    }
+
+    private void updateRuntimeStatusUi(RuntimeBackendProbe.FexMode fexMode) {
+        int normal = Color.rgb(184, 196, 206);
+        int active = Color.rgb(76, 175, 80);
+        int warning = Color.rgb(255, 152, 0);
+
+        String renderer = xServerView instanceof DisplayXServerView ? "DisplayX"
+                : xServerView instanceof EGLXServerView ? "EGL" : "Vulkan";
+        setRuntimeStatus(R.id.TVRuntimeRendererStatus, "Renderer", renderer + " active", active);
+
+        boolean displayX = xServerView instanceof DisplayXServerView;
+        boolean trueDisplayX = shortcut != null ? shortcut.getTrueDisplayX()
+                : container != null && container.getTrueDisplayX();
+        String displayXStatus = !displayX ? "Off"
+                : trueDisplayX ? "True DisplayX active" : "DRI3 active";
+        setRuntimeStatus(R.id.TVRuntimeDisplayXStatus, "DisplayX", displayXStatus,
+                displayX ? active : normal);
+
+        boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
+        boolean fexConfigured = arm64ec && "fexcore".equalsIgnoreCase(emulator);
+        String version = container == null ? "" : shortcut != null
+                ? shortcut.getExtra("fexcoreVersion", container.getFEXCoreVersion())
+                : container.getFEXCoreVersion();
+        String fexStatus = !arm64ec ? "Not applicable"
+                : !fexConfigured ? "Off · " + emulator
+                : (version == null || version.isEmpty() ? "" : version + " ")
+                        + (fexMode == RuntimeBackendProbe.FexMode.NA ? "not detected" : "active");
+        setRuntimeStatus(R.id.TVRuntimeFEXCoreStatus, "FEXCore", fexStatus,
+                fexConfigured ? (fexMode == RuntimeBackendProbe.FexMode.NA ? warning : active) : normal);
+
+        String unixLibsStatus = !fexConfigured ? "Not applicable"
+                : fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? "Active"
+                : fexMode == RuntimeBackendProbe.FexMode.DLL ? "Off · DLL mode" : "Not detected";
+        setRuntimeStatus(R.id.TVRuntimeUnixLibsStatus, "Unixlibs", unixLibsStatus,
+                fexMode == RuntimeBackendProbe.FexMode.UNIXLIB ? active
+                        : fexConfigured && fexMode == RuntimeBackendProbe.FexMode.NA ? warning : normal);
+    }
+
+    private void setRuntimeStatus(int viewId, String label, String value, int color) {
+        TextView view = findViewById(viewId);
+        if (view == null) return;
+        view.setText(label + ": " + value);
+        view.setTextColor(color);
     }
 
     private ActivityResultLauncher<Intent> controlsEditorActivityResultLauncher = registerForActivityResult(
@@ -1591,6 +1701,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             sub.animate().alpha(1.0f).translationX(0.0f).setDuration(130).start();
         }
         setSidebarActiveItem(parentId);
+        if (parentId == R.id.BTItemGraphics) requestRuntimeStatusProbe();
         if (parentId != R.id.BTItemMouse && parentId != R.id.BTItemPause) {
             activeSidebarItemId = parentId;
             activeSidebarPanelId = subId;
@@ -1814,6 +1925,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final EGLXServerView     eglRenderer = renderer instanceof EGLXServerView ? (EGLXServerView) renderer : null;
         final DisplayXServerView displayXRenderer = renderer instanceof DisplayXServerView ? (DisplayXServerView) renderer : null;
 
+        setupSidebarFullscreenModes(displayXRenderer);
+
         Spinner spNativeFPS        = findViewById(R.id.SPNativeFPS);
         View    llStandardOptions  = findViewById(R.id.LLStandardOptions);
         Switch  swEnableFSR        = findViewById(R.id.SWEnableFSR);
@@ -1976,6 +2089,36 @@ public class XServerDisplayActivity extends AppCompatActivity {
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spFrameGenFPS.setAdapter(a);
         }
+    }
+
+    private void setupSidebarFullscreenModes(DisplayXServerView renderer) {
+        View panel = findViewById(R.id.LLFullscreenModes);
+        View legacyToggle = findViewById(R.id.BTItemToggleFullscreen);
+        if (panel != null) panel.setVisibility(renderer != null ? View.VISIBLE : View.GONE);
+        if (legacyToggle != null) legacyToggle.setVisibility(renderer != null ? View.GONE : View.VISIBLE);
+        if (renderer == null) return;
+
+        int[] buttonIds = {R.id.BTFullscreenOff, R.id.BTFullscreenFit,
+                R.id.BTFullscreenStretch, R.id.BTFullscreenFill, R.id.BTFullscreenInteger};
+        Runnable updateSelection = () -> {
+            int selectedMode = renderer.getFullscreenMode();
+            for (int mode = 0; mode < buttonIds.length; mode++) {
+                View button = findViewById(buttonIds[mode]);
+                if (button != null) button.setSelected(mode == selectedMode);
+            }
+        };
+        for (int mode = 0; mode < buttonIds.length; mode++) {
+            View button = findViewById(buttonIds[mode]);
+            if (button == null) continue;
+            int selectedMode = mode;
+            button.setOnClickListener(v -> {
+                renderer.setFullscreenMode(selectedMode);
+                if (touchpadView != null) touchpadView.toggleFullscreen();
+                persistFullscreenMode(selectedMode);
+                updateSelection.run();
+            });
+        }
+        updateSelection.run();
     }
 
         private void setupSidebarInputControls() {
@@ -2411,7 +2554,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             adrenotoolsManager.setDriverById(envVars, imageFs, adrenoToolsDriverId);
         }
 
-        String vulkanVersion = graphicsDriverConfig.get("vulkanVersion");
+        String vulkanVersion = graphicsDriverConfig.getOrDefault("vulkanVersion", Container.DEFAULT_VULKAN_VERSION);
         String vulkanVersionPatch = GPUInformation.getVulkanVersion(adrenoToolsDriverId, this).split("\\.")[2];
         vulkanVersion = vulkanVersion + "." + vulkanVersionPatch;
         envVars.put("WRAPPER_VK_VERSION", vulkanVersion);

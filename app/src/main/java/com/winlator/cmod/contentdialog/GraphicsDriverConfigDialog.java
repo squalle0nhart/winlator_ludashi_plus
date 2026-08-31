@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.contents.ContentsManager;
+import com.winlator.cmod.container.Container;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.FileUtils;
@@ -49,6 +50,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
     private Spinner sBCnEmulationCache;
     private CheckBox cbSyncFrame;
     private CheckBox cbDisablePresentWait;
+    private CheckBox cbTimelineSemaphores;
 
     private static String selectedVulkanVersion;
     private static String selectedVersion;
@@ -58,6 +60,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
 
     private static String isSyncFrame;
     private static String isDisablePresentWait;
+    private static String isTimelineSemaphoresEnabled;
     private static String selectedPresentMode;
     private static String selectedResourceType;
     private static String selectedBCnEmulation;
@@ -127,6 +130,7 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
                 "presentMode=" + selectedPresentMode + ";" +
                 "syncFrame=" + isSyncFrame + ";" +
                 "disablePresentWait=" + isDisablePresentWait + ";" +
+                "timelineSemaphores=" + isTimelineSemaphoresEnabled + ";" +
                 "resourceType=" + selectedResourceType + ";" +
                 "bcnEmulation=" + selectedBCnEmulation + ";" +
                 "bcnEmulationType=" + selectedBCnEmulationType + ";" +
@@ -174,16 +178,18 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         sBCnEmulationCache = findViewById(R.id.SGraphicsDriverBCnEmulationCache);
         cbSyncFrame = findViewById(R.id.CBSyncFrame);
         cbDisablePresentWait = findViewById(R.id.CBDisablePresentWait);
+        cbTimelineSemaphores = findViewById(R.id.CBTimelineSemaphores);
 
         HashMap<String, String> config = parseGraphicsDriverConfig(graphicsDriverConfig);
 
-        String vulkanVersion = config.get("vulkanVersion");
+        String vulkanVersion = config.getOrDefault("vulkanVersion", Container.DEFAULT_VULKAN_VERSION);
         String initialVersion = config.get("version");
         String blExtensions = config.get("blacklistedExtensions");
         String gpuName = config.get("gpuName");
         String maxDeviceMemory = config.get("maxDeviceMemory");
         String syncFrame = config.get("syncFrame");
         String disablePresentWait = config.get("disablePresentWait");
+        String timelineSemaphores = config.getOrDefault("timelineSemaphores", "0");
         String presentMode = config.get("presentMode");
         String resourceType = config.get("resourceType");
         String bcnEmulation = config.get("bcnEmulation");
@@ -324,6 +330,12 @@ public class GraphicsDriverConfigDialog extends ContentDialog {
         cbDisablePresentWait.setChecked(isDisablePresentWait.equals("1") ? true : false);
         cbDisablePresentWait.setOnCheckedChangeListener((buttonView, isChecked) -> {
             isDisablePresentWait = isChecked ? "1" : "0";
+        });
+
+        isTimelineSemaphoresEnabled = timelineSemaphores;
+        cbTimelineSemaphores.setChecked("1".equals(isTimelineSemaphoresEnabled));
+        cbTimelineSemaphores.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            isTimelineSemaphoresEnabled = isChecked ? "1" : "0";
         });
 
         // Ensure ContentsManager syncContents is called

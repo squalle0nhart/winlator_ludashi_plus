@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.R
 import com.winlator.cmod.box64.Box64PresetManager
+import com.winlator.cmod.container.Container
 import com.winlator.cmod.container.ContainerManager
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
@@ -65,11 +66,12 @@ internal fun ContainerRuntimePane(
     var graphics by remember { mutableStateOf(graphicsEntries.firstOrNull() ?: "Wrapper") }
     var graphicsConfig by remember { mutableStateOf(container.getGraphicsDriverConfig()) }
     var driverVersion by remember { mutableStateOf(readConfig(graphicsConfig, "version", ';').ifBlank { "System" }) }
-    var vulkanVersion by remember { mutableStateOf(readConfig(graphicsConfig, "vulkanVersion", ';').ifBlank { "1.3" }) }
+    var vulkanVersion by remember { mutableStateOf(readConfig(graphicsConfig, "vulkanVersion", ';').ifBlank { Container.DEFAULT_VULKAN_VERSION }) }
     var maxDeviceMemory by remember { mutableStateOf(readConfig(graphicsConfig, "maxDeviceMemory", ';').ifBlank { "0" }) }
     var graphicsPresentMode by remember { mutableStateOf(readConfig(graphicsConfig, "presentMode", ';').ifBlank { "mailbox" }) }
     var syncFrame by remember { mutableStateOf(readConfig(graphicsConfig, "syncFrame", ';') == "1") }
     var disablePresentWait by remember { mutableStateOf(readConfig(graphicsConfig, "disablePresentWait", ';') == "1") }
+    var timelineSemaphores by remember { mutableStateOf(readConfig(graphicsConfig, "timelineSemaphores", ';') == "1") }
     var resourceType by remember { mutableStateOf(readConfig(graphicsConfig, "resourceType", ';').ifBlank { "auto" }) }
     var bcnEmulation by remember { mutableStateOf(readConfig(graphicsConfig, "bcnEmulation", ';').ifBlank { "auto" }) }
     var bcnType by remember { mutableStateOf(readConfig(graphicsConfig, "bcnEmulationType", ';').ifBlank { "compute" }) }
@@ -206,11 +208,12 @@ internal fun ContainerRuntimePane(
                         driverVersion = it; saveGraphics("version", it)
                     }
                 }
-                SettingsDivider(); SettingChoice("Vulkan Version", vulkanVersion, listOf("1.1", "1.2", "1.3")) { vulkanVersion = it; saveGraphics("vulkanVersion", it) }
+                SettingsDivider(); SettingChoice("Vulkan Version", vulkanVersion, listOf("1.1", "1.2", "1.3", "1.4")) { vulkanVersion = it; saveGraphics("vulkanVersion", it) }
                 SettingsDivider(); SettingChoice("Max Device Memory", maxDeviceMemory, listOf("0", "512", "1024", "2048", "4096", "8192", "12288", "16384")) { maxDeviceMemory = it; saveGraphics("maxDeviceMemory", it) }
                 SettingsDivider(); SettingChoice("Driver Present Mode", graphicsPresentMode, listOf("mailbox", "fifo", "immediate", "relaxed")) { graphicsPresentMode = it; saveGraphics("presentMode", it) }
                 SettingsDivider(); SettingToggle("Sync Frame", syncFrame) { syncFrame = it; saveGraphics("syncFrame", if (it) "1" else "0") }
                 SettingsDivider(); SettingToggle("Disable Present Wait", disablePresentWait) { disablePresentWait = it; saveGraphics("disablePresentWait", if (it) "1" else "0") }
+                SettingsDivider(); SettingToggle("Enable DXVK timeline semaphores", timelineSemaphores) { timelineSemaphores = it; saveGraphics("timelineSemaphores", if (it) "1" else "0") }
                 SettingsDivider(); SettingChoice("Resource Type", resourceType, listOf("auto", "dmabuf", "ahb", "opaque")) { resourceType = it; saveGraphics("resourceType", it) }
                 SettingsDivider(); SettingChoice("BCN Emulation", bcnEmulation, listOf("none", "partial", "full", "auto")) { bcnEmulation = it; saveGraphics("bcnEmulation", it) }
                 SettingsDivider(); SettingChoice("BCN Emulation Type", bcnType, listOf("software", "compute")) { bcnType = it; saveGraphics("bcnEmulationType", it) }

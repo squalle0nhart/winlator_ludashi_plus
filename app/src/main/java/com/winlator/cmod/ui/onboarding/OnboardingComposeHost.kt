@@ -39,6 +39,7 @@ data class OnboardingComponent @JvmOverloads constructor(
 )
 
 interface OnboardingCallbacks {
+    fun onContentsSourceSelected(url: String)
     fun onInstall(componentId: String)
     fun onRemove(componentId: String)
     fun onInstallBundledRuntime()
@@ -108,6 +109,7 @@ object OnboardingComposeHost {
         initialBundledWineInstalled: Boolean,
         initialBundledWineInUse: Boolean,
         componentManagerMode: Boolean,
+        initialContentsUrl: String,
         callbacks: OnboardingCallbacks
     ): OnboardingComposeController {
         val ready = mutableStateOf(initialCoreReady)
@@ -149,6 +151,7 @@ object OnboardingComposeHost {
                     containerPreparing,
                     containerReady,
                     componentManagerMode,
+                    initialContentsUrl,
                     callbacks
                 )
             }
@@ -243,11 +246,13 @@ private fun OnboardingFlow(
     containerPreparing: MutableState<Boolean>,
     containerReady: MutableState<Boolean>,
     managerMode: Boolean,
+    initialContentsUrl: String,
     cb: OnboardingCallbacks
 ) {
     var page by rememberSaveable(managerMode) {
         mutableStateOf(if (managerMode) OnboardingPage.Components else OnboardingPage.Theme)
     }
+    var contentsUrl by rememberSaveable { mutableStateOf(initialContentsUrl) }
 
     val hasInstalledRuntime = bundledInstalled.value || components.value.any {
         it.installed && (it.type == "Wine" || it.type == "Proton") && !it.runtimeIdentifier.isNullOrBlank()
@@ -269,7 +274,12 @@ private fun OnboardingFlow(
         )
 
         OnboardingPage.Theme -> OnboardingThemeScreen(
-            onContinue = { page = OnboardingPage.Components }
+            contentsUrl = contentsUrl,
+            onContentsUrlChanged = { contentsUrl = it },
+            onContinue = {
+                cb.onContentsSourceSelected(contentsUrl)
+                page = OnboardingPage.Components
+            }
         )
 
         OnboardingPage.Components -> OnboardingComponentsScreen(

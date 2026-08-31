@@ -53,6 +53,11 @@ import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.container.ContainerManager;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.core.WineThemeManager;
+import com.winlator.cmod.store.AmazonMainActivity;
+import com.winlator.cmod.store.DownloadsActivity;
+import com.winlator.cmod.store.EpicMainActivity;
+import com.winlator.cmod.store.GogMainActivity;
+import com.winlator.cmod.store.SteamMainActivity;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 import com.winlator.cmod.services.NotificationService;
 
@@ -399,6 +404,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 break;
             case R.id.main_menu_about:
                 showAboutDialog();
+                break;
+            case R.id.main_menu_gog:
+                startActivity(new Intent(this, GogMainActivity.class));
+                break;
+            case R.id.main_menu_epic:
+                startActivity(new Intent(this, EpicMainActivity.class));
+                break;
+            case R.id.main_menu_amazon:
+                startActivity(new Intent(this, AmazonMainActivity.class));
+                break;
+            case R.id.main_menu_steam:
+                startActivity(new Intent(this, SteamMainActivity.class));
+                break;
+            case R.id.main_menu_downloads:
+                startActivity(new Intent(this, DownloadsActivity.class));
                 break;
         }
         return true;

@@ -25,6 +25,16 @@ import java.util.Map;
 public class ContentsManager {
     public static final String PROFILE_NAME = "profile.json";
     public static final String REMOTE_PROFILES = "https://raw.githubusercontent.com/StevenMXZ/Winlator-Contents/main/contents.json";
+    public static final String REMOTE_PROFILES_NICHOLASX417 = "https://raw.githubusercontent.com/nicholasx417/WinNative-Components/refs/heads/main/contents.json";
+    public static final String REMOTE_PROFILES_THE412BANNER = "https://raw.githubusercontent.com/The412Banner/winlator-contents/main/contents.json";
+
+    public static int getRemoteProfilesSource(String url) {
+        if (REMOTE_PROFILES.equals(url)) return 0;
+        if (REMOTE_PROFILES_NICHOLASX417.equals(url)) return 1;
+        if (REMOTE_PROFILES_THE412BANNER.equals(url)) return 2;
+        return 3;
+    }
+
     public static final String[] DXVK_TRUST_FILES = {"${system32}/d3d8.dll", "${system32}/d3d9.dll", "${system32}/d3d10.dll", "${system32}/d3d10_1.dll",
             "${system32}/d3d10core.dll", "${system32}/d3d11.dll", "${system32}/dxgi.dll", "${syswow64}/d3d8.dll", "${syswow64}/d3d9.dll", "${syswow64}/d3d10.dll",
             "${syswow64}/d3d10_1.dll", "${syswow64}/d3d10core.dll", "${syswow64}/d3d11.dll", "${syswow64}/dxgi.dll"};

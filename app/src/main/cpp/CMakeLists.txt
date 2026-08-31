@@ -61,68 +61,29 @@ target_link_libraries(fakeinput
 
 set(VULKAN_RENDERER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/winlator/renderer/vulkan)
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
-    COMMAND glslangValidator -V --vn window_vert_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
-            ${VULKAN_RENDERER_DIR}/window.vert
-    DEPENDS ${VULKAN_RENDERER_DIR}/window.vert
-    COMMENT "Compiling window.vert → window_vert.h"
-)
+function(compile_shader_header source_file output_file variable_name description)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${output_file}
+        COMMAND ${CMAKE_COMMAND}
+                -DGLSL_COMPILER=${GLSL_COMPILER}
+                -DGLSLANG_VALIDATOR=${GLSLANG_VALIDATOR}
+                -DSOURCE_FILE=${VULKAN_RENDERER_DIR}/${source_file}
+                -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/${output_file}
+                -DVARIABLE_NAME=${variable_name}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/compile_shader.cmake
+        DEPENDS ${VULKAN_RENDERER_DIR}/${source_file} ${CMAKE_CURRENT_SOURCE_DIR}/compile_shader.cmake
+        COMMENT "${description}"
+        VERBATIM
+    )
+endfunction()
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
-    COMMAND glslangValidator -V --vn window_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
-            ${VULKAN_RENDERER_DIR}/window.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window.frag
-    COMMENT "Compiling window.frag → window_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
-    COMMAND glslangValidator -V --vn window_sgsr_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
-            ${VULKAN_RENDERER_DIR}/window_sgsr.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_sgsr.frag
-    COMMENT "Compiling window_sgsr.frag → window_sgsr_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_fsr1_frag.h
-    COMMAND glslangValidator -V --vn window_fsr1_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_fsr1_frag.h
-            ${VULKAN_RENDERER_DIR}/window_fsr1.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_fsr1.frag
-    COMMENT "Compiling single-pass FSR → window_fsr1_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
-    COMMAND glslangValidator -V --vn window_lanczos_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
-            ${VULKAN_RENDERER_DIR}/window_lanczos.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_lanczos.frag
-    COMMENT "Compiling Lanczos 2 → window_lanczos_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
-    COMMAND glslangValidator -V --vn window_stretch_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
-            ${VULKAN_RENDERER_DIR}/window_stretch.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_stretch.frag
-    COMMENT "Compiling window_stretch.frag → window_stretch_frag.h"
-)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
-    COMMAND glslangValidator -V --vn window_postfx_frag_code
-            -x -o ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
-            ${VULKAN_RENDERER_DIR}/window_postfx.frag
-    DEPENDS ${VULKAN_RENDERER_DIR}/window_postfx.frag
-    COMMENT "Compiling window_postfx.frag → window_postfx_frag.h"
-)
+compile_shader_header(window.vert window_vert.h window_vert_code "Compiling window.vert → window_vert.h")
+compile_shader_header(window.frag window_frag.h window_frag_code "Compiling window.frag → window_frag.h")
+compile_shader_header(window_sgsr.frag window_sgsr_frag.h window_sgsr_frag_code "Compiling window_sgsr.frag → window_sgsr_frag.h")
+compile_shader_header(window_fsr1.frag window_fsr1_frag.h window_fsr1_frag_code "Compiling single-pass FSR → window_fsr1_frag.h")
+compile_shader_header(window_lanczos.frag window_lanczos_frag.h window_lanczos_frag_code "Compiling Lanczos 2 → window_lanczos_frag.h")
+compile_shader_header(window_stretch.frag window_stretch_frag.h window_stretch_frag_code "Compiling window_stretch.frag → window_stretch_frag.h")
+compile_shader_header(window_postfx.frag window_postfx_frag.h window_postfx_frag_code "Compiling window_postfx.frag → window_postfx_frag.h")
 
 set(VULKAN_CONTEXT_SOURCE ${VULKAN_RENDERER_DIR}/VulkanRendererContext.cpp)
 set(VULKAN_CONTEXT_LEGACY ${CMAKE_CURRENT_BINARY_DIR}/VulkanRendererContext_legacy.cpp)

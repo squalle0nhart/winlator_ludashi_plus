@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.winlator.star" >
+    <!--
+ FusionHUD library: pure UI overlay views. No components, no launcher, no permissions.
+         BatteryManager / procfs / sysfs reads used by HudMetrics need no runtime permission.
+    -->
+    <uses-sdk android:minSdkVersion="26" />
+
+</manifest>

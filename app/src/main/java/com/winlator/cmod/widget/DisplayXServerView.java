@@ -5,11 +5,13 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import androidx.annotation.Keep;
 import com.winlator.cmod.renderer.GPUImage;
+import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Cursor;
 import com.winlator.cmod.xserver.CursorManager;
 import com.winlator.cmod.xserver.Drawable;
 import com.winlator.cmod.xserver.Pointer;
+import com.winlator.cmod.xserver.Property;
 import com.winlator.cmod.xserver.Window;
 import com.winlator.cmod.xserver.WindowAttributes;
 import com.winlator.cmod.xserver.WindowManager;
@@ -19,7 +21,7 @@ import java.nio.ByteBuffer;
 
 public class DisplayXServerView extends XServerRendererView implements SurfaceHolder.Callback, WindowManager.OnWindowModificationListener, Pointer.OnPointerMotionListener, CursorManager.OnCursorModificationListener {
     private Context context;
-    private boolean fullscreen = false;
+    private int fullscreenMode = ViewTransformation.FULLSCREEN_OFF;
     private String[] unviewableWMClasses = null;
     private boolean cursorVisible = true;
     private int fpsWindowId = -1;
@@ -95,8 +97,8 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Override
     public void toggleFullscreen() {
-        fullscreen = !fullscreen;
-        nativeToggleFullscreen();
+        setFullscreenMode(isFullscreen()
+                ? ViewTransformation.FULLSCREEN_OFF : ViewTransformation.FULLSCREEN_STRETCH);
     }
 
     @Override
@@ -112,7 +114,21 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Override
     public boolean isFullscreen() {
-        return fullscreen;
+        return fullscreenMode != ViewTransformation.FULLSCREEN_OFF;
+    }
+
+    @Override
+    public int getFullscreenMode() {
+        return fullscreenMode;
+    }
+
+    @Override
+    public void setFullscreenMode(int mode) {
+        if (mode < ViewTransformation.FULLSCREEN_OFF || mode > ViewTransformation.FULLSCREEN_INTEGER)
+            mode = ViewTransformation.FULLSCREEN_OFF;
+        if (mode == fullscreenMode) return;
+        fullscreenMode = mode;
+        nativeSetFullscreenMode(mode);
     }
 
     @Override
@@ -142,19 +158,27 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Override
     public void onMapWindow(Window window) {
-        if (unviewableWMClasses != null) {
-            String wmClass = window.getClassName();
-            for (String cls : unviewableWMClasses) {
-                if (wmClass.contains(cls)) {
-                    if (window.attributes.isEnabled()) {
-                        window.disableAllDescendants();
-                    }
-                    break;
-                }
+        if (hideUnviewableWindow(window, window.getClassName(), false)) return;
+        nativeMapWindow(window.id);
+    }
+
+    @Override
+    public void onModifyWindowProperty(Window window, Property property) {
+        if ("WM_CLASS".equals(property.nameAsString())) {
+            hideUnviewableWindow(window, property.toString(), true);
+        }
+    }
+
+    private boolean hideUnviewableWindow(Window window, String wmClass, boolean unmap) {
+        if (unviewableWMClasses == null || wmClass == null) return false;
+        for (String cls : unviewableWMClasses) {
+            if (wmClass.toLowerCase(java.util.Locale.ROOT).contains(cls.toLowerCase(java.util.Locale.ROOT))) {
+                if (window.attributes.isEnabled()) window.disableAllDescendants();
+                if (unmap) nativeUnmapWindow(window.id);
+                return true;
             }
         }
-
-        nativeMapWindow(window.id);
+        return false;
     }
 
     @Override
@@ -257,7 +281,7 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
     @FastNative
     public native void nativePointerMove(int x, int y);
     @FastNative
-    public native void nativeToggleFullscreen();
+    public native void nativeSetFullscreenMode(int mode);
     @FastNative
     public native void nativeSetCursorVisible(boolean visible);
     @FastNative
