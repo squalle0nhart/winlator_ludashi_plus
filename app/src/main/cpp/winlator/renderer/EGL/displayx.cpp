@@ -1,6 +1,7 @@
 #include "displayx.hpp"
 
 #include <android/api-level.h>
+#include <android/choreographer.h>
 #include <android/log.h>
 #include <android/rect.h>
 
@@ -42,10 +43,14 @@ using STSetZOrderFn = void (*)(void*, void*, int32_t);
 using STReparentFn = void (*)(void*, void*, void*);
 using STSetTransparencyFn = void (*)(void*, void*, int8_t);
 using STSetBackPressureFn = void (*)(void*, void*, bool);
+using STSetFrameTimelineFn = void (*)(void*, int64_t);
 using TransactionCallback = void (*)(void*, void*);
 using STSetCallbackFn = void (*)(void*, void*, TransactionCallback);
 using ChoreographerGetFn = void* (*)();
 using ChoreographerPostFn = void (*)(void*, void (*)(int64_t, void*), void*);
+using ChoreographerPostVsyncFn = void (*)(void*, void (*)(const AChoreographerFrameCallbackData*, void*), void*);
+using ChoreographerGetFrameTimelineVsyncIdFn = int64_t (*)(const AChoreographerFrameCallbackData*, size_t);
+using ChoreographerGetPreferredTimelineIndexFn = size_t (*)(const AChoreographerFrameCallbackData*);
 using PerformanceGetManagerFn = void* (*)();
 using PerformanceCreateSessionFn = void* (*)(void*, const int32_t*, size_t, int64_t);
 using PerformanceReportFn = int (*)(void*, int64_t);
@@ -67,9 +72,13 @@ static STSetZOrderFn pSTSetZOrder = nullptr;
 static STReparentFn pSTReparent = nullptr;
 static STSetTransparencyFn pSTSetTransparency = nullptr;
 static STSetBackPressureFn pSTSetBackPressure = nullptr;
+static STSetFrameTimelineFn pSTSetFrameTimeline = nullptr;
 static STSetCallbackFn pSTSetOnComplete = nullptr;
 static ChoreographerGetFn pChoreographerGet = nullptr;
 static ChoreographerPostFn pChoreographerPost = nullptr;
+static ChoreographerPostVsyncFn pChoreographerPostVsync = nullptr;
+static ChoreographerGetFrameTimelineVsyncIdFn pChoreographerGetFrameTimelineVsyncId = nullptr;
+static ChoreographerGetPreferredTimelineIndexFn pChoreographerGetPreferredTimelineIndex = nullptr;
 static PerformanceGetManagerFn pPerformanceGetManager = nullptr;
 static PerformanceCreateSessionFn pPerformanceCreateSession = nullptr;
 static PerformanceReportFn pPerformanceReport = nullptr;
@@ -108,9 +117,13 @@ static bool loadDisplayXApi() {
         pSTReparent = DX_SYMBOL("ASurfaceTransaction_reparent", STReparentFn);
         pSTSetTransparency = DX_SYMBOL("ASurfaceTransaction_setBufferTransparency", STSetTransparencyFn);
         pSTSetBackPressure = DX_SYMBOL("ASurfaceTransaction_setEnableBackPressure", STSetBackPressureFn);
+        pSTSetFrameTimeline = DX_SYMBOL("ASurfaceTransaction_setFrameTimeline", STSetFrameTimelineFn);
         pSTSetOnComplete = DX_SYMBOL("ASurfaceTransaction_setOnComplete", STSetCallbackFn);
         pChoreographerGet = DX_SYMBOL("AChoreographer_getInstance", ChoreographerGetFn);
         pChoreographerPost = DX_SYMBOL("AChoreographer_postFrameCallback64", ChoreographerPostFn);
+        pChoreographerPostVsync = DX_SYMBOL("AChoreographer_postVsyncCallback", ChoreographerPostVsyncFn);
+        pChoreographerGetFrameTimelineVsyncId = DX_SYMBOL("AChoreographerFrameCallbackData_getFrameTimelineVsyncId", ChoreographerGetFrameTimelineVsyncIdFn);
+        pChoreographerGetPreferredTimelineIndex = DX_SYMBOL("AChoreographerFrameCallbackData_getPreferredFrameTimelineIndex", ChoreographerGetPreferredTimelineIndexFn);
         pPerformanceGetManager = DX_SYMBOL("APerformanceHint_getManager", PerformanceGetManagerFn);
         pPerformanceCreateSession = DX_SYMBOL("APerformanceHint_createSession", PerformanceCreateSessionFn);
         pPerformanceReport = DX_SYMBOL("APerformanceHint_reportActualWorkDuration", PerformanceReportFn);
@@ -205,6 +218,28 @@ void DisplayX::onFrameCallback64(int64_t, void *data) {
 
     if (!self->stopped && self->choreographer)
         pChoreographerPost(self->choreographer, DisplayX::onFrameCallback64, self);
+}
+
+void DisplayX::onVsyncCallback(const AChoreographerFrameCallbackData *callbackData,
+                               void *data) {
+    auto *self = static_cast<DisplayX *>(data);
+    if (!self || self->stopped) return;
+
+    if (self->cursorUpdate && self->hasSurface && !self->paused)
+        self->eventLock.notify();
+
+    size_t index = pChoreographerGetPreferredTimelineIndex(callbackData);
+    {
+        auto lock = self->presentLock.lock();
+        self->vsyncId = pChoreographerGetFrameTimelineVsyncId(callbackData, index);
+        if (!self->presentRequests.empty() && self->presentAtRefreshRate) {
+            self->requestUpdate = true;
+            self->presentLock.notify();
+        }
+    }
+
+    if (!self->stopped && self->choreographer)
+        pChoreographerPostVsync(self->choreographer, DisplayX::onVsyncCallback, self);
 }
 
 void DisplayX::networkThreadLoop() {
@@ -617,6 +652,8 @@ void DisplayX::presentThreadLoop() {
         std::queue<std::unique_ptr<PresentRequest>> requests;
         while (!presentRequests.empty())
             requests.push(presentRequests.pop());
+        if (vsyncId >= 0 && pSTSetFrameTimeline)
+            pSTSetFrameTimeline(presentTransaction, vsyncId);
         if (presentAtRefreshRate) requestUpdate = false;
         lock.unlock();
         int64_t workStarted = getCurrentTimeNanos();
@@ -701,6 +738,7 @@ void DisplayX::start() {
     hasSurface = false;
     surfaceChanged = false;
     requestUpdate = false;
+    vsyncId = -1;
     eventsPending = 0;
 
     networkWakeFd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
@@ -715,8 +753,15 @@ void DisplayX::start() {
     presentThread = std::thread(&DisplayX::presentThreadLoop, this);
 
     choreographer = pChoreographerGet();
-    if (choreographer)
-        pChoreographerPost(choreographer, DisplayX::onFrameCallback64, this);
+    if (choreographer) {
+        bool preciseSupported = pChoreographerPostVsync &&
+            pChoreographerGetFrameTimelineVsyncId &&
+            pChoreographerGetPreferredTimelineIndex && pSTSetFrameTimeline;
+        if (precisePresentation && preciseSupported)
+            pChoreographerPostVsync(choreographer, DisplayX::onVsyncCallback, this);
+        else
+            pChoreographerPost(choreographer, DisplayX::onFrameCallback64, this);
+    }
 }
 
 void DisplayX::stop() {
@@ -1095,4 +1140,8 @@ void DisplayX::setPresentAtRefreshRate(bool enabled) {
 
 void DisplayX::setBackPressure(bool enabled) {
     backPressure = enabled;
+}
+
+void DisplayX::setPrecisePresentation(bool enabled) {
+    precisePresentation = enabled;
 }

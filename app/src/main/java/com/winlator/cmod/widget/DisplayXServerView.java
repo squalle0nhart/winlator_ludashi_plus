@@ -41,13 +41,14 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
     }
 
     public DisplayXServerView(Context context, XServer xserver) {
-        this(context, xserver, true, true, false);
+        this(context, xserver, true, true, false, false);
     }
 
     public DisplayXServerView(Context context, XServer xserver,
                               boolean performanceMode,
                               boolean presentAtRefreshRate,
-                              boolean backPressure) {
+                              boolean backPressure,
+                              boolean precisePresentation) {
         super(context, xserver);
         this.context = context;
         getHolder().addCallback(this);
@@ -56,7 +57,8 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
         xServer.pointer.addOnPointerMotionListener(this);
         xServer.cursorManager.addOnCursorModificationListener(this);
         nativeInit(this.context, xServer, getDisplayRefreshRate(context),
-                   performanceMode, presentAtRefreshRate, backPressure);
+                   performanceMode, presentAtRefreshRate, backPressure,
+                   precisePresentation);
     }
 
     private static float getDisplayRefreshRate(Context context) {
@@ -261,7 +263,8 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
     public native void nativeInit(Context context, XServer xserver, float refreshRate,
                                   boolean performanceMode,
                                   boolean presentAtRefreshRate,
-                                  boolean backPressure);
+                                  boolean backPressure,
+                                  boolean precisePresentation);
     @FastNative
     public native void nativeChangeSurface(int width, int height);
     @FastNative

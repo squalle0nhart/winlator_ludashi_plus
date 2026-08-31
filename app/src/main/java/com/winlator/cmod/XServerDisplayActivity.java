@@ -1194,12 +1194,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean backPressure = shortcut != null
                     ? shortcut.getDisplayXBackPressure()
                     : container != null && container.getDisplayXBackPressure();
+            boolean precisePresentation = shortcut != null
+                    ? shortcut.getDisplayXPrecisePresentation()
+                    : container != null && container.getDisplayXPrecisePresentation();
             xServerView = new DisplayXServerView(
                     this,
                     xServer,
                     performanceMode,
                     presentAtRefreshRate,
-                    backPressure);
+                    backPressure,
+                    precisePresentation);
         } else if (useEGL) {
             EGLXServerView.loadNativeLibrary();
             xServerView = new EGLXServerView(this, xServer);

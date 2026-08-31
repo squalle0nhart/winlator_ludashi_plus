@@ -194,6 +194,13 @@ public class Container {
         putExtra("displayXBackPressure", v ? "1" : "0");
     }
 
+    public boolean getDisplayXPrecisePresentation() {
+        return "1".equals(getExtra("displayXPrecisePresentation", "0"));
+    }
+    public void setDisplayXPrecisePresentation(boolean v) {
+        putExtra("displayXPrecisePresentation", v ? "1" : "0");
+    }
+
     public boolean isLsfgEnabled() {
         String value = getExtra("lsfgEnabled", "false");
         return "1".equals(value) || "true".equalsIgnoreCase(value);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <android/hardware_buffer.h>
+#include <android/choreographer.h>
 #include <android/native_window.h>
 
 #include <atomic>
@@ -139,8 +140,10 @@ class DisplayX {
         std::atomic_bool performanceMode{true};
         std::atomic_bool presentAtRefreshRate{true};
         std::atomic_bool backPressure{false};
+        std::atomic_bool precisePresentation{false};
 
         bool requestUpdate = false;
+        int64_t vsyncId = -1;
         int fullscreenMode = 0;
         int eventsPending = 0;
         int networkWakeFd = -1;
@@ -149,6 +152,8 @@ class DisplayX {
         void networkThreadLoop();
         void presentThreadLoop();
         static void onFrameCallback64(int64_t frameTimeNanos, void *data);
+        static void onVsyncCallback(const AChoreographerFrameCallbackData *callbackData,
+                                    void *data);
         static void onCompleteCallback(void *context, void *stats);
         static void releasePresentRequest(std::unique_ptr<PresentRequest> request);
         int64_t getCurrentTimeNanos();
@@ -196,4 +201,5 @@ class DisplayX {
         void setPerformanceMode(bool enabled);
         void setPresentAtRefreshRate(bool enabled);
         void setBackPressure(bool enabled);
+        void setPrecisePresentation(bool enabled);
 };

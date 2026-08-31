@@ -334,6 +334,14 @@ public class Shortcut {
         putExtra("displayXBackPressure", v ? "1" : "0");
     }
 
+    public boolean getDisplayXPrecisePresentation() {
+        String v = getExtra("displayXPrecisePresentation", null);
+        return v != null ? v.equals("1") : container.getDisplayXPrecisePresentation();
+    }
+    public void setDisplayXPrecisePresentation(boolean v) {
+        putExtra("displayXPrecisePresentation", v ? "1" : "0");
+    }
+
     public String getRendererPresentMode() {
         String v = getExtra("rendererPresentMode", null);
         return v != null && !v.isEmpty() ? v : container.getRendererPresentMode();
