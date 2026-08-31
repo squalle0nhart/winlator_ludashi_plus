@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cerrno>
+#include <chrono>
 #include <climits>
 #include <cstring>
 #include <dlfcn.h>
@@ -416,7 +417,7 @@ void DisplayX::networkThreadLoop() {
 
                 auto lock = presentLock.lock();
                 presentRequests.push(request);
-                if (!presentAtRefreshRate) presentLock.notify();
+                presentLock.notify();
             } else if (requestCode == DESTROY_CLIENT_SWAPCHAIN) {
                 uint8_t id = 0;
                 if (!readExact(fd, &id, sizeof(id))) {
@@ -491,6 +492,8 @@ void DisplayX::eventThreadLoop() {
             restoreControlState();
             restoreState = false;
         }
+
+        if (currentState != State::NONE) presentLock.notify();
 
         if (!eventQueue.empty() && hasSurface && surfaceChanged && !paused) {
             function = std::move(eventQueue.front());
@@ -595,13 +598,21 @@ void DisplayX::presentThreadLoop() {
     while (true) {
         auto lock = presentLock.lock();
         presentLock.wait(lock, [&] {
-            bool presentationReady = presentAtRefreshRate
-                ? requestUpdate && !presentRequests.empty()
-                : !presentRequests.empty();
-            return stopped || (eventsPending == 0 && presentationReady &&
+            return stopped || (eventsPending == 0 && !presentRequests.empty() &&
                                hasSurface && surfaceChanged && !paused);
         });
         if (stopped) break;
+
+        if (presentAtRefreshRate && !requestUpdate) {
+            int64_t frameNanos = static_cast<int64_t>(1000000000.0f /
+                std::max(1.0f, xServer->refreshRate));
+            presentLock.cv.wait_for(lock, std::chrono::nanoseconds(frameNanos), [&] {
+                return stopped || requestUpdate || !presentAtRefreshRate;
+            });
+            if (stopped) break;
+            if (eventsPending != 0 || presentRequests.empty() || !hasSurface ||
+                !surfaceChanged || paused) continue;
+        }
 
         std::queue<std::unique_ptr<PresentRequest>> requests;
         while (!presentRequests.empty())
@@ -791,7 +802,7 @@ void DisplayX::requestWindowUpdate(Window *window) {
     auto lock = presentLock.lock();
     if (!presentRequests.push(request))
         releasePresentRequest(std::move(request));
-    if (!presentAtRefreshRate) presentLock.notify();
+    presentLock.notify();
 }
 
 void DisplayX::requestCursorUpdate() {
@@ -833,6 +844,8 @@ void DisplayX::destroyWindowControl(Window *window) {
 
 void DisplayX::mapWindow(Window *window) {
     if (!window || !window->control || !windowTransaction) return;
+    if (!window->enabled)
+        pSTSetBuffer(windowTransaction, window->control, nullptr, -1);
     pSTSetVisibility(windowTransaction, window->control, SURFACE_VISIBILITY_SHOW);
     pSTApply(windowTransaction);
 }

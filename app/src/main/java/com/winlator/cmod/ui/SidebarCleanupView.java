@@ -350,7 +350,7 @@ public class SidebarCleanupView extends View {
         String filterValue = store.getExtra("graphicsFilterMode", "");
         if (!filterValue.isEmpty()) {
             int filter = parseInt(filterValue, 0);
-            if (filter > 0 && upscaler.getCount() > 0) {
+            if (filter >= 2 && upscaler.getCount() > 0) {
                 int position = Math.max(0, Math.min(upscaler.getCount() - 1, filter - 2));
                 upscaler.setSelection(position, false);
                 fsr.setChecked(true);

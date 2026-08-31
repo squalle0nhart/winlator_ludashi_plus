@@ -7,6 +7,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Favorite
@@ -40,6 +44,7 @@ import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -92,6 +97,7 @@ internal fun LibraryRoot(
     grid: Boolean,
     query: String,
     selectedShortcutPath: MutableState<String?>,
+    showAddGame: MutableState<Boolean>,
     cb: LibraryCallbacks
 ) {
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.All.name) }
@@ -101,6 +107,7 @@ internal fun LibraryRoot(
             LibraryFilter.All -> items
             LibraryFilter.Favorites -> items.filter { it.favorite }
             LibraryFilter.Recent -> items.asReversed()
+            LibraryFilter.Store -> emptyList()
         }
         if (query.isBlank()) source else source.filter { it.name.contains(query, true) }
     }
@@ -127,10 +134,11 @@ internal fun LibraryRoot(
                     activity = activity,
                     grid = grid,
                     onArtwork = true,
+                    onAddGame = { showAddGame.value = true },
                     onGridViewChanged = cb::onGridViewChanged
                 )
                 Spacer(Modifier.height(7.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     LibraryFilter.values().forEach { option ->
                         LibraryFilterChip(option.name, option == filter) { filterName = option.name }
                     }
@@ -141,6 +149,7 @@ internal fun LibraryRoot(
             }
         )
         menu?.let { LibraryItemMenuCompat(it, cb) { menu = null } }
+        if (showAddGame.value) AddGameSheet(cb) { showAddGame.value = false }
         return
     }
 
@@ -150,16 +159,22 @@ internal fun LibraryRoot(
                 activity = activity,
                 grid = grid,
                 onArtwork = false,
+                onAddGame = { showAddGame.value = true },
                 onGridViewChanged = cb::onGridViewChanged
             )
             Spacer(Modifier.height(7.dp))
         }
-        Row(Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.padding(vertical = 12.dp).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             LibraryFilter.values().forEach { option ->
                 LibraryFilterChip(option.name, option == filter) { filterName = option.name }
             }
         }
-        if (visible.isEmpty()) {
+        if (filter == LibraryFilter.Store) {
+            StoreList(cb)
+        } else if (visible.isEmpty()) {
             if (query.isNotBlank() || (filter != LibraryFilter.All && items.isNotEmpty())) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -170,7 +185,7 @@ internal fun LibraryRoot(
             } else {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Surface(
-                        onClick = { activity?.navigateToMainDestination(R.id.main_menu_file_manager) },
+                        onClick = { showAddGame.value = true },
                         modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
                         color = MaterialTheme.colorScheme.surface,
@@ -207,6 +222,7 @@ internal fun LibraryRoot(
             }
         }
     }
+    if (showAddGame.value) AddGameSheet(cb) { showAddGame.value = false }
 }
 
 @Composable
@@ -214,6 +230,7 @@ private fun LibraryLandscapeHeader(
     activity: MainActivity?,
     grid: Boolean,
     onArtwork: Boolean,
+    onAddGame: () -> Unit,
     onGridViewChanged: (Boolean) -> Unit
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -227,7 +244,7 @@ private fun LibraryLandscapeHeader(
         LibraryTopIcon(if (grid) Icons.Outlined.ViewList else Icons.Outlined.GridView, false) {
             onGridViewChanged(!grid)
         }
-        LibraryTopIcon(Icons.Outlined.Add, false) { activity?.navigateToMainDestination(R.id.main_menu_file_manager) }
+        LibraryTopIcon(Icons.Outlined.Add, false, onAddGame)
         LibraryTopIcon(Icons.Outlined.Home, true) {}
         LibraryTopIcon(Icons.Outlined.SportsEsports, false) { activity?.navigateToMainDestination(R.id.main_menu_input_controls) }
         LibraryTopIcon(Icons.Outlined.Settings, false) { activity?.navigateToMainDestination(R.id.main_menu_settings) }
@@ -298,6 +315,72 @@ private fun LibraryFilterChip(label: String, selected: Boolean, click: () -> Uni
         color = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) { Text(label, Modifier.padding(horizontal = 15.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge) }
+}
+
+@Composable
+private fun StoreList(cb: LibraryCallbacks) {
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 680.dp).padding(top = 4.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Text("Game stores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        StoreRow("Steam", "Steam library and downloads") { cb.onOpenStore("steam") }
+        StoreRow("GOG", "DRM-free games") { cb.onOpenStore("gog") }
+        StoreRow("Epic Games", "Epic Games library") { cb.onOpenStore("epic") }
+        StoreRow("Amazon Games", "Amazon Games library") { cb.onOpenStore("amazon") }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddGameSheet(cb: LibraryCallbacks, close: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = close,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            Modifier.fillMaxWidth().widthIn(max = 680.dp).verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp).padding(bottom = 28.dp)
+        ) {
+            Text("Add game", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text("From local", Modifier.padding(top = 20.dp, bottom = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AddGameRow(Icons.Outlined.Computer, "Local files", "Browse for a game on this device") {
+                close()
+                cb.onAddLocal()
+            }
+            Text("From store", Modifier.padding(top = 20.dp, bottom = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AddGameRow(Icons.Outlined.Storefront, "Steam", "Open Steam") { close(); cb.onOpenStore("steam") }
+            AddGameRow(Icons.Outlined.Storefront, "GOG", "Open GOG") { close(); cb.onOpenStore("gog") }
+            AddGameRow(Icons.Outlined.Storefront, "Epic Games", "Open Epic Games") { close(); cb.onOpenStore("epic") }
+            AddGameRow(Icons.Outlined.Storefront, "Amazon Games", "Open Amazon Games") { close(); cb.onOpenStore("amazon") }
+        }
+    }
+}
+
+@Composable
+private fun AddGameRow(icon: ImageVector, title: String, subtitle: String, click: () -> Unit) {
+    Surface(
+        onClick = click,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, modifier = Modifier.size(25.dp))
+            Spacer(Modifier.width(13.dp))
+            Column {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StoreRow(title: String, subtitle: String, click: () -> Unit) {
+    AddGameRow(Icons.Outlined.Storefront, title, subtitle, click)
 }
 
 @OptIn(ExperimentalFoundationApi::class)

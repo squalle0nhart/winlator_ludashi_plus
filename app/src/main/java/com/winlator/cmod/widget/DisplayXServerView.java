@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import androidx.annotation.Keep;
+import com.winlator.cmod.XServerDisplayActivity;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.xserver.Bitmask;
@@ -158,23 +159,23 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Override
     public void onMapWindow(Window window) {
-        if (hideUnviewableWindow(window, window.getClassName(), false)) return;
+        disableUnviewableWindow(window, window.getClassName());
         nativeMapWindow(window.id);
     }
 
     @Override
     public void onModifyWindowProperty(Window window, Property property) {
         if ("WM_CLASS".equals(property.nameAsString())) {
-            hideUnviewableWindow(window, property.toString(), true);
+            if (disableUnviewableWindow(window, property.toString()))
+                nativeMapWindow(window.id);
         }
     }
 
-    private boolean hideUnviewableWindow(Window window, String wmClass, boolean unmap) {
+    private boolean disableUnviewableWindow(Window window, String wmClass) {
         if (unviewableWMClasses == null || wmClass == null) return false;
         for (String cls : unviewableWMClasses) {
             if (wmClass.toLowerCase(java.util.Locale.ROOT).contains(cls.toLowerCase(java.util.Locale.ROOT))) {
-                if (window.attributes.isEnabled()) window.disableAllDescendants();
-                if (unmap) nativeUnmapWindow(window.id);
+                window.attributes.setEnabled(false);
                 return true;
             }
         }
@@ -204,7 +205,7 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Override
     public void onUpdateWindowContentDirect(Window window, Drawable drawable) {
-        nativeUpdateDirectContent(window.id, drawable.id, (short) 0, (short) 0);
+        onUpdateWindowContentDirect(window, drawable, (short) 0, (short) 0);
     }
 
     @Override
@@ -214,6 +215,7 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
             if (classicHudRef != null) classicHudRef.update();
         }
         nativeUpdateDirectContent(window.id, drawable.id, xOff, yOff);
+        notifyRendererFrame(window);
     }
 
     @Override
@@ -310,9 +312,15 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
 
     @Keep
     public void onNativeFramePresented(int windowId) {
+        notifyRendererFrame(xServer.windowManager.getWindow(windowId));
         if (windowId != fpsWindowId) return;
         if (hudRef != null) hudRef.onFrame();
         if (classicHudRef != null) classicHudRef.update();
+    }
+
+    private void notifyRendererFrame(Window window) {
+        if (window != null && context instanceof XServerDisplayActivity)
+            ((XServerDisplayActivity) context).onRendererFrame(window);
     }
 
     @Override

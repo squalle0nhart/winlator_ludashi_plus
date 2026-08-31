@@ -70,6 +70,7 @@ public class OnboardingActivity extends AppCompatActivity {
     public static final String EXTRA_AUTO_INSTALL_VERSION_CODE = "auto_install_version_code";
 
     private static final String PREF_INITIAL_WINE = "winz_initial_wine_version";
+    private static final String PREF_COMPONENT_DISPLAY_NAME = "winz_component_display_name_";
     private static final String BUNDLED_RUNTIME_ID = "bundled:" + ProtonPackageManager.DEFAULT_IDENTIFIER;
     private static final String BUNDLED_RUNTIME_NAME =
             ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER) != null
@@ -330,12 +331,12 @@ public class OnboardingActivity extends AppCompatActivity {
                 ComponentItem item = new ComponentItem();
                 item.profile = profile;
                 item.type = typeName;
-                item.name = profile.verName;
+                item.name = componentDisplayName(profile);
                 item.versionCode = profile.verCode;
                 item.url = profile.remoteUrl;
                 item.installed = isInstalled(profile);
                 item.entryName = item.installed ? installedEntryName(type, profile) : "";
-                String key = typeName + ":" + profile.verCode + ":" + profile.verName;
+                String key = typeName + ":" + profile.verCode + ":" + item.name;
                 if (!seen.add(key)) continue;
                 rebuilt.add(item);
                 ComponentItem current = newest.get(typeName);
@@ -347,12 +348,13 @@ public class OnboardingActivity extends AppCompatActivity {
             for (ContentProfile profile : contentsManager.getInstalledProfiles(type)) {
                 String typeName = displayType(type);
                 if (typeName.isEmpty()) continue;
-                String key = typeName + ":" + profile.verCode + ":" + profile.verName;
+                String name = componentDisplayName(profile);
+                String key = typeName + ":" + profile.verCode + ":" + name;
                 if (seen.add(key)) {
                     ComponentItem item = new ComponentItem();
                     item.profile = profile;
                     item.type = typeName;
-                    item.name = profile.verName;
+                    item.name = name;
                     item.versionCode = profile.verCode;
                     item.installed = true;
                     item.entryName = ContentsManager.getEntryName(profile);
@@ -414,6 +416,14 @@ public class OnboardingActivity extends AppCompatActivity {
     private String componentId(ComponentItem item) {
         if (item.packageInfo != null) return "release-proton:" + item.packageInfo.identifier;
         return item.type + ":" + item.versionCode + ":" + item.name;
+    }
+
+    private String componentDisplayName(ContentProfile profile) {
+        return preferences.getString(PREF_COMPONENT_DISPLAY_NAME + ContentsManager.getEntryName(profile), profile.verName);
+    }
+
+    private void rememberComponentDisplayName(ContentProfile profile, String name) {
+        preferences.edit().putString(PREF_COMPONENT_DISPLAY_NAME + ContentsManager.getEntryName(profile), name).apply();
     }
 
     private ComponentItem findComponent(String id) {
@@ -481,7 +491,7 @@ public class OnboardingActivity extends AppCompatActivity {
             File archive = new File(getCacheDir(), "winz-component-" + System.nanoTime());
             try {
                 if (!download(item.url, archive, item.name)) throw new Exception("Download failed");
-                installContentArchive(Uri.fromFile(archive), item.name, 72, () -> {
+                installContentArchive(Uri.fromFile(archive), item.name, 72, true, () -> {
                     rebuildCatalog();
                     runOnUiThread(() -> finishInstall(id, null));
                 }, error -> runOnUiThread(() -> finishInstall(id, error)));
@@ -530,7 +540,7 @@ public class OnboardingActivity extends AppCompatActivity {
 
     private interface FailureCallback { void call(String error); }
 
-    private void installContentArchive(Uri uri, String displayName, int startProgress,
+    private void installContentArchive(Uri uri, String displayName, int startProgress, boolean rememberDisplayName,
                                        Runnable success, FailureCallback failure) {
         postInstallProgress("Installing " + displayName, startProgress);
         contentsManager.extraContentFile(uri, archiveProgress -> {
@@ -553,6 +563,7 @@ public class OnboardingActivity extends AppCompatActivity {
                     @Override
                     public void onFailed(ContentsManager.InstallFailedReason reason, Exception error) {
                         if (reason == ContentsManager.InstallFailedReason.ERROR_EXIST) {
+                            if (rememberDisplayName) rememberComponentDisplayName(extracted, displayName);
                             postInstallProgress("Installed " + installedName, 100);
                             success.run();
                         }
@@ -561,6 +572,7 @@ public class OnboardingActivity extends AppCompatActivity {
 
                     @Override
                     public void onSucceed(ContentProfile installed) {
+                        if (rememberDisplayName) rememberComponentDisplayName(installed, displayName);
                         postInstallProgress("Installed " + installedName, 100);
                         success.run();
                     }
@@ -629,11 +641,7 @@ public class OnboardingActivity extends AppCompatActivity {
 
     private ContentProfile findInstalledProfile(String componentId) {
         ComponentItem item = findComponent(componentId);
-        if (item == null) return null;
-        for (ContentProfile profile : contentsManager.getInstalledProfiles(item.profile.type)) {
-            if (profile.verCode == item.versionCode && profile.verName.equals(item.name)) return profile;
-        }
-        return null;
+        return item == null ? null : contentsManager.getProfileByEntryName(item.entryName);
     }
 
     private void requestRemoveComponent(String componentId) {
@@ -704,6 +712,7 @@ public class OnboardingActivity extends AppCompatActivity {
         composeController.setInstallBusy(id, true);
         io.execute(() -> {
             contentsManager.removeContent(profile);
+            preferences.edit().remove(PREF_COMPONENT_DISPLAY_NAME + ContentsManager.getEntryName(profile)).apply();
             contentsManager.syncContents();
             rebuildCatalog();
             runOnUiThread(() -> finishInstall(id, null));
@@ -807,7 +816,7 @@ public class OnboardingActivity extends AppCompatActivity {
             Uri uri = data.getData();
             String displayName = localDisplayName(uri);
             composeController.updateInstallProgress("Preparing " + displayName, 0);
-            io.execute(() -> installContentArchive(uri, displayName, 5, () -> {
+            io.execute(() -> installContentArchive(uri, displayName, 5, false, () -> {
                 rebuildCatalog();
                 runOnUiThread(() -> finishInstall("local", null));
             }, error -> runOnUiThread(() -> finishInstall("local", error))));

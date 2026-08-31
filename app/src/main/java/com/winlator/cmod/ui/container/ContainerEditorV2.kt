@@ -66,6 +66,7 @@ import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
 import com.winlator.cmod.core.ImageUtils
+import com.winlator.cmod.core.LsfgVkManager
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRegistryEditor
@@ -77,6 +78,7 @@ import com.winlator.cmod.ui.settings.CpuSelectorRow
 import com.winlator.cmod.ui.settings.DriverOption
 import com.winlator.cmod.ui.settings.DxvkAsyncMode
 import com.winlator.cmod.ui.settings.EnvironmentVariablesEditor
+import com.winlator.cmod.ui.settings.FrameGenerationSettings
 import com.winlator.cmod.ui.settings.SettingChoice
 import com.winlator.cmod.ui.settings.SettingDriverChoice
 import com.winlator.cmod.ui.settings.SettingInstallChoice
@@ -170,6 +172,13 @@ private class ContainerEditorStateV2(
     var trueDisplayX by mutableStateOf(editing?.getTrueDisplayX() ?: false)
     var displayXPerformanceMode by mutableStateOf(editing?.getDisplayXPerformanceMode() ?: true)
     var displayXPresentAtRefreshRate by mutableStateOf(editing?.getDisplayXPresentAtRefreshRate() ?: true)
+    var frameGenBackend by mutableStateOf(editing?.getFrameGenBackend() ?: "lsfg_vk")
+    var lsfgMultiplier by mutableIntStateOf(editing?.getLsfgMultiplier() ?: 0)
+    var lsfgFlowScale by mutableStateOf(editing?.getLsfgFlowScale() ?: 0.80f)
+    var lsfgPerformanceMode by mutableStateOf(editing?.getLsfgPerformanceMode() ?: true)
+    var winFgMultiplier by mutableIntStateOf(editing?.getWinFgMultiplier() ?: 0)
+    var winFgFlowScale by mutableStateOf(editing?.getWinFgFlowScale() ?: 0.80f)
+    var winFgModel by mutableIntStateOf(editing?.getWinFgModel() ?: 3)
 
     var graphicsDriver by mutableStateOf(
         editing?.graphicsDriver ?: if (preferredDriver == DefaultVersion.WRAPPER_ADRENO) {
@@ -303,7 +312,8 @@ private class ContainerEditorStateV2(
         name, screen, audio, oboeProfile, oboeApi, oboeAdaptive, oboeExclusive, hudMode, locale, soundFont,
         fullscreen, desktopTheme, desktopBackground, wallpaperStamp, mouseWarp,
         renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
-        displayXPerformanceMode, displayXPresentAtRefreshRate, graphicsDriver, graphicsConfig,
+        displayXPerformanceMode, displayXPresentAtRefreshRate, frameGenBackend, lsfgMultiplier,
+        lsfgFlowScale, lsfgPerformanceMode, winFgMultiplier, winFgFlowScale, winFgModel, graphicsDriver, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
         cpu64.joinToString(), cpu32.joinToString(), components.entries.sortedBy { it.key }.joinToString()
@@ -446,6 +456,14 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setTrueDisplayX(state.trueDisplayX)
         container.setDisplayXPerformanceMode(state.displayXPerformanceMode)
         container.setDisplayXPresentAtRefreshRate(state.displayXPresentAtRefreshRate)
+        container.setFrameGenBackend(state.frameGenBackend)
+        container.setLsfgMultiplier(state.lsfgMultiplier)
+        container.setLsfgEnabled(state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2)
+        container.setLsfgFlowScale(state.lsfgFlowScale)
+        container.setLsfgPerformanceMode(state.lsfgPerformanceMode)
+        container.setWinFgMultiplier(state.winFgMultiplier)
+        container.setWinFgFlowScale(state.winFgFlowScale)
+        container.setWinFgModel(state.winFgModel)
         container.setDXWrapper(state.wrapper)
         container.setDXWrapperConfig(state.wrapperConfig)
         container.setAudioDriver(state.audio)
@@ -535,6 +553,14 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     .put("trueDisplayX", if (state.trueDisplayX) "1" else "0")
                     .put("displayXPerformanceMode", if (state.displayXPerformanceMode) "1" else "0")
                     .put("displayXPresentAtRefreshRate", if (state.displayXPresentAtRefreshRate) "1" else "0")
+                    .put("frameGenBackend", state.frameGenBackend)
+                    .put("lsfgEnabled", if (state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2) "true" else "false")
+                    .put("lsfgMultiplier", state.lsfgMultiplier.toString())
+                    .put("lsfgFlowScale", String.format(Locale.US, "%.2f", state.lsfgFlowScale))
+                    .put("lsfgPerformanceMode", if (state.lsfgPerformanceMode) "true" else "false")
+                    .put("winFgMultiplier", state.winFgMultiplier.toString())
+                    .put("winFgFlowScale", String.format(Locale.US, "%.2f", state.winFgFlowScale))
+                    .put("winFgModel", state.winFgModel.toString())
                     .put("oboeProfile", state.oboeProfile)
                     .put("oboeApi", state.oboeApi)
                     .put("oboeAdaptive", if (state.oboeAdaptive) "1" else "0")
@@ -862,6 +888,24 @@ private fun ContainerCategoryV2(
                     SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
                         s.filterMode = filters.indexOf(it).coerceAtLeast(0)
                     }
+                }
+            }
+            if (s.renderer != "EGL") {
+                SettingsCard {
+                    val winFg = s.frameGenBackend == "win_fg"
+                    FrameGenerationSettings(
+                        backend = s.frameGenBackend,
+                        multiplier = if (winFg) s.winFgMultiplier else s.lsfgMultiplier,
+                        flowScale = if (winFg) s.winFgFlowScale else s.lsfgFlowScale,
+                        winFgModel = s.winFgModel,
+                        lsfgPerformanceMode = s.lsfgPerformanceMode,
+                        lsfgAvailable = LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(s.editing) != null,
+                        onBackendChanged = { s.frameGenBackend = it },
+                        onMultiplierChanged = { if (winFg) s.winFgMultiplier = it else s.lsfgMultiplier = it },
+                        onFlowScaleChanged = { if (winFg) s.winFgFlowScale = it else s.lsfgFlowScale = it },
+                        onWinFgModelChanged = { s.winFgModel = it },
+                        onLsfgPerformanceModeChanged = { s.lsfgPerformanceMode = it }
+                    )
                 }
             }
             SettingsCard {

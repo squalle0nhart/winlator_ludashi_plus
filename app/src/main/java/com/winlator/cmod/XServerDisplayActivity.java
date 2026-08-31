@@ -202,6 +202,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private String lc_all = "";
     private String vkbasaltConfig = "";
     PreloaderDialog preloaderDialog = null;
+    private boolean winStarted = false;
     private Runnable configChangedCallback = null;
     private boolean isPaused = false;
     private boolean isRelativeMouseMovement = false;
@@ -563,33 +564,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
         xServer.setRelativeMouseMovement(isRelativeMouseMovement);
         advertisePanelRefreshRates();
 
-        boolean[] winStarted = { false };
-
         xServer.windowManager.addOnWindowModificationListener(new WindowManager.OnWindowModificationListener() {
             @Override
             public void onUpdateWindowContent(Window window) {
-                if (!winStarted[0] && window.isApplicationWindow()) {
-                    if (!simulateTouchScreen) {
-                        xServerView.setCursorVisible(true);
-                    }
-                    preloaderDialog.closeOnUiThread();
-                    winStarted[0] = true;
-                }
-
-                if (frameRatingWindowId == window.id) {
-                    if (classicHud != null) classicHud.update();
-                    if (modernHud != null) modernHud.onFrame();
-                } else if (frameRatingWindowId == -1 && lastRendererName != null
-                        && window.isApplicationWindow()
-                        && ((modernHud != null && modernHud.isUserEnabled())
-                         || (classicHud != null && classicHud.getVisibility() == View.VISIBLE))) {
-
-                    frameRatingWindowId = window.id;
-                    activeRendererWindowId = window.id;
-                    if (xServerView != null) xServerView.setFpsWindowId(window.id);
-                    if (classicHud != null) classicHud.update();
-                    if (modernHud != null) modernHud.onFrame();
-                }
+                onRendererFrame(window);
             }
 
             @Override
@@ -1401,6 +1379,17 @@ public class XServerDisplayActivity extends AppCompatActivity {
         setRuntimeStatus(R.id.TVRuntimeDisplayXStatus, "DisplayX", displayXStatus,
                 displayX ? active : normal);
 
+        Switch upscaler = findViewById(R.id.SWEnableFSR);
+        Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
+        boolean upscalerActive = xServerView instanceof VulkanXServerView
+                && upscaler != null && upscaler.isChecked();
+        String upscalerStatus = !(xServerView instanceof VulkanXServerView) ? "Unavailable"
+                : upscalerActive && upscalerMode != null
+                        && upscalerMode.getSelectedItemPosition() == 1 ? "FSR active"
+                : upscalerActive ? "SGSR active" : "Off";
+        setRuntimeStatus(R.id.TVRuntimeUpscalerStatus, "Upscaler", upscalerStatus,
+                upscalerActive ? active : normal);
+
         boolean arm64ec = wineInfo != null && wineInfo.isArm64EC();
         boolean fexConfigured = arm64ec && "fexcore".equalsIgnoreCase(emulator);
         String version = container == null ? "" : shortcut != null
@@ -2013,8 +2002,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spUpscalerMode.setAdapter(a);
             spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (swEnableFSR != null && swEnableFSR.isChecked())
+                    if (swEnableFSR != null && swEnableFSR.isChecked()) {
                         vkRenderer.setFilterMode(pos + 2);
+                        updateRuntimeStatusUi(runtimeFexMode);
+                    }
                 }
                 @Override public void onNothingSelected(AdapterView<?> p) {}
             });
@@ -2036,22 +2027,31 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (sbSharpness        != null) sbSharpness.setVisibility(vis);
         };
 
-        String savedFilter = container != null ? container.getExtra("graphicsFilterMode") : "";
-        boolean fsrOn = !savedFilter.isEmpty() && Integer.parseInt(savedFilter) > 0;
+        String savedFilter = shortcut != null
+                ? shortcut.getExtra("graphicsFilterMode", container != null
+                        ? container.getExtra("graphicsFilterMode") : "")
+                : container != null ? container.getExtra("graphicsFilterMode") : "";
+        int savedFilterMode = savedFilter.isEmpty() ? 0 : Integer.parseInt(savedFilter);
+        boolean fsrOn = savedFilterMode >= 2;
+        int baseFilterMode = (shortcut != null ? shortcut.getRendererFilterMode()
+                : container != null ? container.getRendererFilterMode() : 0) == 1 ? 1 : 0;
+        if (spUpscalerMode != null && fsrOn)
+            spUpscalerMode.setSelection(Math.min(1, savedFilterMode - 2), false);
         if (swEnableFSR != null) {
             swEnableFSR.setChecked(fsrOn);
             if (spUpscalerMode != null)
                 spUpscalerMode.setVisibility(fsrOn ? View.VISIBLE : View.GONE);
-            if (fsrOn)
-                vkRenderer.setFilterMode(spUpscalerMode != null
-                    ? spUpscalerMode.getSelectedItemPosition() + 2 : 2);
+            vkRenderer.setFilterMode(fsrOn && spUpscalerMode != null
+                    ? spUpscalerMode.getSelectedItemPosition() + 2
+                    : baseFilterMode);
             swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
                 if (spUpscalerMode != null)
                     spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
                 vkRenderer.setFilterMode(checked
                     ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2)
-                    : (container != null ? container.getRendererFilterMode() : 0));
+                    : baseFilterMode);
                 updateSharpnessVis.run();
+                updateRuntimeStatusUi(runtimeFexMode);
             });
         }
 
@@ -2535,7 +2535,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
 
         File graphicsRuntimeMarker = new File(rootDir,
-                "usr/lib/.winlator-graphics-runtime-c7474f7e-25b50a11-v2");
+                "usr/lib/.winlator-graphics-runtime-c7474f7e-a20866cf-v2");
         if (firstTimeBoot || !graphicsRuntimeMarker.isFile()) {
             Log.d("XServerDisplayActivity", "Installing paired Pipetto wrapper and common graphics runtime");
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst",
@@ -2544,7 +2544,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst",
                     rootDir);
             FileUtils.writeString(graphicsRuntimeMarker,
-                    "wrapper=c7474f7e;extra_libs=25b50a11;layers=9d57736d;opengl=split-v1");
+                    "wrapper=c7474f7e;extra_libs=a20866cf;layers=9d57736d;opengl=split-v1");
         }
 
         extractOpenGLDriver(rootDir);
@@ -3135,6 +3135,29 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 classicHud.reset();
             });
             if (modernHud != null) runOnUiThread(() -> modernHud.onRendererGone());
+        }
+    }
+
+    public void onRendererFrame(Window window) {
+        if (window == null) return;
+        if (!winStarted && window.isApplicationWindow()) {
+            if (!simulateTouchScreen && xServerView != null) xServerView.setCursorVisible(true);
+            preloaderDialog.closeOnUiThread();
+            winStarted = true;
+        }
+
+        if (frameRatingWindowId == window.id) {
+            if (classicHud != null) classicHud.update();
+            if (modernHud != null) modernHud.onFrame();
+        } else if (frameRatingWindowId == -1 && lastRendererName != null
+                && window.isApplicationWindow()
+                && ((modernHud != null && modernHud.isUserEnabled())
+                 || (classicHud != null && classicHud.getVisibility() == View.VISIBLE))) {
+            frameRatingWindowId = window.id;
+            activeRendererWindowId = window.id;
+            if (xServerView != null) xServerView.setFpsWindowId(window.id);
+            if (classicHud != null) classicHud.update();
+            if (modernHud != null) modernHud.onFrame();
         }
     }
 

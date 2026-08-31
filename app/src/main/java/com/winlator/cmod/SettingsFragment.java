@@ -51,6 +51,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ArrayUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
@@ -107,6 +108,7 @@ public class SettingsFragment extends Fragment {
     private static final int REQUEST_CODE_INSTALL_SOUNDFONT = 1001;
     private static final int REQUEST_CODE_IMPORT_BOX64_PRESET = 1004;
     private static final int REQUEST_CODE_IMPORT_FEXCORE_PRESET = 1005;
+    private static final int REQUEST_CODE_IMPORT_LOSSLESS_DLL = 1006;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -477,6 +479,7 @@ public class SettingsFragment extends Fragment {
                 fexChoices,
                 preferences.getString("fexcore_preset", FEXCorePreset.COMPATIBILITY),
                 soundFontChoices,
+                LsfgVkManager.isGlobalDllAvailable(context),
                 winlatorPath,
                 shortcutPath,
                 preferences.getBoolean("enable_big_picture_mode", false),
@@ -576,6 +579,11 @@ public class SettingsFragment extends Fragment {
                         AppUtils.showToast(requireContext(), R.string.sound_font_removed_failed);
                     }
                 });
+            }
+
+            @Override
+            public void onImportLosslessDll() {
+                openFile(REQUEST_CODE_IMPORT_LOSSLESS_DLL);
             }
 
             @Override
@@ -1103,6 +1111,15 @@ public class SettingsFragment extends Fragment {
                             } finally {
                                 installSoundFontCallback = null;
                             }
+                        }
+                        break;
+
+                    case REQUEST_CODE_IMPORT_LOSSLESS_DLL:
+                        if (LsfgVkManager.importGlobalLosslessDll(requireContext(), uri)) {
+                            AppUtils.showToast(requireContext(), "Lossless.dll imported");
+                            refreshCompose();
+                        } else {
+                            AppUtils.showToast(requireContext(), "Unable to import Lossless.dll");
                         }
                         break;
 

@@ -448,7 +448,7 @@ private fun ComponentCard(
                 Icon(Icons.Outlined.InsertDriveFile, null, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(item.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     val status = when {
                         busy && installingProgress >= 0 ->
                             "${installingLabel ?: "Installing"} • ${installingProgress}%"
@@ -464,13 +464,13 @@ private fun ComponentCard(
                 }
                 if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
                 else if (item.installed && item.removable) {
-                    OutlinedButton(onClick = { cb.onRemove(item.id) }, enabled = !locked && !item.inUse) {
+                    OutlinedButton(onClick = { cb.onRemove(item.id) }, modifier = Modifier.width(112.dp), enabled = !locked && !item.inUse) {
                         Icon(Icons.Outlined.DeleteOutline, null)
                         Spacer(Modifier.width(5.dp))
                         Text(if (item.inUse) "In use" else "Delete")
                     }
                 } else if (!item.installed) {
-                    OutlinedButton(onClick = { cb.onInstall(item.id) }, enabled = !locked) { Text("Download") }
+                    OutlinedButton(onClick = { cb.onInstall(item.id) }, modifier = Modifier.width(112.dp), enabled = !locked) { Text("Download") }
                 } else Icon(Icons.Outlined.Check, null)
             }
             if (busy) {

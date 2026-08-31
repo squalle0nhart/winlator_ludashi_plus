@@ -218,6 +218,14 @@
                         android:textSize="12sp" />
 
                     <TextView
+                        android:id="@+id/TVRuntimeUpscalerStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="?attr/ingameSidebarOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <TextView
                         android:id="@+id/TVRuntimeFEXCoreStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"

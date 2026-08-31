@@ -33,6 +33,8 @@ data class LibraryItem(
 interface LibraryCallbacks {
     fun onOpen(shortcutPath: String)
     fun onRun(shortcutPath: String)
+    fun onAddLocal()
+    fun onOpenStore(store: String)
     fun onGridViewChanged(gridView: Boolean)
     fun onAction(shortcutPath: String, action: String)
     fun onArtworkNeeded(shortcutPath: String, kind: String)
@@ -43,7 +45,8 @@ class LibraryComposeController internal constructor(
     private val items: MutableState<List<LibraryItem>>,
     private val grid: MutableState<Boolean>,
     private val query: MutableState<String>,
-    private val selectedShortcutPath: MutableState<String?>
+    private val selectedShortcutPath: MutableState<String?>,
+    private val showAddGame: MutableState<Boolean>
 ) {
     private val statePreferences = context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
     private val metadataGeneration = AtomicInteger(0)
@@ -63,6 +66,7 @@ class LibraryComposeController internal constructor(
 
     fun setGridView(value: Boolean) { grid.value = value }
     fun setSearchQuery(value: String?) { query.value = value?.trim().orEmpty() }
+    fun showAddGamePicker() { showAddGame.value = true }
 
     fun setSelectedShortcutPath(value: String?) {
         selectedShortcutPath.value = value
@@ -100,6 +104,7 @@ object LibraryComposeHost {
         val items = mutableStateOf<List<LibraryItem>>(emptyList())
         val grid = mutableStateOf(initialGridView)
         val query = mutableStateOf("")
+        val showAddGame = mutableStateOf(false)
         val selectedShortcutPath = mutableStateOf(
             context.getSharedPreferences("library_compose_state", Context.MODE_PRIVATE)
                 .getString("selected_shortcut_path", null)
@@ -109,7 +114,8 @@ object LibraryComposeHost {
             items,
             grid,
             query,
-            selectedShortcutPath
+            selectedShortcutPath,
+            showAddGame
         )
         val view = ComposeView(context).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -120,6 +126,7 @@ object LibraryComposeHost {
                         grid.value,
                         query.value,
                         selectedShortcutPath,
+                        showAddGame,
                         callbacks
                     )
                 }
@@ -129,4 +136,4 @@ object LibraryComposeHost {
     }
 }
 
-internal enum class LibraryFilter { All, Favorites, Recent }
+internal enum class LibraryFilter { All, Favorites, Recent, Store }

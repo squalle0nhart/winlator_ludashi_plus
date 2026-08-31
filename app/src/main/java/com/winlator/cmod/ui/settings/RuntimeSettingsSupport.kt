@@ -28,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -720,6 +721,62 @@ internal fun SettingToggle(
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onChanged, enabled = enabled)
     }
+}
+
+@Composable
+internal fun FrameGenerationSettings(
+    backend: String,
+    multiplier: Int,
+    flowScale: Float,
+    winFgModel: Int,
+    lsfgPerformanceMode: Boolean,
+    lsfgAvailable: Boolean,
+    onBackendChanged: (String) -> Unit,
+    onMultiplierChanged: (Int) -> Unit,
+    onFlowScaleChanged: (Float) -> Unit,
+    onWinFgModelChanged: (Int) -> Unit,
+    onLsfgPerformanceModeChanged: (Boolean) -> Unit
+) {
+    val winFg = backend == "win_fg"
+    val multiplierLabels = if (winFg) listOf("Off", "2x") else listOf("Off", "2x", "3x", "4x")
+    SettingChoice("Frame Generation", if (winFg) "win-fg" else "LSFG-VK", listOf("LSFG-VK", "win-fg")) {
+        onBackendChanged(if (it == "win-fg") "win_fg" else "lsfg_vk")
+    }
+    SettingsDivider()
+    SettingChoice("Frame Multiplier", if (multiplier < 2) "Off" else "${multiplier}x", multiplierLabels) {
+        val selected = it.removeSuffix("x").toIntOrNull() ?: 0
+        onMultiplierChanged(if (!winFg && !lsfgAvailable) 0 else selected)
+    }
+    SettingsDivider()
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth()) {
+            Text("Flow Scale", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(String.format(java.util.Locale.US, "%.2f", flowScale), fontWeight = FontWeight.SemiBold)
+        }
+        Slider(
+            value = flowScale.coerceIn(0.25f, 1f),
+            onValueChange = onFlowScaleChanged,
+            valueRange = 0.25f..1f,
+            steps = 74
+        )
+    }
+    if (winFg) {
+        SettingsDivider()
+        SettingChoice("win-fg Model", if (winFgModel >= 4) "FSR3+" else "FSR3", listOf("FSR3", "FSR3+")) {
+            onWinFgModelChanged(if (it == "FSR3+") 4 else 3)
+        }
+    } else {
+        SettingsDivider()
+        SettingToggle("Performance Mode", lsfgPerformanceMode, onChanged = onLsfgPerformanceModeChanged)
+    }
+    Text(
+        if (winFg) "Bundled win-fg runtime"
+        else if (lsfgAvailable) "LSFG-VK ready"
+        else "Import Lossless.dll before enabling LSFG-VK",
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 @Composable

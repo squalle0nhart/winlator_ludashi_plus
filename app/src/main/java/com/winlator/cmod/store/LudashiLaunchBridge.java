@@ -119,8 +119,7 @@ public final class LudashiLaunchBridge {
                 }
 
                 h.post(() -> Toast.makeText(activity,
-                        "\"" + gameName + "\" added to Shortcuts.\n"
-                                + "Open the side menu → Shortcuts to launch and configure it.",
+                        "\"" + gameName + "\" added to Library.",
                         Toast.LENGTH_LONG).show());
 
             } catch (Exception e) {

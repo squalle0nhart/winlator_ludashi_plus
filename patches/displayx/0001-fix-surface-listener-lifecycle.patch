@@ -1,0 +1,454 @@
+diff --git a/src/displayx_layer.cpp b/src/displayx_layer.cpp
+index ae04728..052048d 100644
+--- a/src/displayx_layer.cpp
++++ b/src/displayx_layer.cpp
+@@ -1,5 +1,39 @@
+ #include "displayx_layer.hpp"
+ 
++static bool readExact(int socket, void *data, size_t size) {
++	auto *bytes = static_cast<char *>(data);
++	while (size > 0) {
++		ssize_t count = read(socket, bytes, size);
++		if (count < 0) {
++			if (errno == EINTR)
++				continue;
++			return false;
++		}
++		if (count == 0)
++			return false;
++		bytes += count;
++		size -= static_cast<size_t>(count);
++	}
++	return true;
++}
++
++static bool writeSocket(int socket, const void *data, size_t size) {
++	const auto *bytes = static_cast<const char *>(data);
++	while (size > 0) {
++		ssize_t written = send(socket, bytes, size, MSG_NOSIGNAL);
++		if (written < 0) {
++			if (errno == EINTR)
++				continue;
++			return false;
++		}
++		if (written == 0)
++			return false;
++		bytes += written;
++		size -= static_cast<size_t>(written);
++	}
++	return true;
++}
++
+ static int readFD(int& socket) {
+     std::vector<char> msg_contents(1);
+     struct iovec iov{};
+@@ -21,24 +55,29 @@ static int readFD(int& socket) {
+     return fd;
+ }
+ 
+-static void networkThreadLoop() {
++static void networkThreadLoop(struct fake_surface *surface) {
+ 	static constexpr int RECEIVE_PRESENT_ID = 4;
+ 	
+-	int n;
+ 	std::array<struct epoll_event, 1> events;
+ 	
+-	while ((n = epoll_wait(epoll_fd, events.data(), 1, -1))) {
+-    	if (events[0].events & (EPOLLERR | EPOLLHUP)) {
+-	    	epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[0].data.fd, nullptr);
+-	    	close(events[0].data.fd);
++	while (true) {
++		int n = epoll_wait(surface->epoll_fd, events.data(), 1, -1);
++		if (n < 0) {
++			if (errno == EINTR)
++				continue;
++			return;
++		}
++		if (n == 0)
++			continue;
++
++	    if (events[0].events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
+ 	        return;
+ 	    }
+ 	     
+ 	    if (events[0].events & EPOLLIN) {
+ 	    	int request_code;
+-	        int size = read(events[0].data.fd, &request_code, 4);
+-	        if (size <= 0)
+-	        	continue;
++	        if (!readExact(events[0].data.fd, &request_code, sizeof(request_code)))
++	            return;
+ 	                 
+ 	        switch (request_code) {
+ 	        	case RECEIVE_PRESENT_ID:
+@@ -46,17 +85,19 @@ static void networkThreadLoop() {
+ 	            	uint8_t id;
+ 	                uint64_t presentId;
+ 	                         
+-	                read(events[0].data.fd, &id, 1);
+-	                read(events[0].data.fd, &presentId, 8);
++	                if (!readExact(events[0].data.fd, &id, sizeof(id)) ||
++	                    !readExact(events[0].data.fd, &presentId, sizeof(presentId)))
++	                    return;
+ 
+-	                auto swapchain = swapchains[id];
+-	                if (!swapchain)
++	                scoped_lock globalLock(global_lock);
++	                auto it = swapchains.find(id);
++	                if (it == swapchains.end() || it->second->surface != surface)
+ 	                	continue;
+ 
+-	                {
+-	                	std::unique_lock<std::mutex> lock(swapchain->presentIdMutex);
+-	                 	swapchain->presentId = presentId;
+-	                }
++	                auto *swapchain = it->second;
++	                std::unique_lock<std::mutex> presentLock(swapchain->presentIdMutex);
++	                swapchain->presentId = presentId;
++	                presentLock.unlock();
+ 	                swapchain->presentIdCv.notify_all();
+ 	                break;
+ 	            }    
+@@ -372,7 +413,7 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
+ 
+ 	int res;
+ 	  
+-	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
++	auto *fake_surf = new struct fake_surface{};
+ 	fake_surf->conn = pCreateInfo->connection;
+ 	fake_surf->window = pCreateInfo->window;
+ 	fake_surf->displayx_server_fd = socket(AF_UNIX, SOCK_STREAM, 0);                  
+@@ -389,22 +430,41 @@ DisplayX_CreateXcbSurfaceKHR(VkInstance instance,
+ 
+ 	if (res != 0) {
+ 		Logger::log("error", "Failed to connect to DisplayX server, res %d", res);
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
+ 		return VK_ERROR_INITIALIZATION_FAILED;
+ 	}
+ 
+-	epoll_fd = epoll_create1(0);
++	fake_surf->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
++	if (fake_surf->epoll_fd < 0) {
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 	struct epoll_event event{};
+ 	event.data.fd = fake_surf->displayx_server_fd;
+-	event.events = EPOLLIN;
++	event.events = EPOLLIN | EPOLLRDHUP;
+ 	
+-	epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fake_surf->displayx_server_fd, &event);
++	if (epoll_ctl(fake_surf->epoll_fd, EPOLL_CTL_ADD,
++	              fake_surf->displayx_server_fd, &event) != 0) {
++		close(fake_surf->epoll_fd);
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 
+-	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
++	x11_set_string_property(fake_surf->conn, fake_surf->window, "_MESA_DRV", "0");
++	try {
++		fake_surf->networkListeningThread = std::thread(networkThreadLoop, fake_surf);
++	} catch (...) {
++		close(fake_surf->epoll_fd);
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_OUT_OF_HOST_MEMORY;
++	}
+ 
++	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+ 	Logger::log("info", "Created surface %p", pSurface);
+-
+-	x11_set_string_property(fake_surf->conn, fake_surf->window, "_MESA_DRV", "0");
+-	networkListeningThread = std::thread(networkThreadLoop);
+ 	
+ 	return VK_SUCCESS;
+ }
+@@ -419,7 +479,7 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
+ 
+ 	int res;
+ 	
+-	struct fake_surface *fake_surf = (struct fake_surface *)malloc(sizeof(struct fake_surface));
++	auto *fake_surf = new struct fake_surface{};
+ 	fake_surf->conn = XGetXCBConnection(pCreateInfo->dpy);
+ 	fake_surf->window = pCreateInfo->window;
+ 	fake_surf->displayx_server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+@@ -435,23 +495,42 @@ DisplayX_CreateXlibSurfaceKHR(VkInstance instance,
+ 
+ 	if (res != 0) {                                                                                    
+ 		Logger::log("error", "Failed to connect to DisplayX, res %d", res);                     
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
+ 		return VK_ERROR_INITIALIZATION_FAILED;                                                     
+ 	}
+ 
+-	epoll_fd = epoll_create1(0);
++	fake_surf->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
++	if (fake_surf->epoll_fd < 0) {
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 	struct epoll_event event{};
+ 	event.data.fd = fake_surf->displayx_server_fd;
+-	event.events = EPOLLIN;
++	event.events = EPOLLIN | EPOLLRDHUP;
+ 	            
+-	epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fake_surf->displayx_server_fd, &event);
++	if (epoll_ctl(fake_surf->epoll_fd, EPOLL_CTL_ADD,
++	              fake_surf->displayx_server_fd, &event) != 0) {
++		close(fake_surf->epoll_fd);
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 
+-	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
++	x11_set_string_property(fake_surf->conn, fake_surf->window, "_MESA_DRV", "0");
++	try {
++		fake_surf->networkListeningThread = std::thread(networkThreadLoop, fake_surf);
++	} catch (...) {
++		close(fake_surf->epoll_fd);
++		close(fake_surf->displayx_server_fd);
++		delete fake_surf;
++		return VK_ERROR_OUT_OF_HOST_MEMORY;
++	}
+ 
++	*pSurface = VK_WRAP_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR, fake_surf);
+ 	Logger::log("info", "Created surface %p", pSurface);
+ 	
+-	x11_set_string_property(fake_surf->conn, fake_surf->window, "_MESA_DRV", "0");
+-	networkListeningThread = std::thread(networkThreadLoop);
+-	
+ 	return VK_SUCCESS;
+ }
+ 
+@@ -637,13 +716,14 @@ DisplayX_DestroySurfaceKHR(VkInstance instance,
+ 	if (!fake_surface)
+ 		return;
+ 
+-	scoped_lock l(global_lock);
+-
+ 	Logger::log("info", "Destroying surface %p", fake_surface);
+ 
++	shutdown(fake_surface->displayx_server_fd, SHUT_RDWR);
++	if (fake_surface->networkListeningThread.joinable())
++		fake_surface->networkListeningThread.join();
++	close(fake_surface->epoll_fd);
+ 	close(fake_surface->displayx_server_fd);
+-	
+-	free(fake_surface);
++	delete fake_surface;
+ }
+ 
+ int to_ahardwarebuffer_format(VkFormat format) {
+@@ -684,7 +764,7 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
+ 	auto dev = deviceDispatch[GetKey(device)];                              
+ 	VkLayerDispatchTable table = dev->table;
+ 	
+-	struct fake_swapchain *swapchain = (struct fake_swapchain *)malloc(sizeof(struct fake_swapchain));
++	auto *swapchain = new struct fake_swapchain();
+ 	swapchain->imageCount = pCreateInfo->minImageCount;
+ 	swapchain->format = pCreateInfo->imageFormat;
+ 	swapchain->extent = pCreateInfo->imageExtent;
+@@ -700,10 +780,13 @@ DisplayX_CreateSwapchainKHR(VkDevice device,
+ 	swapchain->images.resize(swapchain->imageCount);
+ 	
+ 	int request_code = 1;
+-	write(fake_surface->displayx_server_fd, &request_code, 4);
+-	write(fake_surface->displayx_server_fd, &swapchain->id, 1);
+-	write(fake_surface->displayx_server_fd, &swapchain->imageCount, 4);
+-	write(fake_surface->displayx_server_fd, &swapchain->surface->window, 4);
++	if (!writeSocket(fake_surface->displayx_server_fd, &request_code, 4) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->id, 1) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->imageCount, 4) ||
++		!writeSocket(fake_surface->displayx_server_fd, &swapchain->surface->window, 4)) {
++		delete swapchain;
++		return VK_ERROR_SURFACE_LOST_KHR;
++	}
+ 	
+ 	for (uint32_t index = 0; index < swapchain->imageCount; index++) {
+ 		VkResult result;
+@@ -827,16 +910,21 @@ DisplayX_GetSwapchainImagesKHR(VkDevice device,
+ 	
+ 	VK_UNWRAP_NON_DISPATCHABLE_HANDLE(swapchain, struct fake_swapchain, fake_swapchain)
+ 	
++	const uint32_t availableImageCount = static_cast<uint32_t>(fake_swapchain->images.size());
+ 	if (pSwapchainImages == nullptr) {
+-		*pSwapchainImageCount = fake_swapchain->images.size();
++		*pSwapchainImageCount = availableImageCount;
+ 		return VK_SUCCESS;
+ 	}
+ 	
+-	for (uint32_t i = 0; i < *pSwapchainImageCount; i++) {
++	const uint32_t requestedImageCount = *pSwapchainImageCount;
++	const uint32_t returnedImageCount = requestedImageCount < availableImageCount
++		? requestedImageCount : availableImageCount;
++	for (uint32_t i = 0; i < returnedImageCount; i++) {
+ 		pSwapchainImages[i] = fake_swapchain->images[i]->handle;
+ 	}
++	*pSwapchainImageCount = returnedImageCount;
+ 
+-	return VK_SUCCESS;
++	return returnedImageCount < availableImageCount ? VK_INCOMPLETE : VK_SUCCESS;
+ }
+ 
+ VK_LAYER_EXPORT VkResult VKAPI_CALL
+@@ -929,17 +1017,17 @@ DisplayX_DestroySwapchainKHR(VkDevice device,
+ 	fake_swapchain->images.clear();
+ 
+ 	int request_code = 3;
+-	write(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
+-	write(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
++	writeSocket(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
++	writeSocket(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
+ 
+ 	swapchains.erase(fake_swapchain->id);
+ 
+ 	id.destroy(fake_swapchain->id);
+ 
+-	free(fake_swapchain);
++	delete fake_swapchain;
+ }
+ 
+-void sendFD(int& socket, int fd) {
++static bool sendFD(int socket, int fd) {
+ 	std::vector<char> control_buffer(CMSG_SPACE(sizeof(int)));
+ 	
+ 	char dummy = 0;
+@@ -950,16 +1038,18 @@ void sendFD(int& socket, int fd) {
+ 	struct msghdr msg{};
+ 	msg.msg_iov = &iov;
+ 	msg.msg_iovlen = 1;
+-	msg.msg_control = control_buffer.data();
+-	msg.msg_controllen = control_buffer.size();
+-
+-	struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+-	cmsg->cmsg_level = SOL_SOCKET;
+-	cmsg->cmsg_type = SCM_RIGHTS;
+-	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+-	*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
++	if (fd >= 0) {
++		msg.msg_control = control_buffer.data();
++		msg.msg_controllen = control_buffer.size();
++
++		struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
++		cmsg->cmsg_level = SOL_SOCKET;
++		cmsg->cmsg_type = SCM_RIGHTS;
++		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
++		*reinterpret_cast<int*>(CMSG_DATA(cmsg)) = fd;
++	}
+ 
+-	sendmsg(socket, &msg, 0);
++	return sendmsg(socket, &msg, MSG_NOSIGNAL) == 1;
+ }
+ 
+ VK_LAYER_EXPORT VkResult VKAPI_CALL
+@@ -969,7 +1059,17 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 	Logger::log("trace", "Calling vkQueuePresentKHR");
+ 	const VkPresentIdKHR *presentIdInfo = nullptr;
+ 
+-	auto q = queues[queue];
++	std::shared_ptr<struct queue> q;
++	{
++		scoped_lock l(global_lock);
++		auto queueIt = queues.find(queue);
++		if (queueIt != queues.end())
++			q = queueIt->second;
++	}
++	if (!q || !q->device || !q->fence) {
++		Logger::log("error", "No DisplayX state for present queue %p", queue);
++		return VK_ERROR_INITIALIZATION_FAILED;
++	}
+ 
+ 	const VkBaseInStructure *current = reinterpret_cast<const VkBaseInStructure *>(pPresentInfo->pNext);
+ 	while(current) {
+@@ -999,8 +1099,13 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 	submitInfo.pWaitDstStageMask = waitStages.data();
+ 	submitInfo.waitSemaphoreCount = pPresentInfo->waitSemaphoreCount;
+ 	submitInfo.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+-	q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
+-	q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
++	VkResult result = q->device->table.QueueSubmit(q->handle, 1, &submitInfo, q->fence->handle);
++	if (result != VK_SUCCESS)
++		return result;
++
++	result = q->device->table.GetFenceFdKHR(q->device->handle, &getFence, &q->fence->sync_fd);
++	if (result != VK_SUCCESS)
++		return result;
+ 
+ 	for (uint32_t i = 0; i < pPresentInfo->swapchainCount; i++) {
+ 		VK_UNWRAP_NON_DISPATCHABLE_HANDLE(pPresentInfo->pSwapchains[i], struct fake_swapchain, fake_swapchain)
+@@ -1013,14 +1118,23 @@ DisplayX_QueuePresentKHR(VkQueue queue,
+ 			present_id = presentIdInfo->pPresentIds[i];
+ 		}
+ 		
+-		write(fake_swapchain->surface->displayx_server_fd, &request_code, 4);
+-		write(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1);
+-		write(fake_swapchain->surface->displayx_server_fd, &index, 4);
+-		sendFD(fake_swapchain->surface->displayx_server_fd, fence);
+-		write(fake_swapchain->surface->displayx_server_fd, &present_id, 8);
++		if (!writeSocket(fake_swapchain->surface->displayx_server_fd, &request_code, 4) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &fake_swapchain->id, 1) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &index, 4) ||
++			!sendFD(fake_swapchain->surface->displayx_server_fd, fence) ||
++			!writeSocket(fake_swapchain->surface->displayx_server_fd, &present_id, 8)) {
++			if (q->fence->sync_fd >= 0)
++				close(q->fence->sync_fd);
++			q->fence->sync_fd = -1;
++			return VK_ERROR_SURFACE_LOST_KHR;
++		}
++		if (pPresentInfo->pResults)
++			pPresentInfo->pResults[i] = VK_SUCCESS;
+ 	}
+ 
+-	close(q->fence->sync_fd);
++	if (q->fence->sync_fd >= 0)
++		close(q->fence->sync_fd);
++	q->fence->sync_fd = -1;
+ 	
+ 	return VK_SUCCESS;
+ }
+diff --git a/src/displayx_layer.hpp b/src/displayx_layer.hpp
+index db37788..c47f39f 100755
+--- a/src/displayx_layer.hpp
++++ b/src/displayx_layer.hpp
+@@ -13,7 +13,6 @@
+ #include <X11/Xlib.h>
+ #include <xcb/xcb.h>
+ #include <sys/epoll.h>
+-#include <libsync.h>
+ #include <vulkan/vulkan_xcb.h>
+ #include <vulkan/vulkan_xlib.h>
+ #include <vector>
+@@ -22,6 +21,8 @@
+ #include <sys/un.h>
+ #include <memory>
+ #include <cstring>
++#include <cerrno>
++#include <condition_variable>
+ 
+ #undef VK_LAYER_EXPORT
+ #if defined(WIN32)
+@@ -49,9 +50,6 @@ std::unordered_map<VkQueue, std::shared_ptr<struct queue>> queues;
+ ID id;
+ std::mutex global_lock;
+ 
+-std::thread networkListeningThread;
+-int epoll_fd;
+-
+ typedef std::lock_guard<std::mutex> scoped_lock;
+ 
+ #define GETPROCADDR(func) \
+@@ -79,6 +77,8 @@ struct device {
+ struct fake_surface {
+ 	VkInstance instance;
+ 	int displayx_server_fd;
++	int epoll_fd;
++	std::thread networkListeningThread;
+ 	xcb_connection_t *conn;
+ 	xcb_window_t window;
+ };
