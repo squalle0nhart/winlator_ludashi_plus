@@ -4,4 +4,5 @@
 
 struct VulkanTable {
     PFN_vkGetFenceFdKHR GetFenceFdKHR;
+    PFN_vkGetAndroidHardwareBufferPropertiesANDROID GetAndroidHardwareBufferPropertiesANDROID;
 };

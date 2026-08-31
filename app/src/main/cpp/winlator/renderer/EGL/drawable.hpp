@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#define VK_USE_PLATFORM_ANDROID_KHR 1
 #include <vulkan/vulkan.h>
 
 #include "renderer_jni.hpp"

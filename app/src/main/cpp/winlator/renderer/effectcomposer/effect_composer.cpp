@@ -1,5 +1,6 @@
 #include "effect_composer.hpp"
 #include "color_swap_spv.h"
+#include <android/log.h>
 
 #define LOG_TAG "EffectComposer"
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -19,14 +20,14 @@ static bool areLayersPresent() {
     std::vector<VkLayerProperties> layerProps;
     uint32_t layerCount;
     VkResult result;
-    
+
     result = vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
     if (result != VK_SUCCESS) return false;
-    
+
     layerProps.resize(layerCount);
     result = vkEnumerateInstanceLayerProperties(&layerCount, layerProps.data());
     if (result != VK_SUCCESS) return false;
-    
+
     for (const auto& name : layerNames) {
         bool layerFound = false;
         for (const auto& layerProp : layerProps) {
@@ -35,13 +36,13 @@ static bool areLayersPresent() {
                 break;
             }
         }
-        
+
         if (!layerFound) {
             printf("Layer %s not found", name);
             return false;
         }
     }
-    
+
     return true;
 }
 
@@ -63,7 +64,7 @@ bool EffectComposer::isSuitableForColorSwap(Drawable *drawable) {
 
 VkResult EffectComposer::createInstance() {
     VkResult result;
-    
+
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "EffectComposer";
@@ -71,7 +72,7 @@ VkResult EffectComposer::createInstance() {
     appInfo.pEngineName = "EffectComposer";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_1;
-    
+
     if (enable_validation) {
         if (!areLayersPresent()) return VK_ERROR_INITIALIZATION_FAILED;
     }
@@ -89,7 +90,7 @@ VkResult EffectComposer::createInstance() {
         printf("Failed to create instance, result %d", result);
         return result;
     }
-    
+
     return VK_SUCCESS;
 }
 
@@ -103,10 +104,10 @@ VkResult EffectComposer::pickPhysicalDevice() {
         printf("Failed to enumarate physical devices, result %d", result);
         return result;
     }
-    
+
     physicalDevices.resize(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
-    
+
     physicalDevice = physicalDevices[0];
     return VK_SUCCESS;
 }
@@ -114,26 +115,25 @@ VkResult EffectComposer::pickPhysicalDevice() {
 static uint32_t findQueueIndex(VkPhysicalDevice physicalDevice) {
     uint32_t queueFamilyCount;
     std::vector<VkQueueFamilyProperties> queueFamilyProps;
-    VkResult result;
 
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
     if (queueFamilyCount == 0) {
-        printf("Failed to query queue family properties, result %d", result);
+        printf("Failed to query queue family properties");
         return UINT32_MAX;
     }
-    
+
     queueFamilyProps.resize(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilyProps.data());
-    
+
     uint32_t index = 0;
     for (const auto& prop : queueFamilyProps) {
         if (prop.queueFlags & VK_QUEUE_COMPUTE_BIT) {
             return index;
         }
-        
+
         index++;
     }
-    
+
     return UINT32_MAX;
 }
 
@@ -141,21 +141,21 @@ VkResult EffectComposer::createDevice() {
     uint32_t queueIndex;
     VkPhysicalDeviceFeatures enabledFeatures{};
     VkResult result;
-    
+
     queueIndex = findQueueIndex(physicalDevice);
     if (queueIndex == UINT32_MAX) {
         printf("Failed to find suitable queue index");
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-    
+
     VkDeviceQueueCreateInfo queueCreateInfo{};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex = queueIndex;
     queueCreateInfo.queueCount = 1;
-    
+
     float queuePriority = 1.0f;
     queueCreateInfo.pQueuePriorities = &queuePriority;
-    
+
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount = 1;
@@ -164,15 +164,20 @@ VkResult EffectComposer::createDevice() {
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
     createInfo.enabledLayerCount = 0;
     createInfo.pEnabledFeatures = &enabledFeatures;
-    
+
     result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
     if (result != VK_SUCCESS) {
         printf("Failed to create device, result %d", result);
         return result;
     }
-    
+
     dispatchTable.GetFenceFdKHR = (PFN_vkGetFenceFdKHR)vkGetDeviceProcAddr(device, "vkGetFenceFdKHR");
-     
+    dispatchTable.GetAndroidHardwareBufferPropertiesANDROID =
+        (PFN_vkGetAndroidHardwareBufferPropertiesANDROID)vkGetDeviceProcAddr(
+            device, "vkGetAndroidHardwareBufferPropertiesANDROID");
+    if (!dispatchTable.GetAndroidHardwareBufferPropertiesANDROID)
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+
     vkGetDeviceQueue(device, queueIndex, 0, &queue);
 
     VkFenceCreateInfo fenceCreateInfo{};
@@ -185,7 +190,7 @@ VkResult EffectComposer::createDevice() {
         printf("Failed to create synchronization fence, result %d", result);
         return result;
     }
-    
+
     VkCommandPoolCreateInfo poolCreateInfo{};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -196,7 +201,7 @@ VkResult EffectComposer::createDevice() {
         printf("Failed to create command pool, result %d", result);
         return result;
     }
-    
+
     VkCommandBufferAllocateInfo allocateInfo{};
     allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocateInfo.commandPool = commandPool;
@@ -208,14 +213,14 @@ VkResult EffectComposer::createDevice() {
         printf("Failed to allocate command buffer, result %d", result);
         return result;
     }
-    
+
     return VK_SUCCESS;
 }
 
 VkResult EffectComposer::createPipelines() {
     VkShaderModule colorSwapModule;
     VkResult result;
-    
+
     VkShaderModuleCreateInfo colorSwapShaderInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = nullptr,
@@ -223,13 +228,13 @@ VkResult EffectComposer::createPipelines() {
         .codeSize = color_swap_spv_len,
         .pCode = (const uint32_t *)color_swap_spv
     };
-    
+
     result = vkCreateShaderModule(device, &colorSwapShaderInfo, nullptr, &colorSwapModule);
     if (result != VK_SUCCESS) {
         printf("Failed to create shader module, result %d", result);
         return result;
     }
-    
+
     VkPipelineShaderStageCreateInfo shaderStageInfos[] = {
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -240,8 +245,8 @@ VkResult EffectComposer::createPipelines() {
             .pName = "main",
             .pSpecializationInfo = nullptr
         }
-    }; 
-    
+    };
+
     VkDescriptorSetLayoutBinding bindings[] = {
         {
             .binding = 0,
@@ -257,22 +262,22 @@ VkResult EffectComposer::createPipelines() {
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = nullptr
         }
-    };  
-    
+    };
+
     VkDescriptorSetLayoutCreateInfo descriptorSetCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
         .bindingCount = 2,
         .pBindings = bindings
-    }; 
-    
+    };
+
     result = vkCreateDescriptorSetLayout(device, &descriptorSetCreateInfo, nullptr, &descriptorSetLayout);
     if (result != VK_SUCCESS) {
         printf("Failed to create descriptor set layout, result %d", result);
         return result;
     }
-    
+
     VkPushConstantRange pushConstants = {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         .offset = 0,
@@ -294,7 +299,7 @@ VkResult EffectComposer::createPipelines() {
         printf("Failed to create pipeline layout, result %d", result);
         return result;
     }
-    
+
     VkComputePipelineCreateInfo pipelineCreateInfos[] = {
         {
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -306,7 +311,7 @@ VkResult EffectComposer::createPipelines() {
             .basePipelineIndex = -1
         }
     };
-    
+
     VkPipeline pipelines[1];
 
     result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, pipelineCreateInfos, nullptr, pipelines);
@@ -346,7 +351,7 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
 
     res = AHardwareBuffer_allocate(&outDesc, &drawable->composerTexture->dstBuffer);
     if (res != 0) {
-        printf("Failed to allocate destination AHardwareBuffer, result %d\n", result);
+        printf("Failed to allocate destination AHardwareBuffer, result %d\n", res);
         return VK_ERROR_OUT_OF_DEVICE_MEMORY;
     }
 
@@ -357,7 +362,8 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
     srcAHBProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
     srcAHBProps.pNext = &srcFormatProps;
 
-    result = vkGetAndroidHardwareBufferPropertiesANDROID(device, drawable->ahb, &srcAHBProps);
+    result = dispatchTable.GetAndroidHardwareBufferPropertiesANDROID(
+        device, drawable->ahb, &srcAHBProps);
     if (result != VK_SUCCESS) {
         printf("Failed to query source AHardwareBuffer properties, result %d", result);
         return result;
@@ -370,7 +376,8 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
     dstAHBProps.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID;
     dstAHBProps.pNext = &dstFormatProps;
 
-    result = vkGetAndroidHardwareBufferPropertiesANDROID(device, drawable->composerTexture->dstBuffer, &dstAHBProps);
+    result = dispatchTable.GetAndroidHardwareBufferPropertiesANDROID(
+        device, drawable->composerTexture->dstBuffer, &dstAHBProps);
     if (result != VK_SUCCESS) {
         printf("Failed to query destination AHardwareBuffer properties, result %d\n", result);
         return result;
@@ -558,7 +565,7 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
     drawable->composerTexture->srcImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     drawable->composerTexture->srcPipelineStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     drawable->composerTexture->srcAccessFlags = static_cast<VkAccessFlagBits>(0);
-    
+
     drawable->composerTexture->dstImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     drawable->composerTexture->dstPipelineStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     drawable->composerTexture->dstAccessFlags = static_cast<VkAccessFlagBits>(0);
@@ -568,42 +575,42 @@ VkResult EffectComposer::createComposerTexture(Drawable *drawable) {
 
 void EffectComposer::destroyComposerTexture(Drawable *drawable) {
     vkDeviceWaitIdle(device);
-    
+
     auto descriptorPool = poolsBuffer.getPoolForImage(drawable->composerTexture->srcImage);
     if (!descriptorPool) {
         printf("Found no descriptor pool associated to image");
         return;
     }
-    
+
     vkFreeDescriptorSets(device, descriptorPool->handle, 1, &drawable->composerTexture->vkDescriptorSet);
-    
+
     poolsBuffer.removeImageBinding(drawable->composerTexture->srcImage);
     vkFreeMemory(device, drawable->composerTexture->srcMemory, nullptr);
     vkDestroyImageView(device, drawable->composerTexture->srcImageView, nullptr);
     vkDestroyImage(device, drawable->composerTexture->srcImage, nullptr);
-    
+
     descriptorPool = poolsBuffer.getPoolForImage(drawable->composerTexture->dstImage);
     if (!descriptorPool) {
         printf("Found no descriptor pool associated to image");
         return;
     }
-    
+
     poolsBuffer.removeImageBinding(drawable->composerTexture->dstImage);
     vkFreeMemory(device, drawable->composerTexture->dstMemory, nullptr);
     vkDestroyImageView(device, drawable->composerTexture->dstImageView, nullptr);
     vkDestroyImage(device, drawable->composerTexture->dstImage, nullptr);
-}    
+}
 
 void EffectComposer::swapColors(Drawable *drawable) {
     vkResetFences(device, 1, &fence);
     vkResetCommandBuffer(commandBuffer, 0);
-    
+
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.pNext = nullptr;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     beginInfo.pInheritanceInfo = nullptr;
-    
+
     VkImageSubresourceRange subresourceRange = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
         .baseMipLevel = 0,
@@ -611,14 +618,14 @@ void EffectComposer::swapColors(Drawable *drawable) {
         .baseArrayLayer = 0,
         .layerCount = 1
     };
-    
+
     vkBeginCommandBuffer(commandBuffer, &beginInfo);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, colorSwapPipeline);
-      
+
     if (drawable->composerTexture->srcPipelineStage != VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ||
         !(drawable->composerTexture->srcAccessFlags & (VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT)) ||
         drawable->composerTexture->srcImageLayout != VK_IMAGE_LAYOUT_GENERAL) {
-            
+
         VkImageMemoryBarrier initialImageBarrier{};
         initialImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         initialImageBarrier.pNext = nullptr;
@@ -630,20 +637,20 @@ void EffectComposer::swapColors(Drawable *drawable) {
         initialImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         initialImageBarrier.image = drawable->composerTexture->srcImage;
         initialImageBarrier.subresourceRange = subresourceRange;
-        
+
         vkCmdPipelineBarrier(commandBuffer, drawable->composerTexture->srcPipelineStage, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &initialImageBarrier);
-            
+
         drawable->composerTexture->srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
         drawable->composerTexture->srcPipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         drawable->composerTexture->srcAccessFlags = static_cast<VkAccessFlagBits>(VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
     }
-    
-          
+
+
     if (drawable->composerTexture->dstPipelineStage != VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ||
         !(drawable->composerTexture->dstAccessFlags & (VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT)) ||
         drawable->composerTexture->dstImageLayout != VK_IMAGE_LAYOUT_GENERAL) {
-            
+
         VkImageMemoryBarrier initialImageBarrier{};
         initialImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         initialImageBarrier.pNext = nullptr;
@@ -655,25 +662,25 @@ void EffectComposer::swapColors(Drawable *drawable) {
         initialImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         initialImageBarrier.image = drawable->composerTexture->dstImage;
         initialImageBarrier.subresourceRange = subresourceRange;
-        
+
         vkCmdPipelineBarrier(commandBuffer, drawable->composerTexture->dstPipelineStage, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, 0, nullptr, 0, nullptr, 1, &initialImageBarrier);
-            
+
         drawable->composerTexture->dstImageLayout = VK_IMAGE_LAYOUT_GENERAL;
         drawable->composerTexture->dstPipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         drawable->composerTexture->dstAccessFlags = static_cast<VkAccessFlagBits>(VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
     }
-    
+
     PushConstants constants{};
     constants.width = drawable->width;
     constants.height = drawable->height;
-    
+
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(constants), &constants);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &drawable->composerTexture->vkDescriptorSet, 0, nullptr);
     vkCmdDispatch(commandBuffer, (drawable->width + 15) / 16, (drawable->height + 15) / 16, 1);
-    
+
     vkEndCommandBuffer(commandBuffer);
-    
+
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = nullptr;
@@ -684,9 +691,9 @@ void EffectComposer::swapColors(Drawable *drawable) {
     submitInfo.pCommandBuffers = &commandBuffer;
     submitInfo.signalSemaphoreCount = 0;
     submitInfo.pSignalSemaphores = nullptr;
-    
+
     vkQueueSubmit(queue, 1, &submitInfo, fence);
-    
+
     vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
 }
 
@@ -708,39 +715,39 @@ void EffectComposer::apply(Drawable *drawable) {
         }
         drawable->composerTexture->sizeChanged = false;
     }
-    
+
     if (isSuitableForColorSwap(drawable)) {
         swapColors(drawable);
         return;
-    }    
+    }
 }
 
 void EffectComposer::init() {
     VkResult result;
-    
+
     result = createInstance();
     if (result != VK_SUCCESS) {
         printf("Failed to create instance, result %d", result);
         return;
     }
-    
+
     result = pickPhysicalDevice();
     if (result != VK_SUCCESS) {
         printf("Failed to find a suitable physical device, result %d", result);
         return;
     }
-    
+
     result = createDevice();
     if (result != VK_SUCCESS) {
         printf("Failed to create device, result %d", result);
         return;
     }
-    
+
     result = createPipelines();
     if (result != VK_SUCCESS) {
         printf("Failed to create pipelines, result %d", result);
         return;
     }
-    
+
     initialized = true;
 }

@@ -13,40 +13,40 @@ class EffectComposer {
             int width;
             int height;
         };
-        
+
         struct DescriptorPool {
             VkDescriptorPool handle;
             uint32_t maxSize;
             uint32_t bindedResources;
-            
+
             bool isFull() {
                 return bindedResources >= maxSize;
             }
-            
+
             void addBindedResource() {
                 bindedResources++;
             }
-            
+
             void removeBindedResource() {
                 bindedResources--;
             }
         };
-        
+
         class DescriptorPoolBuffer {
-            private: 
+            private:
                 std::vector<std::shared_ptr<DescriptorPool>> pools;
                 std::unordered_map<VkImage, DescriptorPool *> imageBindings;
-            
+
             public:
                 void addNew(VkDevice device) {
                     auto descriptorPool = std::make_shared<DescriptorPool>();
                     descriptorPool->maxSize = 1024;
                     descriptorPool->bindedResources = 0;
-                
+
                     VkDescriptorPoolSize descSize{};
                     descSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                     descSize.descriptorCount = descriptorPool->maxSize;
-                
+
                     VkDescriptorPoolCreateInfo createInfo{};
                     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
                     createInfo.pNext = nullptr;
@@ -54,53 +54,53 @@ class EffectComposer {
                     createInfo.maxSets = descriptorPool->maxSize;
                     createInfo.poolSizeCount = 1;
                     createInfo.pPoolSizes = &descSize;
-                
+
                     vkCreateDescriptorPool(device, &createInfo, nullptr, &descriptorPool->handle);
-                
+
                     pools.push_back(descriptorPool);
                 }
-            
+
                 DescriptorPool *findFreePool(VkDevice device) {
                     for (const auto& pool : pools) {
-                        if (!pool->isFull()) 
+                        if (!pool->isFull())
                             return pool.get();
                     }
-               
+
                     addNew(device);
                     return pools.back().get();
                 }
-                
+
                 DescriptorPool *getPoolForImage(VkImage image) {
                     auto it = imageBindings.find(image);
                     if (it == imageBindings.end())
                         return nullptr;
-                        
+
                     return it->second;
                 }
-            
+
                 void addImageBinding(VkImage image, DescriptorPool *pool) {
                     imageBindings[image] = pool;
                     pool->addBindedResource();
                 }
-            
+
                 void removeImageBinding(VkImage image) {
                     auto it = imageBindings.find(image);
                     if (it == imageBindings.end())
                         return;
-                    
+
                     auto descriptorPool = it->second;
                     descriptorPool->removeBindedResource();
                     imageBindings.erase(image);
                 }
-            
+
                 void removeCurrent(VkDevice device) {
                     auto descriptorPool = pools.back();
                     pools.pop_back();
-                
+
                     vkDestroyDescriptorPool(device, descriptorPool->handle, nullptr);
                 }
         };
-        
+
         VkInstance instance;
         VkPhysicalDevice physicalDevice;
         VkDevice device;
@@ -113,17 +113,17 @@ class EffectComposer {
         DescriptorPoolBuffer poolsBuffer;
         VkPipeline colorSwapPipeline;
         VulkanTable dispatchTable;
-        
+
         bool colorSwapEnabled = false;
         bool initialized = false;
-        
+
         VkResult createInstance();
         VkResult pickPhysicalDevice();
         VkResult createDevice();
         VkResult createPipelines();
         void swapColors(Drawable *drawable);
-        
-  public:      
+
+  public:
         VkResult createComposerTexture(Drawable *drawable);
         void destroyComposerTexture(Drawable *drawable);
         void init();
