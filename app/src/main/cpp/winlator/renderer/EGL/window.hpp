@@ -30,6 +30,7 @@ struct Window {
     int directContentOffsetY = 0;
     bool enabled = true;
     void *control = nullptr;
+    bool backPressureEnabled = false;
 
     bool hasDirectContents() {
         return !directContents.empty();

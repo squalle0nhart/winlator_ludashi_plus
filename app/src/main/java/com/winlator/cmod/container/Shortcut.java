@@ -326,6 +326,14 @@ public class Shortcut {
         putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
     }
 
+    public boolean getDisplayXBackPressure() {
+        String v = getExtra("displayXBackPressure", null);
+        return v != null ? v.equals("1") : container.getDisplayXBackPressure();
+    }
+    public void setDisplayXBackPressure(boolean v) {
+        putExtra("displayXBackPressure", v ? "1" : "0");
+    }
+
     public String getRendererPresentMode() {
         String v = getExtra("rendererPresentMode", null);
         return v != null && !v.isEmpty() ? v : container.getRendererPresentMode();

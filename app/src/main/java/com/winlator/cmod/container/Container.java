@@ -187,6 +187,13 @@ public class Container {
         putExtra("displayXPresentAtRefreshRate", v ? "1" : "0");
     }
 
+    public boolean getDisplayXBackPressure() {
+        return "1".equals(getExtra("displayXBackPressure", "0"));
+    }
+    public void setDisplayXBackPressure(boolean v) {
+        putExtra("displayXBackPressure", v ? "1" : "0");
+    }
+
     public boolean isLsfgEnabled() {
         String value = getExtra("lsfgEnabled", "false");
         return "1".equals(value) || "true".equalsIgnoreCase(value);

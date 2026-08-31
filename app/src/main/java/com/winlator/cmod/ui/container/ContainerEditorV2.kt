@@ -172,6 +172,7 @@ private class ContainerEditorStateV2(
     var trueDisplayX by mutableStateOf(editing?.getTrueDisplayX() ?: false)
     var displayXPerformanceMode by mutableStateOf(editing?.getDisplayXPerformanceMode() ?: true)
     var displayXPresentAtRefreshRate by mutableStateOf(editing?.getDisplayXPresentAtRefreshRate() ?: true)
+    var displayXBackPressure by mutableStateOf(editing?.getDisplayXBackPressure() ?: false)
     var frameGenBackend by mutableStateOf(editing?.getFrameGenBackend() ?: "lsfg_vk")
     var lsfgMultiplier by mutableIntStateOf(editing?.getLsfgMultiplier() ?: 0)
     var lsfgFlowScale by mutableStateOf(editing?.getLsfgFlowScale() ?: 0.80f)
@@ -312,7 +313,7 @@ private class ContainerEditorStateV2(
         name, screen, audio, oboeProfile, oboeApi, oboeAdaptive, oboeExclusive, hudMode, locale, soundFont,
         fullscreen, desktopTheme, desktopBackground, wallpaperStamp, mouseWarp,
         renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
-        displayXPerformanceMode, displayXPresentAtRefreshRate, frameGenBackend, lsfgMultiplier,
+        displayXPerformanceMode, displayXPresentAtRefreshRate, displayXBackPressure, frameGenBackend, lsfgMultiplier,
         lsfgFlowScale, lsfgPerformanceMode, winFgMultiplier, winFgFlowScale, winFgModel, graphicsDriver, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
@@ -456,6 +457,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setTrueDisplayX(state.trueDisplayX)
         container.setDisplayXPerformanceMode(state.displayXPerformanceMode)
         container.setDisplayXPresentAtRefreshRate(state.displayXPresentAtRefreshRate)
+        container.setDisplayXBackPressure(state.displayXBackPressure)
         container.setFrameGenBackend(state.frameGenBackend)
         container.setLsfgMultiplier(state.lsfgMultiplier)
         container.setLsfgEnabled(state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2)
@@ -553,6 +555,7 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     .put("trueDisplayX", if (state.trueDisplayX) "1" else "0")
                     .put("displayXPerformanceMode", if (state.displayXPerformanceMode) "1" else "0")
                     .put("displayXPresentAtRefreshRate", if (state.displayXPresentAtRefreshRate) "1" else "0")
+                    .put("displayXBackPressure", if (state.displayXBackPressure) "1" else "0")
                     .put("frameGenBackend", state.frameGenBackend)
                     .put("lsfgEnabled", if (state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2) "true" else "false")
                     .put("lsfgMultiplier", state.lsfgMultiplier.toString())
@@ -862,6 +865,10 @@ private fun ContainerCategoryV2(
                     SettingsDivider()
                     SettingToggle("Present at refresh rate", s.displayXPresentAtRefreshRate) {
                         s.displayXPresentAtRefreshRate = it
+                    }
+                    SettingsDivider()
+                    SettingToggle("Submit every buffer", s.displayXBackPressure) {
+                        s.displayXBackPressure = it
                     }
                 } else {
                     if (s.renderer != "EGL") {

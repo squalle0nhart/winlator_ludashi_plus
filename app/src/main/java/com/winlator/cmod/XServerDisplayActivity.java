@@ -1191,11 +1191,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             boolean presentAtRefreshRate = shortcut != null
                     ? shortcut.getDisplayXPresentAtRefreshRate()
                     : container == null || container.getDisplayXPresentAtRefreshRate();
+            boolean backPressure = shortcut != null
+                    ? shortcut.getDisplayXBackPressure()
+                    : container != null && container.getDisplayXBackPressure();
             xServerView = new DisplayXServerView(
                     this,
                     xServer,
                     performanceMode,
-                    presentAtRefreshRate);
+                    presentAtRefreshRate,
+                    backPressure);
         } else if (useEGL) {
             EGLXServerView.loadNativeLibrary();
             xServerView = new EGLXServerView(this, xServer);

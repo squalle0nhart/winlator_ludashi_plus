@@ -12,7 +12,7 @@ DisplayX displayX;
 EffectComposer effectComposer;
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject thiz, jobject context, jobject xServer, jfloat refreshRate, jboolean performanceMode, jboolean presentAtRefreshRate) {
+Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject thiz, jobject context, jobject xServer, jfloat refreshRate, jboolean performanceMode, jboolean presentAtRefreshRate, jboolean backPressure) {
     jobject windowManagerObj = env->GetObjectField(xServer, cache.windowManager);
     jobject inputDeviceManagerObj = env->GetObjectField(xServer, cache.inputDeviceManager);
     jobject rootWindowObj = env->GetObjectField(windowManagerObj, cache.rootWindow);
@@ -170,6 +170,7 @@ Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject
 
     displayX.setPerformanceMode(performanceMode);
     displayX.setPresentAtRefreshRate(presentAtRefreshRate);
+    displayX.setBackPressure(backPressure);
     displayX.start();
 }
 

@@ -138,6 +138,7 @@ class DisplayX {
         std::atomic_bool surfaceChanged{false};
         std::atomic_bool performanceMode{true};
         std::atomic_bool presentAtRefreshRate{true};
+        std::atomic_bool backPressure{false};
 
         bool requestUpdate = false;
         int fullscreenMode = 0;
@@ -194,4 +195,5 @@ class DisplayX {
         void setFullscreenMode(int mode);
         void setPerformanceMode(bool enabled);
         void setPresentAtRefreshRate(bool enabled);
+        void setBackPressure(bool enabled);
 };

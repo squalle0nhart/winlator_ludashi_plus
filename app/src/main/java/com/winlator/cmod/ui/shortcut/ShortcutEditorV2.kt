@@ -164,6 +164,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var trueDisplayX by mutableStateOf(shortcut.getTrueDisplayX())
     var displayXPerformanceMode by mutableStateOf(shortcut.getDisplayXPerformanceMode())
     var displayXPresentAtRefreshRate by mutableStateOf(shortcut.getDisplayXPresentAtRefreshRate())
+    var displayXBackPressure by mutableStateOf(shortcut.getDisplayXBackPressure())
     var frameGenBackend by mutableStateOf(shortcut.getFrameGenBackend())
     var lsfgMultiplier by mutableIntStateOf(shortcut.getLsfgMultiplier())
     var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
@@ -381,6 +382,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
         shortcut.setTrueDisplayX(trueDisplayX)
         shortcut.setDisplayXPerformanceMode(displayXPerformanceMode)
         shortcut.setDisplayXPresentAtRefreshRate(displayXPresentAtRefreshRate)
+        shortcut.setDisplayXBackPressure(displayXBackPressure)
         save()
     }
 
@@ -806,6 +808,11 @@ private fun ShortcutCategoryV2(
                     SettingsDivider()
                     SettingToggle("Present at refresh rate", s.displayXPresentAtRefreshRate) {
                         s.displayXPresentAtRefreshRate = it
+                        s.saveRenderer()
+                    }
+                    SettingsDivider()
+                    SettingToggle("Submit every buffer", s.displayXBackPressure) {
+                        s.displayXBackPressure = it
                         s.saveRenderer()
                     }
                 } else {

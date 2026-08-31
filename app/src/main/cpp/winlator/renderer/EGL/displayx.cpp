@@ -642,6 +642,10 @@ void DisplayX::presentThreadLoop() {
                 }
                 pSTSetBuffer(presentTransaction, window->control,
                              buffer, request->syncFence);
+                if (!window->backPressureEnabled && pSTSetBackPressure && backPressure) {
+                    pSTSetBackPressure(presentTransaction, window->control, true);
+                    window->backPressureEnabled = true;
+                }
                 request->fenceSubmitted = true;
                 request->syncFence = -1;
             } else {
@@ -825,8 +829,6 @@ void DisplayX::createWindowControl(Window *window) {
     window->control = pSCCreate(window->parent->control, "displayx-window");
     if (!window->control) return;
     if (pSCAcquire) pSCAcquire(window->control);
-    if (pSTSetBackPressure)
-        pSTSetBackPressure(windowTransaction, window->control, false);
     pSTSetZOrder(windowTransaction, window->control, window->zOrder);
     pSTSetVisibility(windowTransaction, window->control, SURFACE_VISIBILITY_HIDE);
 
@@ -1089,4 +1091,8 @@ void DisplayX::setPresentAtRefreshRate(bool enabled) {
     auto lock = presentLock.lock();
     presentAtRefreshRate = enabled;
     if (!enabled && !presentRequests.empty()) presentLock.notify();
+}
+
+void DisplayX::setBackPressure(bool enabled) {
+    backPressure = enabled;
 }
