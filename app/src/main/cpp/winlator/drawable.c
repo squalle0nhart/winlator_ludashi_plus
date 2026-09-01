@@ -544,6 +544,10 @@ Java_com_winlator_cmod_xserver_Drawable_allocate(JNIEnv *env, jobject obj, jint 
         desc.usage &= ~AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY;
         ret = AHardwareBuffer_allocate(&desc, &hardwareBuffer);
     }
+    if (ret != 0) {
+        desc.usage &= ~AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
+        ret = AHardwareBuffer_allocate(&desc, &hardwareBuffer);
+    }
     if (ret != 0 || !hardwareBuffer) {
         printf("Failed to allocate hardwareBuffer");
         return 0;

@@ -59,7 +59,13 @@ bool EffectComposer::isColorSwapEnabled() {
 }
 
 bool EffectComposer::isSuitableForColorSwap(Drawable *drawable) {
-    return isColorSwapEnabled() && !drawable->isDirectContent && !drawable->isDisplayX;
+    if (!isColorSwapEnabled() || !drawable || !drawable->ahb ||
+        drawable->isDirectContent || drawable->isDisplayX)
+        return false;
+
+    AHardwareBuffer_Desc desc{};
+    AHardwareBuffer_describe(drawable->ahb, &desc);
+    return desc.usage & AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
 }
 
 VkResult EffectComposer::createInstance() {
