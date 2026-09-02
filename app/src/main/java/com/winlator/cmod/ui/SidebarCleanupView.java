@@ -286,31 +286,20 @@ public class SidebarCleanupView extends View {
         }
 
         View root = getRootView();
-        Switch fsr = root.findViewById(R.id.SWEnableFSR);
-        Spinner upscaler = root.findViewById(R.id.SPUpscalerMode);
         Spinner postFx = root.findViewById(R.id.SPPostFXMode);
         SeekBar sharpness = root.findViewById(R.id.SBSharpness);
 
-        if (fsr == null || upscaler == null || postFx == null || sharpness == null
-                || upscaler.getAdapter() == null || postFx.getAdapter() == null
-                || upscaler.getOnItemSelectedListener() == null
+        if (postFx == null || sharpness == null || postFx.getAdapter() == null
                 || postFx.getOnItemSelectedListener() == null) {
             retryBind();
             return;
         }
 
         resolveShortcutFile(activity);
-        restoreShortcutGraphics(container, fsr, upscaler, postFx, sharpness);
+        restoreShortcutGraphics(container, postFx, sharpness);
 
-        wrapSpinnerAutosave(upscaler);
         wrapSpinnerAutosave(postFx);
 
-        fsr.setOnTouchListener((v, event) -> {
-            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                postDelayed(this::saveGraphicsState, 40);
-            }
-            return false;
-        });
         sharpness.setOnTouchListener((v, event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_UP
                     || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
@@ -342,22 +331,9 @@ public class SidebarCleanupView extends View {
         });
     }
 
-    private void restoreShortcutGraphics(Container container, Switch fsr, Spinner upscaler,
-                                         Spinner postFx, SeekBar sharpness) {
+    private void restoreShortcutGraphics(Container container, Spinner postFx, SeekBar sharpness) {
         Shortcut store = openShortcutStore(container);
         if (store == null) return;
-
-        String filterValue = store.getExtra("graphicsFilterMode", "");
-        if (!filterValue.isEmpty()) {
-            int filter = parseInt(filterValue, 0);
-            if (filter >= 2 && upscaler.getCount() > 0) {
-                int position = Math.max(0, Math.min(upscaler.getCount() - 1, filter - 2));
-                upscaler.setSelection(position, false);
-                fsr.setChecked(true);
-            } else {
-                fsr.setChecked(false);
-            }
-        }
 
         String postValue = store.getExtra("graphicsPostFXMode", "");
         if (!postValue.isEmpty() && postFx.getCount() > 0) {
@@ -384,26 +360,20 @@ public class SidebarCleanupView extends View {
         if (activity == null || container == null) return;
 
         View root = getRootView();
-        Switch fsr = root.findViewById(R.id.SWEnableFSR);
-        Spinner upscaler = root.findViewById(R.id.SPUpscalerMode);
         Spinner postFx = root.findViewById(R.id.SPPostFXMode);
         SeekBar sharpness = root.findViewById(R.id.SBSharpness);
-        if (fsr == null || upscaler == null || postFx == null || sharpness == null) return;
+        if (postFx == null || sharpness == null) return;
 
-        int upscalerPosition = Math.max(0, upscaler.getSelectedItemPosition());
-        String filter = fsr.isChecked() ? String.valueOf(upscalerPosition + 2) : "0";
         String post = String.valueOf(Math.max(0, postFx.getSelectedItemPosition()));
         String sharp = String.valueOf(Math.round(sharpness.getValue()));
 
         Shortcut store = openShortcutStore(container);
         if (store != null) {
-            store.putExtra("graphicsFilterMode", filter);
             store.putExtra("graphicsSharpness", sharp);
             store.putExtra("graphicsPostFXMode", post);
             store.putExtra("graphicsColorMode", "0");
             store.saveData();
         } else {
-            container.putExtra("graphicsFilterMode", filter);
             container.putExtra("graphicsSharpness", sharp);
             container.putExtra("graphicsPostFXMode", post);
             container.putExtra("graphicsColorMode", "0");

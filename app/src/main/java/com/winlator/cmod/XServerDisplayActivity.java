@@ -258,6 +258,34 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private void persistRendererFilterMode(int mode) {
+        if (shortcut != null) {
+            shortcut.setRendererFilterMode(mode);
+            shortcut.saveData();
+        } else if (container != null) {
+            container.setRendererFilterMode(mode);
+            container.saveData();
+        }
+    }
+
+    private int restoreRendererFilterMode() {
+        String legacyMode = shortcut != null ? shortcut.getExtra("graphicsFilterMode", null)
+                : container != null ? container.getExtra("graphicsFilterMode", null) : null;
+        if (legacyMode != null) {
+            try {
+                int mode = Integer.parseInt(legacyMode);
+                if (mode >= 0 && mode <= 3) {
+                    if (shortcut != null) shortcut.putExtra("graphicsFilterMode", null);
+                    else container.putExtra("graphicsFilterMode", null);
+                    persistRendererFilterMode(mode);
+                    return mode;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+        return shortcut != null ? shortcut.getRendererFilterMode()
+                : container != null ? container.getRendererFilterMode() : 0;
+    }
+
     private void createNotifcationChannel() {
         String name = "Winlator";
         String description = "Winlator XServer Messages";
@@ -1987,9 +2015,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 container.putExtra("graphicsFpsPreset",
                     String.valueOf(spNativeFPS != null ? spNativeFPS.getSelectedItemPosition() : 0));
                 if (vkRenderer != null) {
-                    container.putExtra("graphicsFilterMode",
-                        String.valueOf(swEnableFSR != null && swEnableFSR.isChecked()
-                            ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2) : 0));
+                    container.setRendererFilterMode(swEnableFSR != null && swEnableFSR.isChecked()
+                            ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 3) : 0);
                     container.putExtra("graphicsSharpness",
                         String.valueOf(sbSharpness != null ? sbSharpness.getValue() : 50f));
                     container.putExtra("graphicsPostFXMode",
@@ -2011,7 +2038,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (swEnableFSR != null && swEnableFSR.isChecked()) {
-                        vkRenderer.setFilterMode(pos + 2);
+                        int mode = pos + 2;
+                        vkRenderer.setFilterMode(mode);
+                        persistRendererFilterMode(mode);
                         updateRuntimeStatusUi(runtimeFexMode);
                     }
                 }
@@ -2035,16 +2064,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (sbSharpness        != null) sbSharpness.setVisibility(vis);
         };
 
-        String savedFilter = shortcut != null
-                ? shortcut.getExtra("graphicsFilterMode", container != null
-                        ? container.getExtra("graphicsFilterMode") : "")
-                : container != null ? container.getExtra("graphicsFilterMode") : "";
-        int savedFilterMode = savedFilter.isEmpty() ? 0 : Integer.parseInt(savedFilter);
-        boolean fsrOn = savedFilterMode >= 2;
-        int baseFilterMode = (shortcut != null ? shortcut.getRendererFilterMode()
-                : container != null ? container.getRendererFilterMode() : 0) == 1 ? 1 : 0;
-        if (spUpscalerMode != null && fsrOn)
-            spUpscalerMode.setSelection(Math.min(1, savedFilterMode - 2), false);
+        int savedFilterMode = restoreRendererFilterMode();
+        boolean fsrOn = savedFilterMode == 2 || savedFilterMode == 3;
+        int baseFilterMode = fsrOn ? 0 : savedFilterMode;
+        if (spUpscalerMode != null)
+            spUpscalerMode.setSelection(fsrOn ? savedFilterMode - 2 : 1, false);
         if (swEnableFSR != null) {
             swEnableFSR.setChecked(fsrOn);
             if (spUpscalerMode != null)
@@ -2055,9 +2079,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
             swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
                 if (spUpscalerMode != null)
                     spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
-                vkRenderer.setFilterMode(checked
-                    ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 2)
-                    : baseFilterMode);
+                int mode = checked
+                    ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 3)
+                    : baseFilterMode;
+                vkRenderer.setFilterMode(mode);
+                persistRendererFilterMode(mode);
                 updateSharpnessVis.run();
                 updateRuntimeStatusUi(runtimeFexMode);
             });
