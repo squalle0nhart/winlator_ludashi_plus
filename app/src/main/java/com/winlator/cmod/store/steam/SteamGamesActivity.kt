@@ -118,7 +118,7 @@ class SteamGamesActivity : Activity(), SteamRepository.SteamEventListener {
         // and markUninstalled(), so installed state is always current.
         val rows = repo.getCachedGameRows()
         games = rows
-            .filter { it.type == "game" }
+            .filter { SteamRepository.isLibraryApp(it.appId, it.type) }
             .map { SteamGame.fromGameRow(it) }
             .sortedBy { it.name.lowercase() }
         if (games.isNotEmpty()) {

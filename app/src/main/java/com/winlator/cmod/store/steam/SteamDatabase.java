@@ -378,6 +378,11 @@ public final class SteamDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public void clearDepotManifests(int appId) {
+        getWritableDatabase().delete("depot_manifests", "app_id = ?",
+                new String[]{String.valueOf(appId)});
+    }
+
     public void upsertDepotManifest(int appId, int depotId, long manifestId, long sizeBytes) {
         ContentValues cv = new ContentValues();
         cv.put("app_id",      appId);
@@ -427,10 +432,11 @@ public final class SteamDatabase extends SQLiteOpenHelper {
                 "steam_downloads", null, cv, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
-    public void updateDownloadProgress(int appId, long bytesDownloaded) {
+    public void updateDownloadProgress(int appId, long bytesDownloaded, long bytesTotal) {
         ContentValues cv = new ContentValues();
         cv.put("status",           DL_DOWNLOADING);
         cv.put("bytes_downloaded", bytesDownloaded);
+        cv.put("bytes_total",      bytesTotal);
         getWritableDatabase().update(
                 "steam_downloads", cv, "app_id = ?", new String[]{String.valueOf(appId)});
     }

@@ -79,7 +79,7 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
                 if (id != appId) return
                 val done  = parts.getOrNull(2)?.toLongOrNull() ?: 0L
                 val total = parts.getOrNull(3)?.toLongOrNull() ?: 1L
-                val pct   = if (total > 0) (done * 100 / total).toInt().coerceIn(0, 100) else 0
+                val pct   = if (total > 0) (done.toDouble() * 100 / total).toInt().coerceIn(0, 99) else 0
                 ui.post {
                     progressBar.visibility  = View.VISIBLE
                     progressBar.progress    = pct
@@ -102,7 +102,7 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
                     val dlRow = SteamRepository.getInstance().database.getDownload(appId)
                     val done  = dlRow?.bytesDownloaded ?: 0L
                     val total = dlRow?.bytesTotal ?: 0L
-                    val pct   = if (total > 0) (done * 100 / total).toInt().coerceIn(0, 100) else 0
+                    val pct   = if (total > 0) (done.toDouble() * 100 / total).toInt().coerceIn(0, 99) else 0
                     progressBar.visibility  = View.VISIBLE
                     progressBar.progress    = pct
                     progressText.visibility = View.VISIBLE
@@ -182,11 +182,18 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
         loadHeaderImage()
 
         // Check for an active / paused download
-        val dlRow = SteamRepository.getInstance().database.getDownload(appId)
+        downloadHandle = SteamDepotDownloader.getControl(appId)
+        val db = SteamRepository.getInstance().database
+        var dlRow = db.getDownload(appId)
+        if (dlRow != null && downloadHandle == null &&
+            dlRow.status in listOf(SteamDatabase.DL_DOWNLOADING, SteamDatabase.DL_QUEUED)) {
+            db.markDownloadPaused(appId, dlRow.bytesDownloaded)
+            dlRow = db.getDownload(appId)
+        }
         if (dlRow != null) {
             val pct = if (dlRow.bytesTotal > 0) (dlRow.bytesDownloaded * 100 / dlRow.bytesTotal).toInt().coerceIn(0, 100) else 0
             when (dlRow.status) {
-                SteamDatabase.DL_DOWNLOADING -> {
+                SteamDatabase.DL_QUEUED, SteamDatabase.DL_DOWNLOADING -> {
                     if (SteamDepotDownloader.isDownloading(appId)) {
                         progressBar.visibility  = View.VISIBLE
                         progressBar.progress    = pct
@@ -199,9 +206,6 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
                         pauseBtn.alpha          = 1f
                         pauseBtn.text           = "Pause"
                         pauseBtn.setBackgroundColor(COLOR_PAUSE)
-                    } else {
-                        // Stale record (app was killed mid-download) — clean up
-                        SteamRepository.getInstance().database.deleteDownload(appId)
                     }
                 }
                 SteamDatabase.DL_PAUSED -> {
@@ -264,32 +268,20 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
     private fun onInstallClicked() {
         val g = game ?: return
 
-        // Active download — cancel immediately and reset UI without waiting for event
-        val handle = downloadHandle
+        val handle = SteamDepotDownloader.getControl(appId)
         if (handle != null) {
-            val db = SteamRepository.getInstance().database
-            val dir = db.getDownload(appId)?.installDir ?: ""
             handle.cancel.run()
-            downloadHandle = null
-            if (dir.isNotEmpty()) Thread { File(dir).deleteRecursively() }.start()
-            progressBar.visibility  = View.GONE
-            progressText.visibility = View.GONE
-            statusText.text = "Download cancelled"
-            statusText.setTextColor(Color.parseColor("#AAAAAA"))
-            installBtn.text = "Install"
-            installBtn.setBackgroundColor(COLOR_INSTALL)
-            installBtn.isEnabled = true
-            resetPauseBtn()
+            installBtn.text = "Cancelling…"
+            installBtn.isEnabled = false
+            pauseBtn.isEnabled = false
             return
         }
 
-        // Paused download — cancel also deletes files + row
+        // Paused download — remove the row; keep partial files available for a retry.
         val db = SteamRepository.getInstance().database
         val dlRow = db.getDownload(appId)
         if (dlRow != null && dlRow.status == SteamDatabase.DL_PAUSED) {
             db.deleteDownload(appId)
-            val dir = dlRow.installDir
-            if (dir.isNotEmpty()) Thread { File(dir).deleteRecursively() }.start()
             progressBar.visibility  = View.GONE
             progressText.visibility = View.GONE
             statusText.text = "Download cancelled"
@@ -314,19 +306,12 @@ class SteamGameDetailActivity : Activity(), SteamRepository.SteamEventListener {
     }
 
     private fun onPauseResumeClicked() {
-        val handle = downloadHandle
+        val handle = SteamDepotDownloader.getControl(appId)
         if (handle != null) {
-            // Immediately flip button to Resume — don't wait for DownloadPaused event
             handle.pause.run()
-            downloadHandle = null
-            pauseBtn.text = "Resume"
-            pauseBtn.setBackgroundColor(COLOR_RESUME)
-            pauseBtn.isEnabled = true
-            pauseBtn.alpha = 1f
-            installBtn.text = "Cancel"
-            installBtn.isEnabled = true
-            val cur = progressText.text.toString()
-            if (cur.startsWith("Downloading")) progressText.text = cur.replace("Downloading", "Pausing")
+            pauseBtn.text = "Pausing…"
+            pauseBtn.isEnabled = false
+            installBtn.isEnabled = false
         } else {
             // Currently paused — resume it
             val dlRow = SteamRepository.getInstance().database.getDownload(appId) ?: return

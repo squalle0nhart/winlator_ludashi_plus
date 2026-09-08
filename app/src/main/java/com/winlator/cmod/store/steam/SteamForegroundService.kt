@@ -72,6 +72,10 @@ class SteamForegroundService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        if (SteamDepotDownloader.hasActiveDownloads()) {
+            super.onTaskRemoved(rootIntent)
+            return
+        }
         Log.i(TAG, "Task removed — stopping Steam foreground service")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

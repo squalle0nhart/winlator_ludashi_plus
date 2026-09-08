@@ -36,7 +36,7 @@ object SteamCryptoCompat {
         if (current != null) {
             Security.removeProvider("BC")
         }
-        Security.insertProviderAt(BouncyCastleProvider(), 1)
+        Security.addProvider(BouncyCastleProvider())
 
         check(hasBcSha1()) { "Provider BC still does not expose SHA-1 after bcprov reinstall" }
         ready = true

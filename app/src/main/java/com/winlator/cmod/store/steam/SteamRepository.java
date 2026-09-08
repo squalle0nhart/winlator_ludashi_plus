@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -90,6 +91,23 @@ public final class SteamRepository {
 
     private volatile boolean connected = false;
     private volatile boolean loggedIn  = false;
+    private volatile long logonStartedAt = 0L;
+
+    public static boolean isLibraryApp(int appId, String type) {
+        return "game".equals(type) || appId == 993090; // Lossless Scaling
+    }
+
+    static boolean isSelectedDepot(int appId, int depotId, KeyValue config) {
+        // Bannerlator: the duplicate Lossless Scaling depot contains an older Lossless.dll.
+        if (appId == 993090 && depotId == 993092) return false;
+        String oslist = kvStr(config.get("oslist")).trim();
+        if (!oslist.isEmpty() && java.util.Arrays.stream(oslist.split(","))
+                .noneMatch(os -> "windows".equalsIgnoreCase(os.trim()))) return false;
+        String language = kvStr(config.get("language")).trim();
+        String lowViolence = kvStr(config.get("lowviolence")).trim();
+        return (language.isEmpty() || "english".equalsIgnoreCase(language))
+                && !"1".equals(lowViolence) && !"true".equalsIgnoreCase(lowViolence);
+    }
 
     public boolean isConnected() { return connected; }
     public boolean isLoggedIn()  { return loggedIn; }
@@ -345,6 +363,7 @@ public final class SteamRepository {
         stopPump();
         connected = false;
         loggedIn  = false;
+        logonStartedAt = 0L;
     }
 
     private void startPump() {
@@ -393,6 +412,7 @@ public final class SteamRepository {
         Log.i(TAG, "Disconnected (userInitiated=" + cb.isUserInitiated() + ", attempt=" + reconnectAttempts + ")");
         connected = false;
         loggedIn  = false;
+        logonStartedAt = 0L;
         if (!cb.isUserInitiated() && pumping.get() && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
             long delayMs = reconnectAttempts * 2000L;  // 2s, 4s, 6s, 8s, 10s
@@ -412,6 +432,7 @@ public final class SteamRepository {
     }
 
     private void onLoggedOn(LoggedOnCallback cb) {
+        logonStartedAt = 0L;
         if (cb.getResult() != EResult.OK) {
             Log.w(TAG, "Login failed: " + cb.getResult());
             emit("LoginFailed:" + cb.getResult().name());
@@ -431,6 +452,7 @@ public final class SteamRepository {
     private void onLoggedOff(LoggedOffCallback cb) {
         Log.i(TAG, "Logged off: " + cb.getResult());
         loggedIn = false;
+        logonStartedAt = 0L;
         emit("LoggedOut");
     }
 
@@ -555,7 +577,9 @@ public final class SteamRepository {
                         // Skip non-playable app types
                         if ("tool".equals(type) || "hardware".equals(type)
                                 || "music".equals(type) || "video".equals(type)
-                                || "advertising".equals(type)) continue;
+                                || "advertising".equals(type)) {
+                            if (!isLibraryApp(app.getId(), type)) continue;
+                        }
                         // Accept "game", "dlc", "application", "demo", "beta", ""
                         // Empty type means PICS didn't return common section — skip
                         if (type.isEmpty()) continue;
@@ -596,19 +620,26 @@ public final class SteamRepository {
                         long totalSize = 0L;
                         KeyValue depotsKv = root.get("depots");
                         List<KeyValue> depotChildren = depotsKv.getChildren();
+                        db.clearDepotManifests(app.getId());
                         if (depotChildren != null) {
                             for (KeyValue d : depotChildren) {
                                 int depotId;
                                 try { depotId = Integer.parseInt(d.getName()); }
                                 catch (NumberFormatException ignored) { continue; }
-                                if (depotSb.length() > 0) depotSb.append(',');
-                                depotSb.append(depotId);
+                                if (!isSelectedDepot(app.getId(), depotId, d.get("config"))) continue;
                                 // Extract manifest GID from depots/{id}/manifests/public/gid
                                 String manifestGid = kvStr(d.get("manifests").get("public").get("gid"));
                                 if (manifestGid.isEmpty()) {
                                     // Some depots use "manifest" directly (older format)
                                     manifestGid = kvStr(d.get("manifest"));
                                 }
+                                if (manifestGid.isEmpty()) continue;
+                                long manifestId;
+                                try { manifestId = Long.parseUnsignedLong(manifestGid); }
+                                catch (NumberFormatException ignored) { continue; }
+                                if (manifestId == 0L) continue;
+                                if (depotSb.length() > 0) depotSb.append(',');
+                                depotSb.append(depotId);
                                 // Modern PICS stores size at manifests/public/size (uncompressed).
                                 // Older format uses the top-level maxsize field. Try both.
                                 String sizeStr = kvStr(d.get("manifests").get("public").get("size"));
@@ -618,12 +649,7 @@ public final class SteamRepository {
                                     try { depotSize = Long.parseLong(sizeStr); totalSize += depotSize; }
                                     catch (NumberFormatException ignored) {}
                                 }
-                                if (!manifestGid.isEmpty()) {
-                                    try {
-                                        long manifestId = Long.parseLong(manifestGid);
-                                        db.upsertDepotManifest(app.getId(), depotId, manifestId, depotSize);
-                                    } catch (NumberFormatException ignored) {}
-                                }
+                                db.upsertDepotManifest(app.getId(), depotId, manifestId, depotSize);
                             }
                         }
 
@@ -683,11 +709,20 @@ public final class SteamRepository {
     public void loginWithToken(String username, String refreshToken) {
         if (steamUser == null) return;
         Runnable work = () -> {
+            // All callers run this guard on the pump, preventing duplicate token logons.
+            long now = SystemClock.elapsedRealtime();
+            if (loggedIn || !connected || username.isEmpty() || refreshToken.isEmpty()) return;
+            if (logonStartedAt != 0L && now - logonStartedAt < 30_000L) return;
+            logonStartedAt = now;
             LogOnDetails details = new LogOnDetails();
             details.setUsername(username);
             details.setAccessToken(refreshToken);  // refreshToken goes in accessToken field
             details.setShouldRememberPassword(true);
-            steamUser.logOn(details);
+            try { steamUser.logOn(details); }
+            catch (Exception e) {
+                logonStartedAt = 0L;
+                emit("LoginFailed:" + e.getClass().getSimpleName());
+            }
         };
         // steamUser.logOn() does network I/O — must run on the pump background thread.
         if (pumpHandler != null) {
@@ -695,6 +730,20 @@ public final class SteamRepository {
         } else {
             new Thread(work, "SteamLogin").start();
         }
+    }
+
+    /** Wait on a download worker; the callback pump must remain free to finish logging on. */
+    public boolean ensureLoggedIn(long timeoutMs) {
+        if (loggedIn) return true;
+        if (!connected || !isLoggedInPrefs()) return false;
+        if (pumpHandler != null && android.os.Looper.myLooper() == pumpHandler.getLooper()) return false;
+        loginWithToken(pGet("username", ""), pGet("refresh_token", ""));
+        long deadline = SystemClock.elapsedRealtime() + timeoutMs;
+        while (!loggedIn && connected && SystemClock.elapsedRealtime() < deadline) {
+            try { Thread.sleep(150L); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); return false; }
+        }
+        return loggedIn;
     }
 
     /**
@@ -720,6 +769,8 @@ public final class SteamRepository {
     // -------------------------------------------------------------------------
 
     public void logout() {
+        loggedIn = false;
+        logonStartedAt = 0L;
         if (steamUser != null) steamUser.logOff();
         if (prefs != null) {
             prefs.edit()

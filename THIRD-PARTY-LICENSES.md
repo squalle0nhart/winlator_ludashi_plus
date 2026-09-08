@@ -1,3 +1,12 @@
+# Steam integration
+
+Depot selection, multi-depot progress, download/session lifecycle fixes, background
+download locks, and the Lossless Scaling library/depot exceptions are adapted from
+[Bannerlator revision 8b1750e7863a01db4837fd2c0a54a7242dc01ef7](https://github.com/The412Banner/Bannerlator/tree/8b1750e7863a01db4837fd2c0a54a7242dc01ef7)
+(3.0.8 preparation, checked 2026-09-08; GPL-3.0).
+Credits: Bannerlator/The412Banner and the JavaSteam/SteamKit2 contributors.
+See [port scope and validation](docs/steam-update.md).
+
 # VEGAS DXVK
 
 VEGAS 2.7.3 by [isygold](https://github.com/isygold/vegas-releases) is bundled from
