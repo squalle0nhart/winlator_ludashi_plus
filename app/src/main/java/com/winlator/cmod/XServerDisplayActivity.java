@@ -69,6 +69,8 @@ import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
+import com.winlator.cmod.core.FrameGenManager;
+import com.winlator.cmod.core.LsfgVkManager;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
@@ -584,7 +586,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         inputControlsManager = new InputControlsManager(this);
         boolean useDisplayX = isDisplayXEnabled();
-        int surfaceFormat = useDisplayX && "rgba8".equals(getSelectedSurfaceFormat())
+        boolean useEGL = shortcut != null ? shortcut.getRendererNative()
+                : container != null && container.getRendererNative();
+        int surfaceFormat = (useDisplayX || useEGL) && "rgba8".equals(getSelectedSurfaceFormat())
                 ? Drawable.HAL_PIXEL_FORMAT_RGBA_8888
                 : Drawable.HAL_PIXEL_FORMAT_BGRA_8888;
         xServer = new XServer(new ScreenInfo(screenSize), surfaceFormat);
@@ -1241,6 +1245,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
         final XServerRendererView renderer = xServerView;
         renderer.setCursorVisible(false);
+
+        boolean lsfgNative = FrameGenManager.BACKEND_LSFG_NATIVE.equals(shortcut != null
+                ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container));
+        if (lsfgNative) {
+            int multiplier = shortcut != null ? shortcut.getLsfgMultiplier()
+                    : container != null ? container.getLsfgMultiplier() : 0;
+            if (renderer instanceof VulkanXServerView) {
+                File dll = LsfgVkManager.isGlobalDllAvailable(this) ? LsfgVkManager.globalDllFile(this)
+                        : shortcut != null ? LsfgVkManager.containerDllFile(shortcut)
+                        : LsfgVkManager.containerDllFile(container);
+                float flowScale = shortcut != null ? shortcut.getLsfgFlowScale()
+                        : container != null ? container.getLsfgFlowScale() : 0.80f;
+                ((VulkanXServerView) renderer).setLsfgNative(dll, multiplier, flowScale);
+            } else if (multiplier >= 2) {
+                Toast.makeText(this, "LSFG Native requires the Vulkan renderer", Toast.LENGTH_LONG).show();
+            }
+        }
 
         if (renderer instanceof VulkanXServerView) {
             VulkanXServerView vkRenderer = (VulkanXServerView) renderer;
@@ -2569,7 +2590,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
 
         File graphicsRuntimeMarker = new File(rootDir,
-                "usr/lib/.winlator-graphics-runtime-c7474f7e-a20866cf-v2");
+                "usr/lib/.winlator-graphics-runtime-f194ef97-a20866cf-v3");
         if (firstTimeBoot || !graphicsRuntimeMarker.isFile()) {
             Log.d("XServerDisplayActivity", "Installing paired Pipetto wrapper and common graphics runtime");
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst",
@@ -2578,7 +2599,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst",
                     rootDir);
             FileUtils.writeString(graphicsRuntimeMarker,
-                    "wrapper=c7474f7e;extra_libs=a20866cf;layers=9d57736d;opengl=split-v1");
+                    "wrapper=f194ef9761ce004a6828f3409c08a67308b31019;extra_libs=a20866cf;layers=9d57736d;opengl=split-v1");
         }
 
         extractOpenGLDriver(rootDir);

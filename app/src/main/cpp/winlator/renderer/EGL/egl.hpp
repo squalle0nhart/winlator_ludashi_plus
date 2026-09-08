@@ -94,7 +94,7 @@ class EGLRenderer {
         void destroyEGLSurface();
         void destroyEGLContext();
         void renderCursor();
-        void renderDrawable(int textureId, int length, float xform[], bool isFromWindow);
+        void renderDrawable(int textureId, int length, float xform[], bool isFromWindow, bool swapColors);
         void updateTextureDrawable(int textureId, int width, int height, void *data);
         int allocateTexture(int width, int height);
         int allocateTextureDirect(AHardwareBuffer* hardwareBuffer);

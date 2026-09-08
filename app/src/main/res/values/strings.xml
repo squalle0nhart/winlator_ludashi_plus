@@ -692,4 +692,129 @@ E.g. <b>META</b> for <i>META key</i>, \n
     <string name="game_folder">Game Folder</string>
 
     <string name="magnifier_not_available">Magnifier is not available in DisplayX mode</string>
+    <string name="extreme_2">Extreme-2</string>
+    <string name="fex_extreme_wn">Extreme-wn</string>
+    <string name="fex_extreme_tso_wn">Extreme (TSO)-wn</string>
+    <string name="fex_extreme_gn">Extreme-gn</string>
+    <string name="box64_env_var_help__dynarec"><![CDATA[
+        Dynamic recompiler — the heart of Box64. It translates the game x86 code into ARM code once,
+        then reuses the translation.<br /><br />
+        <b>0</b> : Interpret every instruction one at a time. Correct, but many times slower and not
+        realistically playable. Debugging only.<br />
+        <b>1</b> : Translate and cache. This is what makes games run at usable speed. (default)
+        <br /><br /><b>When to change:</b> Never turn this off for playing. It exists for diagnosing a suspected translation bug: if a game misbehaves on 1 but is correct on 0, the fault is in the recompiler rather than the game.
+        ]]></string>
+    <string name="box64_env_var_help__dynarec_sep"><![CDATA[
+        Secondary entry points for CALL/RET. Lets Box64 jump into the middle of a block it already
+        translated instead of building a near-identical copy.<br /><br />
+        <b>0</b> : One entry point per block. More duplicate blocks, more memory.<br />
+        <b>1</b> : Add secondary entry points. Fewer duplicates, slightly faster. (default)<br />
+        <b>2</b> : More aggressive still.<br /><br />
+        Only has an effect when DYNAREC_CALLRET is on.
+        <br /><br /><b>When to change:</b> Leave it at the default. Worth lowering only if you are already turning CALLRET off for a packed or DRM-protected executable, since the two work together.
+        ]]></string>
+    <string name="box64_env_var_help__dynarec_noarch"><![CDATA[
+        How much bookkeeping Box64 keeps for each translated block. That bookkeeping is what lets it
+        notice when code or memory changes and re-translate correctly.<br /><br />
+        <b>0</b> : Keep everything. Safest. (default)<br />
+        <b>1</b> : Trim some. Less memory.<br />
+        <b>2</b> : Trim aggressively. Least memory, most likely to misbehave.<br /><br />
+        <b>When to change:</b> raise it only if you are short on RAM — it trades correctness for memory. Set it back to 0 first if a game starts crashing after previously running fine on the same preset.]]></string>
+    <string name="box64_env_var_help__dynarec_volatile_metadata"><![CDATA[
+        64-bit Windows programs can carry volatile metadata: the compiler marking exactly which memory
+        accesses must not be reordered. Box64 can read it and enforce strict ordering only where the
+        game genuinely needs it, instead of everywhere.<br /><br />
+        <b>0</b> : Ignore it.<br />
+        <b>1</b> : Use it. Usually faster than blanket STRONGMEM while staying correct. (default)<br /><br />
+        Only applies to 64-bit Windows games built with the metadata present.
+        <br /><br /><b>When to change:</b> Leave it on — it costs nothing and simply has no effect on games built without the metadata. Turning it off is only useful to check whether it is masking a different ordering problem.
+        ]]></string>
+    <string name="box64_env_var_help__dynacache"><![CDATA[
+        Whether translated blocks are kept on disk between runs so the next launch starts warm.<br /><br />
+        <b>0</b> : Off. Translate fresh every launch. (default)<br />
+        <b>1</b> / <b>2</b> : Increasing levels of caching. Faster startup and fewer first-time
+        stutters, at the cost of disk space.<br /><br />
+        Clear the container cache after a game update if you see odd behaviour.
+        <br /><br /><b>When to change:</b> Turn it on if a game takes a long time to warm up every session, or stutters in the same places on every launch. Clear the container cache after a game update, since a stale cache can produce odd behaviour.
+        ]]></string>
+    <string name="box64_env_var_help__aes"><![CDATA[
+        AES-NI, the hardware encryption instructions. Games, DRM and anti-cheat use them heavily.<br /><br />
+        <b>0</b> : Tell the game the CPU has no AES. Anything using it falls back to slow software
+        encryption, or picks a different code path.<br />
+        <b>1</b> : Advertise AES and map it onto the ARM equivalents, so it runs at near-native
+        speed. (default)<br /><br />
+        Turn it off only if a game misdetects the CPU and refuses to start.
+        <br /><br /><b>When to change:</b> Leave it on — it maps to real ARM instructions, so it is close to free. Turn it off only if a game misdetects the CPU and refuses to start.
+        ]]></string>
+    <string name="box64_env_var_help__pclmulqdq"><![CDATA[
+        Carry-less multiply — a specialised instruction used by encryption and checksum code, often
+        alongside AES.<br /><br />
+        <b>0</b> : Hide it. Callers fall back to slower software routines.<br />
+        <b>1</b> : Advertise it and map it to the ARM equivalent. (default)
+        <br /><br /><b>When to change:</b> Leave it on. It only matters for games doing heavy encryption or checksum work, where hiding it makes loading and verification noticeably slower.
+        ]]></string>
+    <string name="box64_env_var_help__shaext"><![CDATA[
+        SHA extensions — hardware SHA-1 and SHA-256 hashing, used for file verification, save
+        integrity checks and DRM.<br /><br />
+        <b>0</b> : Hide it. Hashing falls back to software and gets slower.<br />
+        <b>1</b> : Advertise it and map it to the ARM equivalent. (default)
+        <br /><br /><b>When to change:</b> Leave it on. Hiding it slows down any game that verifies its own files at startup, since every hash falls back to software.
+        ]]></string>
+    <string name="box64_env_var_help__sse42"><![CDATA[
+        SSE4.2 — string and text processing instructions plus hardware CRC32.<br /><br />
+        <b>0</b> : Hide it. Some modern games check for SSE4.2 at startup and refuse to run without
+        it.<br />
+        <b>1</b> : Advertise it. (default)<br /><br />
+        Leave this on unless a game specifically misbehaves with it.
+        <br /><br /><b>When to change:</b> Leave it on. Several modern games test for SSE4.2 during startup and exit immediately without it, usually with an unhelpful error or no message at all.
+        ]]></string>
+    <string name="box64_env_var_help__sse_flushto0"><![CDATA[
+        How denormals — extremely small floating-point numbers — are handled in SSE maths.<br /><br />
+        <b>0</b> : Full IEEE behaviour with exception flags tracked. Correct, but slow whenever a
+        game produces denormals. (default)<br />
+        <b>1</b> : Flush denormals straight to zero, which is what most game engines ask for anyway.
+        Faster, and can very slightly change physics or audio results.
+        <br /><br /><b>When to change:</b> Set it to 1 for a speed gain in games with heavy physics or audio processing, which generate denormals constantly. Set it back to 0 if physics or sound behave subtly differently from how they should.
+        ]]></string>
+    <string name="box64_env_var_help__x87_no80bits"><![CDATA[
+        x87 is the old floating-point unit. It works in 80-bit extended precision, which ARM has no
+        equivalent for, so Box64 has to emulate it.<br /><br />
+        <b>0</b> : Emulate full 80-bit precision. Accurate but slow.<br />
+        <b>1</b> : Use ordinary 64-bit doubles instead. Much faster, and what the fast presets pick.<br /><br />
+        Older games doing precise maths — physics, simulation, flight models — can drift or behave
+        oddly on 1.
+        <br /><br /><b>When to change:</b> Leave at 1 for modern games, which barely touch x87. Set it to 0 for older simulation-style games — flight sims, racing physics, strategy titles with large numbers — where accumulated precision loss shows up as drift over a long session.
+        ]]></string>
+    <string name="box64_env_var_help__cputype"><![CDATA[
+        Which CPU vendor Box64 reports to the game.<br /><br />
+        <b>0</b> : Intel (default)<br />
+        <b>1</b> : AMD<br /><br />
+        Some games, DRM and anti-cheat take different code paths depending on the vendor, and a few
+        refuse to run on one of them. Only worth changing if a specific title needs it.
+        <br /><br /><b>When to change:</b> Only change it for a specific title that needs it. Some games and anti-cheat take a different code path per vendor, and a few refuse to run on one of them outright.
+        ]]></string>
+    <string name="box64_env_var_help__unity"><![CDATA[
+        Marks the process as a Unity game so Box64 applies Unity-specific workarounds, mostly around
+        its Mono and IL2CPP runtimes and how they handle threads.<br /><br />
+        <b>0</b> : Off (default)<br />
+        <b>1</b> : On<br /><br />
+        Worth trying if a Unity game crashes at startup or hangs on a loading screen.
+        <br /><br /><b>When to change:</b> Turn it on if a Unity game crashes at startup or hangs on a loading screen. It is a no-op for everything else, so it is safe to leave on for a container dedicated to Unity titles.
+        ]]></string>
+    <string name="fexcore_env_var_help__dynamicl1cacheincreasecountheuristic"><![CDATA[
+        How eagerly the dynamic L1 block cache grows.<br /><br />
+        The L1 cache holds recently used translated blocks. When it fills, FEX either grows it or
+        starts discarding blocks it will likely need again. This number is how much pressure it
+        takes before growing: <b>lower grows sooner</b>, spending memory to avoid re-translating.<br /><br />
+        Default <b>250</b>. Only has any effect when DYNAMICL1CACHE is on.
+        <br /><br /><b>When to change:</b> Lower it if you see stutter in busy scenes and have memory to spare. Raise it on a memory-tight device. It does nothing at all unless DYNAMICL1CACHE is on.
+        ]]></string>
+    <string name="fexcore_env_var_help__dynamicl1cachedecreasecountheuristic"><![CDATA[
+        How eagerly the dynamic L1 block cache shrinks back down.<br /><br />
+        After a busy stretch — a level load, a big area transition — the cache may be far larger than
+        the game now needs. This number is how long it waits before handing memory back:
+        <b>higher holds memory longer</b>, which avoids shrinking and regrowing repeatedly.<br /><br />
+        Default <b>50</b>. Only has any effect when DYNAMICL1CACHE is on.
+        <br /><br /><b>When to change:</b> Raise it if you get a hitch shortly after a level load, which usually means the cache shrank and then had to grow straight back. Lower it to hand memory back sooner. It does nothing at all unless DYNAMICL1CACHE is on.
+        ]]></string>
 </resources>

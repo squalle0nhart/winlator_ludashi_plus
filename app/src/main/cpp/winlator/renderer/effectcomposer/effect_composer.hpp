@@ -121,13 +121,13 @@ class EffectComposer {
         VkResult pickPhysicalDevice();
         VkResult createDevice();
         VkResult createPipelines();
-        void swapColors(Drawable *drawable);
+        bool swapColors(Drawable *drawable);
 
   public:
         VkResult createComposerTexture(Drawable *drawable);
         void destroyComposerTexture(Drawable *drawable);
         void init();
-        void apply(Drawable *drawable);
+        bool apply(Drawable *drawable);
         void setColorSwapEnabled(bool enabled);
         bool isColorSwapEnabled();
         bool isEnabled();

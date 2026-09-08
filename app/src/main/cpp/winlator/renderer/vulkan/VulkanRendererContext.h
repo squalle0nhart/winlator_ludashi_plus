@@ -1,6 +1,10 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <list>
+#include <memory>
+#include <chrono>
+#include "lsfg/lsfg_probe.h"
+namespace lsfg { class Engine; }
 #include <cstddef>
 #include <vulkan/vulkan_android.h>
 
@@ -8,6 +12,17 @@
 #include "xform.hpp"
 
 struct VkTable {
+    PFN_vkGetPhysicalDeviceFeatures2 GetPhysicalDeviceFeatures2;
+    PFN_vkGetPhysicalDeviceFormatProperties GetPhysicalDeviceFormatProperties;
+    PFN_vkCreateComputePipelines CreateComputePipelines;
+    PFN_vkCmdDispatch CmdDispatch;
+    PFN_vkUnmapMemory UnmapMemory;
+    PFN_vkCreateQueryPool CreateQueryPool;
+    PFN_vkDestroyQueryPool DestroyQueryPool;
+    PFN_vkGetQueryPoolResults GetQueryPoolResults;
+    PFN_vkCmdResetQueryPool CmdResetQueryPool;
+    PFN_vkCmdWriteTimestamp CmdWriteTimestamp;
+
 
     PFN_vkCreateInstance CreateInstance;
 
@@ -334,6 +349,154 @@ public:
     std::vector<VkImageView>   swapchainViews;
     std::vector<VkFramebuffer> swapchainFBs;
 
+    // === Native LSFG: composite target ring ===================================
+    // Frame generation cannot composite straight into a swapchain image: the
+    // finished frame has to be READABLE (it becomes the next frame's LSFG
+    // input) and generated frames have to be STORAGE-WRITABLE by a compute
+    // dispatch. Android swapchain images are COLOR_ATTACHMENT only, and
+    // storage support on a swapchain format is not something a driver owes us.
+    //
+    // So when frame gen is armed the whole existing recording is redirected at
+    // a composite image we own — format-identical to the swapchain, so every
+    // existing pipeline stays render-pass compatible — and a copy moves it into
+    // the acquired swapchain image at the end. With frame gen off, not one of
+    // these objects is created and the direct-to-swapchain path is untouched.
+    struct CompositeTarget {
+        VkImage         img         = VK_NULL_HANDLE;
+        VkDeviceMemory  mem         = VK_NULL_HANDLE;
+        VkImageView     view        = VK_NULL_HANDLE;  // colour attachment + sampled
+        VkImageView     storageView = VK_NULL_HANDLE;  // compute writes (generate)
+        VkFramebuffer   fb          = VK_NULL_HANDLE;
+        VkDescriptorSet ds          = VK_NULL_HANDLE;  // sampled, for later passes
+    };
+    // Hard ceiling: (max generations + 1) presentable frames per source frame,
+    // times a queue depth of 2, capped so the footprint stays bounded.
+    static constexpr uint32_t kMaxCompositeTargets = 7;
+
+    std::vector<CompositeTarget> compositeTargets;
+    VkRenderPass compositeRenderPass = VK_NULL_HANDLE;  // CLEAR -> GENERAL
+    uint32_t     compositeW = 0, compositeH = 0;
+    uint32_t     compositeIndex = 0;      // rotates per composite; gives history for free
+    bool         compositeArmed = false;  // targets exist AND this frame uses them
+    bool         swapchainTransferDst = false; // swapchain was created with TRANSFER_DST
+
+    // Set from the app when the native LSFG engine is selected for this
+    // session. Read on the render thread; false keeps every path as it was.
+    std::atomic<bool> fgArmed_{false};
+    std::atomic<int>  fgMultiplier_{0};
+    // Tuning is written by the UI thread and consumed by the render thread, so
+    // it is published through atomics and applied to the engine at the top of
+    // the frame-gen block. The UI thread never touches the engine itself.
+    std::atomic<float> fgFlowScale_{1.0f};
+    std::atomic<float> fgRefreshHz_{0.0f};
+    std::atomic<bool>  fgConfigDirty_{true};
+
+    bool  createCompositeRenderPass();
+    bool  ensureCompositeTargets(uint32_t w, uint32_t h, uint32_t count);
+    void  destroyCompositeTargets();
+    // True when this frame should composite off-swapchain. Call on the render
+    // thread; every gate must hold or we fall back to the untouched path.
+    bool  compositeActive() const;
+    // Render pass / framebuffer this frame draws its FINAL pass into.
+    VkRenderPass  targetRenderPass() const;
+    VkFramebuffer targetFramebuffer(uint32_t imgIdx) const;
+    // Copy the finished composite into the acquired swapchain image and leave
+    // it in PRESENT_SRC. No-op when the composite path is not active.
+    void  copyCompositeToSwapchain(VkCommandBuffer cb, uint32_t imgIdx);
+
+    // === Native LSFG: the software cursor ====================================
+    // LSFG interpolates whatever it is given, so a cursor composited into the
+    // frame gets warped along the flow field and smears. It is therefore
+    // excluded from the composite while frame gen is armed and drawn once into
+    // EVERY presented image instead - real and generated alike - through a
+    // load-op render pass that leaves the image ready to present.
+    VkRenderPass cursorOverlayRenderPass = VK_NULL_HANDLE;
+    struct CursorOverlay {
+        bool  draw = false;
+        float ox = 0, oy = 0, sx = 0, sy = 0, cw = 0, ch = 0;
+        short ptrX = 0, ptrY = 0, hotX = 0, hotY = 0, w = 0, h = 0;
+    };
+    CursorOverlay cursorOverlay_{};
+
+    bool createCursorOverlayRenderPass();
+    // Draw the cursor into an already-copied swapchain image and leave it in
+    // PRESENT_SRC. Takes over the final transition from the copy helpers.
+    void recordCursorOverlay(VkCommandBuffer cb, uint32_t imgIdx);
+    // True when the cursor is being drawn per present rather than composited.
+    bool cursorDrawnPerPresent() const;
+
+    // === Native LSFG: the per-source-frame present plan =======================
+    // Interpolation produces frames that belong BETWEEN N-1 and N, so the
+    // generated frames are presented FIRST and real frame N is held back one
+    // slot. All presents for one source frame are queued together: with FIFO
+    // the driver then shows them on consecutive vblanks, so the pacing falls
+    // out of the present mode for free - no sleeps, no render-mode change.
+    static constexpr uint32_t kMaxPresentsPerFrame = 4;   // 1 real + up to 3 generated
+    struct FrameGenPlan {
+        uint32_t generations = 0;
+        uint32_t presents    = 1;
+        uint32_t imgIdx[kMaxPresentsPerFrame] = {};
+    };
+    FrameGenPlan fgPlan_{};
+    std::unique_ptr<lsfg::Engine> lsfgEngine_;
+    uint64_t    fgSourceFrames_ = 0;
+    std::string lsfgCachePath_;
+    bool        lsfgEngineTried_ = false;
+
+    // Sync objects are indexed per PRESENT, not per composite: each pending
+    // present needs its own image-available and render-finished semaphore.
+    uint32_t syncSlot(uint32_t k) const { return currentFrame * kMaxPresentsPerFrame + k; }
+    // Destroy and rebuild every acquire/present semaphore. Called with the
+    // swapchain, so no stale pending signal can survive into the new one.
+    void recreateSyncObjects();
+    uint32_t fgAcquireFailLog_ = 0;
+
+    // Measured PRESENTS per second - the rate that actually reaches the panel,
+    // counting generated frames. The pacer's own "loop rate" cannot serve this
+    // purpose: it is sampled once per SOURCE frame, so it always equals the
+    // guest rate and contains no evidence that generation happened at all.
+    float    fgPresentedRate_   = 0.0f;
+    uint32_t fgPresentAccum_    = 0;
+    std::chrono::steady_clock::time_point fgRateWindowStart_{};
+    bool     fgRateWindowOpen_  = false;
+    void     trackPresentedRate(uint32_t presents);
+
+    bool ensureLsfgEngine();
+    // One command buffer per pending present: slot 0 carries the composite,
+    // the chain's shared passes and generated frame 0; each later generated
+    // frame and the real frame are recorded and submitted on their own, so a
+    // finished frame reaches the presentation engine without waiting for the
+    // rest of the chain.
+    uint32_t cmdSlot(uint32_t k) const { return currentFrame * kMaxPresentsPerFrame + k; }
+    // Shared chain passes (the 24 shaders every generated frame depends on).
+    void recordFrameGenProcess(VkCommandBuffer cb);
+    // Generated frame g: synthesise into a spare composite target and copy it
+    // into the swapchain image reserved for it.
+    void recordFrameGenGeneration(VkCommandBuffer cb, uint32_t g);
+
+    // Chain cost: a timestamp pair per frame slot, start before the shared
+    // passes, end after the last generation's compute (before its copy, so a
+    // vblank wait on the swapchain image is not counted). Read back after the
+    // slot's fence wait, one frame later.
+    VkQueryPool fgQueryPool_        = VK_NULL_HANDLE;
+    bool        fgTimestampsOk_     = false;
+    float       fgTimestampPeriodNs_ = 0.0f;
+    bool        fgQueryPending_[MAX_FRAMES_IN_FLIGHT] = {};
+    uint32_t    fgQueryGens_[MAX_FRAMES_IN_FLIGHT]    = {};
+    float       fgChainMsPerGen_    = -1.0f;
+    uint32_t    fgChainLogCount_    = 0;
+    void ensureFgQueryPool();
+    void destroyFgQueryPool();
+    void readFgQueryResult();
+
+
+    lsfg::Caps lsfgCaps_{};
+    uint32_t fgSwapchainCapacity_ = 0;
+    void setLsfgCachePath(const char* path);
+    void setFrameGenArmed(bool armed, int multiplier);
+    void setFrameGenTuning(float flowScale, float refreshHz);
+    void frameGenStats(float out[6]) const;
+
     VkRenderPass          renderPass  = VK_NULL_HANDLE;
     VkDescriptorSetLayout dsLayout    = VK_NULL_HANDLE;
     VkPipelineLayout      pipeLayout  = VK_NULL_HANDLE;
@@ -402,6 +565,7 @@ public:
     void createLogicalDevice();
     void createSwapchain();
     void createRenderPass();
+    VkRenderPass createCompatibleRenderPass(VkAttachmentLoadOp loadOp, VkImageLayout initialLayout, VkImageLayout finalLayout);
     void createDSLayout();
     void createPipeline(bool blend, VkPipeline& out);
     void createSgsrPipeline();

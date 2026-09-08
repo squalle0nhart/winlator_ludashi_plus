@@ -120,6 +120,8 @@ class DisplayX {
 
         DisplayXLock eventLock;
         DisplayXLock presentLock;
+        // ponytail: serialize event and composition batches; use per-window locks if contention matters.
+        std::mutex operationMutex;
 
         void *windowTransaction = nullptr;
         void *cursorTransaction = nullptr;

@@ -87,6 +87,16 @@ public class FEXCorePresetManager {
             envVars.put("FEX_DYNAMICL1CACHEINCREASECOUNTHEURISTIC", "250");
             envVars.put("FEX_DYNAMICL1CACHEDECREASECOUNTHEURISTIC", "50");
         }
+        else if (id.equals(FEXCorePreset.EXTREME_GN)) {
+            envVars.put("FEX_TSOENABLED", "0");
+            envVars.put("FEX_VECTORTSOENABLED", "0");
+            envVars.put("FEX_MEMCPYSETTSOENABLED", "0");
+            envVars.put("FEX_HALFBARRIERTSOENABLED", "0");
+            envVars.put("FEX_X87REDUCEDPRECISION", "1");
+            envVars.put("FEX_MULTIBLOCK", "1");
+            envVars.put("FEX_SMALLTSCSCALE", "1");
+            envVars.put("FEX_VOLATILEMETADATA", "1");
+        }
         else if (id.startsWith(FEXCorePreset.CUSTOM)) {
             for (String[] preset : customPresetsIterator(context)) {
                 if (preset[0].equals(id)) {
@@ -106,8 +116,9 @@ public class FEXCorePresetManager {
         presets.add(new FEXCorePreset(FEXCorePreset.INTERMEDIATE, context.getString(R.string.intermediate)));
         presets.add(new FEXCorePreset(FEXCorePreset.PERFORMANCE, context.getString(R.string.performance)));
         presets.add(new FEXCorePreset(FEXCorePreset.PERFORMANCE_TSO, context.getString(R.string.performance_tso)));
-        presets.add(new FEXCorePreset(FEXCorePreset.EXTREME, context.getString(R.string.extreme)));
-        presets.add(new FEXCorePreset(FEXCorePreset.EXTREME_TSO, context.getString(R.string.extreme_tso)));
+        presets.add(new FEXCorePreset(FEXCorePreset.EXTREME, context.getString(R.string.fex_extreme_wn)));
+        presets.add(new FEXCorePreset(FEXCorePreset.EXTREME_TSO, context.getString(R.string.fex_extreme_tso_wn)));
+        presets.add(new FEXCorePreset(FEXCorePreset.EXTREME_GN, context.getString(R.string.fex_extreme_gn)));
         for (String[] preset : customPresetsIterator(context)) presets.add(new FEXCorePreset(preset[0], preset[1]));
         return presets;
     }

@@ -6,6 +6,19 @@
 
 Winlator is an Android application that lets you to run Windows (x86_64) applications with Wine and Box86/Box64.
 
+# Building
+
+Initialize the native dependencies before building:
+
+```sh
+git submodule update --init --recursive
+./gradlew assembleDebug
+```
+
+Debug builds use the standard Android debug key unless `WINLATOR_STORE_PASSWORD`
+and `WINLATOR_KEY_PASSWORD` are supplied (the key password defaults to the store
+password). Release builds require `Untitled.jks` and signing credentials.
+
 # Installation
 
 1. Download and install the APK (Winlator_7.1.apk) from [GitHub Releases](https://github.com/brunodev85/winlator/releases)

@@ -163,7 +163,9 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &r);
     }
 
-    const bool cursorDrawn = curVis && cursorImg != VK_NULL_HANDLE && cursorDS != VK_NULL_HANDLE;
+    cursorOverlay_ = {curVis && cursorImg != VK_NULL_HANDLE && cursorDS != VK_NULL_HANDLE,
+                      ox, oy, sx, sy, cw, ch, ptrX, ptrY, curHotX, curHotY, curW, curH};
+    const bool cursorDrawn = cursorOverlay_.draw && !cursorDrawnPerPresent();
     const bool hasCursorCopy = hasCursorUpload && cursorImg != VK_NULL_HANDLE &&
                                cursorUpload != VK_NULL_HANDLE;
     if (hasCursorCopy) {
@@ -200,8 +202,8 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
 
     VkRenderPassBeginInfo rpi{};
     rpi.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rpi.renderPass = renderPass;
-    rpi.framebuffer = swapchainFBs[imgIdx];
+    rpi.renderPass = targetRenderPass();
+    rpi.framebuffer = targetFramebuffer(imgIdx);
     rpi.renderArea = {{0, 0}, swapchainExt};
     VkClearValue clear = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
     rpi.clearValueCount = 1;
@@ -354,6 +356,11 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     }
 
     vk_.CmdEndRenderPass(cb);
+    if (compositeActive()) {
+        recordFrameGenProcess(cb);
+        if (fgPlan_.generations > 0) recordFrameGenGeneration(cb, 0);
+        else copyCompositeToSwapchain(cb, imgIdx);
+    }
 
     VkResult endStatus = vk_.EndCommandBuffer(cb);
     if (endStatus != VK_SUCCESS) {

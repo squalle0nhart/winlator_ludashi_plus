@@ -88,8 +88,8 @@ VkResult EffectComposer::createInstance() {
     createInfo.pApplicationInfo = &appInfo;
     createInfo.enabledExtensionCount = 0;
     createInfo.ppEnabledExtensionNames = nullptr;
-    createInfo.enabledLayerCount = static_cast<uint32_t>(layerNames.size());
-    createInfo.ppEnabledLayerNames = layerNames.data();
+    createInfo.enabledLayerCount = enable_validation ? static_cast<uint32_t>(layerNames.size()) : 0;
+    createInfo.ppEnabledLayerNames = enable_validation ? layerNames.data() : nullptr;
 
     result = vkCreateInstance(&createInfo, nullptr, &instance);
     if (result != VK_SUCCESS) {
@@ -607,9 +607,9 @@ void EffectComposer::destroyComposerTexture(Drawable *drawable) {
     vkDestroyImage(device, drawable->composerTexture->dstImage, nullptr);
 }
 
-void EffectComposer::swapColors(Drawable *drawable) {
-    vkResetFences(device, 1, &fence);
-    vkResetCommandBuffer(commandBuffer, 0);
+bool EffectComposer::swapColors(Drawable *drawable) {
+    if (vkResetFences(device, 1, &fence) != VK_SUCCESS) return false;
+    if (vkResetCommandBuffer(commandBuffer, 0) != VK_SUCCESS) return false;
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -625,7 +625,7 @@ void EffectComposer::swapColors(Drawable *drawable) {
         .layerCount = 1
     };
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) return false;
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, colorSwapPipeline);
 
     if (drawable->composerTexture->srcPipelineStage != VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT ||
@@ -685,7 +685,7 @@ void EffectComposer::swapColors(Drawable *drawable) {
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &drawable->composerTexture->vkDescriptorSet, 0, nullptr);
     vkCmdDispatch(commandBuffer, (drawable->width + 15) / 16, (drawable->height + 15) / 16, 1);
 
-    vkEndCommandBuffer(commandBuffer);
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) return false;
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -698,17 +698,18 @@ void EffectComposer::swapColors(Drawable *drawable) {
     submitInfo.signalSemaphoreCount = 0;
     submitInfo.pSignalSemaphores = nullptr;
 
-    vkQueueSubmit(queue, 1, &submitInfo, fence);
+    if (vkQueueSubmit(queue, 1, &submitInfo, fence) != VK_SUCCESS) return false;
 
-    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+    // SurfaceTransaction receives no Vulkan fence, so the output must be ready.
+    return vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX) == VK_SUCCESS;
 }
 
-void EffectComposer::apply(Drawable *drawable) {
+bool EffectComposer::apply(Drawable *drawable) {
     if (!drawable->composerTexture) {
         VkResult result = createComposerTexture(drawable);
         if (result != VK_SUCCESS) {
             printf("Failed to create composer texture, result %d", result);
-            return;
+            return false;
         }
         drawable->composerTexture->sizeChanged = false;
     }
@@ -717,15 +718,14 @@ void EffectComposer::apply(Drawable *drawable) {
         VkResult result = createComposerTexture(drawable);
         if (result != VK_SUCCESS) {
             printf("Failed to resize composer texture, result %d", result);
-            return;
+            return false;
         }
         drawable->composerTexture->sizeChanged = false;
     }
 
-    if (isSuitableForColorSwap(drawable)) {
-        swapColors(drawable);
-        return;
-    }
+    // A previous allocation failure can leave a partially created texture.
+    return drawable->composerTexture->vkDescriptorSet != VK_NULL_HANDLE &&
+           isSuitableForColorSwap(drawable) && swapColors(drawable);
 }
 
 void EffectComposer::init() {

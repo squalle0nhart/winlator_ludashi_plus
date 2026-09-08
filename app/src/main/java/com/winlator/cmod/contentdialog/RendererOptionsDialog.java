@@ -134,12 +134,12 @@ public class RendererOptionsDialog extends ContentDialog {
         CheckBox cbPerformance = findViewById(R.id.CBFrameGenPerformanceMode);
 
         frameGenGroup.setVisibility(isNativeMode ? View.GONE : View.VISIBLE);
-        setAmoledAdapter(ctx, spBackend, new String[]{"LSFG-VK", "win-fg"});
+        setAmoledAdapter(ctx, spBackend, new String[]{"LSFG-VK", "win-fg", "LSFG Native"});
         setAmoledAdapter(ctx, spMultiplier, new String[]{"Off", "2x", "3x", "4x"});
         setAmoledAdapter(ctx, spModel, new String[]{"FSR3", "FSR3+"});
 
         boolean winFg = "win_fg".equals(config.getFrameGenBackend());
-        spBackend.setSelection(winFg ? 1 : 0);
+        spBackend.setSelection("lsfg_native".equals(config.getFrameGenBackend()) ? 2 : winFg ? 1 : 0);
         int multiplier = winFg ? config.getWinFgMultiplier() : config.getLsfgMultiplier();
         spMultiplier.setSelection(multiplier < 2 ? 0 : Math.min(3, multiplier - 1));
         spModel.setSelection(Math.max(0, Math.min(1, config.getWinFgModel() - 3)));
@@ -152,12 +152,13 @@ public class RendererOptionsDialog extends ContentDialog {
         Runnable updateFrameGenUi = () -> {
             boolean useWinFg = spBackend.getSelectedItemPosition() == 1;
             modelGroup.setVisibility(useWinFg ? View.VISIBLE : View.GONE);
-            cbPerformance.setVisibility(useWinFg ? View.GONE : View.VISIBLE);
+            cbPerformance.setVisibility(spBackend.getSelectedItemPosition() == 0 ? View.VISIBLE : View.GONE);
             tvStatus.setText(useWinFg
                     ? "Bundled win-fg runtime"
                     : config.isLsfgDllAvailable()
-                            ? "LSFG-VK ready"
-                            : "Import Lossless.dll before enabling LSFG-VK");
+                            ? spBackend.getSelectedItemPosition() == 2
+                                    ? "Requires the Vulkan renderer and a Vulkan 1.3 driver" : "LSFG-VK ready"
+                            : "Import Lossless.dll before enabling LSFG");
         };
         spBackend.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
@@ -186,7 +187,7 @@ public class RendererOptionsDialog extends ContentDialog {
             int selectedMultiplier = spMultiplier.getSelectedItemPosition() == 0
                     ? 0 : spMultiplier.getSelectedItemPosition() + 1;
             float selectedFlowScale = 0.25f + sbFlowScale.getProgress() / 100f;
-            config.setFrameGenBackend(useWinFg ? "win_fg" : "lsfg_vk");
+            config.setFrameGenBackend(spBackend.getSelectedItemPosition() == 2 ? "lsfg_native" : useWinFg ? "win_fg" : "lsfg_vk");
             if (useWinFg) {
                 config.setWinFgMultiplier(selectedMultiplier);
                 config.setWinFgFlowScale(selectedFlowScale);

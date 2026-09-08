@@ -177,6 +177,7 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
     private boolean disableUnviewableWindow(Window window, String wmClass) {
         if (unviewableWMClasses == null || wmClass == null) return false;
         for (String cls : unviewableWMClasses) {
+            if (cls == null || cls.isEmpty()) continue;
             if (wmClass.toLowerCase(java.util.Locale.ROOT).contains(cls.toLowerCase(java.util.Locale.ROOT))) {
                 window.attributes.setEnabled(false);
                 return true;

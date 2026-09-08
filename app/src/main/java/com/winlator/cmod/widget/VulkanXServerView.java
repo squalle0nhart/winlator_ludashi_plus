@@ -13,6 +13,9 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 
 import com.winlator.cmod.R;
+import com.winlator.cmod.core.LsfgNative;
+import java.io.File;
+import android.widget.Toast;
 import com.winlator.cmod.renderer.GPUImage;
 import com.winlator.cmod.xserver.Bitmask;
 import com.winlator.cmod.xserver.Cursor;
@@ -63,6 +66,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private int     pendingFilterMode     = 0;
     private int     pendingPostFXMode     = 0;
     private float   pendingSharpness      = 0.5f;
+    private int pendingLsfgMultiplier = 0;
+    private float pendingLsfgFlowScale = 0.80f;
+    private File pendingLsfgDll;
     private boolean pendingSwapRB         = false;
 
     private WinlatorHUD hudRef = null;
@@ -124,6 +130,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     @FastNative private native void nativeRemoveWindow(long handle, long id);
     @FastNative private native void nativeSetVerboseLog(long handle, boolean v);
     @FastNative private native void nativeSetSharpness(long handle, float sharpness);
+
+    private native String nativeConfigureLsfg(long handle, String cachePath, int multiplier,
+                                               float flowScale, float refreshHz);
 
     private native void nativeDumpRendererInfo(long handle);
     private native void nativeSetFilterMode(long handle, int mode);
@@ -192,6 +201,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                         nativeSetSharpness(nativeHandle, pendingSharpness);
                         updateTransform();
                         nativeSetCursorVisible(nativeHandle, cursorVisible);
+                        applyLsfgNative();
                         initComplete = true;
                         return;
                     }
@@ -222,6 +232,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                 if (nativeHandle != 0) {
                     nativeSetVerboseLog(nativeHandle, true);
                     nativeDumpRendererInfo(nativeHandle);
+                    applyLsfgNative();
                 }
             }
             initComplete = true;
@@ -570,6 +581,42 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     public void setSwapRB(boolean enabled) {
         pendingSwapRB = enabled;
         synchronized (lock) { if (nativeHandle != 0) nativeSetSwapRB(nativeHandle, enabled); }
+    }
+
+    public void setLsfgNative(File dll, int multiplier, float flowScale) {
+        synchronized (lock) {
+            pendingLsfgDll = dll;
+            pendingLsfgMultiplier = multiplier < 2 ? 0 : Math.min(multiplier, 4);
+            pendingLsfgFlowScale = flowScale;
+        }
+        queueEvent(() -> {
+            synchronized (lock) {
+                if (nativeHandle != 0) applyLsfgNative();
+            }
+        });
+    }
+
+    // Runs on an existing worker, under lock; cache translation never blocks the UI.
+    private void applyLsfgNative() {
+        int multiplier = pendingLsfgMultiplier;
+        String error = null;
+        String cachePath = null;
+        if (multiplier >= 2) {
+            int status = LsfgNative.ensureCache(getContext(), pendingLsfgDll, false);
+            if (status == LsfgNative.STATUS_OK) cachePath = LsfgNative.cacheFile(getContext()).getAbsolutePath();
+            else {
+                error = LsfgNative.explain(status);
+                multiplier = 0;
+            }
+        }
+        float refreshHz = getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
+        String nativeError = nativeConfigureLsfg(nativeHandle, cachePath, multiplier,
+                                                pendingLsfgFlowScale, refreshHz);
+        if (error == null) error = nativeError;
+        if (error != null) {
+            final String message = "LSFG Native: " + error;
+            post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());
+        }
     }
 
     public void setVkPresentMode(int mode) {

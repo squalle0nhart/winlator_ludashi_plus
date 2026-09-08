@@ -24,7 +24,7 @@ Java_com_winlator_cmod_widget_DisplayXServerView_nativeInit(JNIEnv *env, jobject
     rootWindow->height = env->CallShortMethod(rootWindowObj, cache.windowGetHeight);
     rootWindow->x = env->CallShortMethod(rootWindowObj, cache.windowGetX);
     rootWindow->y = env->CallShortMethod(rootWindowObj, cache.windowGetY);
-    rootWindow->zOrder = -1;
+    rootWindow->zOrder = INT32_MIN;
 
     jstring className = (jstring)env->CallObjectMethod(rootWindowObj, cache.windowGetClassName);
     const char *chars = env->GetStringUTFChars(className, nullptr);

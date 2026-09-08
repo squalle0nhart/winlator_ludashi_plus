@@ -497,6 +497,8 @@ void DisplayX::eventThreadLoop() {
 
         if (stopped) break;
 
+        // Keep window/texture mutations out of an in-flight composition batch.
+        std::lock_guard<std::mutex> operationGuard(operationMutex);
         State currentState = state;
         state = State::NONE;
         if (currentState == State::PAUSE) {
@@ -658,6 +660,7 @@ void DisplayX::presentThreadLoop() {
         lock.unlock();
         int64_t workStarted = getCurrentTimeNanos();
 
+        std::lock_guard<std::mutex> operationGuard(operationMutex);
         auto complete = std::make_unique<OnCompleteContext>();
         complete->owner = this;
         bool transactionChanged = false;
@@ -673,8 +676,8 @@ void DisplayX::presentThreadLoop() {
             if (window->enabled) {
                 AHardwareBuffer *buffer = request->buffer;
                 if (request->drawable &&
-                    effectComposer->isSuitableForColorSwap(request->drawable)) {
-                    effectComposer->apply(request->drawable);
+                    effectComposer->isSuitableForColorSwap(request->drawable) &&
+                    effectComposer->apply(request->drawable)) {
                     buffer = request->drawable->composerTexture->dstBuffer;
                 }
                 pSTSetBuffer(presentTransaction, window->control,
@@ -692,8 +695,7 @@ void DisplayX::presentThreadLoop() {
             }
             transactionChanged = true;
 
-            if (window->enabled && pSTSetTransparency &&
-                (request->displayXBuffer || request->directContent)) {
+            if (window->enabled && pSTSetTransparency) {
                 pSTSetTransparency(presentTransaction, window->control,
                                    SURFACE_TRANSPARENCY_OPAQUE);
             }

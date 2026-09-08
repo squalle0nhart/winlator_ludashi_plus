@@ -28,6 +28,7 @@ Java_com_winlator_cmod_widget_EGLXServerView_nativeInit(JNIEnv *env, jobject thi
     auto rootWindow = std::make_unique<struct Window>();
 
     rootWindow->id = env->GetIntField(rootWindowObj, cache.windowID);
+    rootWindow->zOrder = INT32_MIN;
     rootWindow->width = env->CallShortMethod(rootWindowObj, cache.windowGetWidth);
     rootWindow->height = env->CallShortMethod(rootWindowObj, cache.windowGetHeight);
     rootWindow->x = env->CallShortMethod(rootWindowObj, cache.windowGetX);

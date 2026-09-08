@@ -1,9 +1,16 @@
 package com.winlator.cmod.contents
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContentsManagerTest {
+    @Test
+    fun acceptsExperimentalFexUnixLibraries() {
+        assertTrue(ContentsManager.FEXCORE_TRUST_FILES.contains("\${libdir}/wine/aarch64-unix/libwow64fex.so"))
+        assertTrue(ContentsManager.FEXCORE_TRUST_FILES.contains("\${libdir}/wine/aarch64-unix/libarm64ecfex.so"))
+    }
+
     @Test
     fun identifiesBundledAndCustomSources() {
         assertEquals(0, ContentsManager.getRemoteProfilesSource(ContentsManager.REMOTE_PROFILES))
