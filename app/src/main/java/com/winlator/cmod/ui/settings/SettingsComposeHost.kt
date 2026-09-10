@@ -201,7 +201,7 @@ private fun SettingsScreen(model: SettingsModel, callbacks: SettingsCallbacks) {
                 NavigationRow(
                     Icons.Outlined.FolderOpen,
                     "Import Lossless.dll",
-                    if (model.losslessDllAvailable) "Lossless.dll imported - LSFG-VK ready" else "Required for LSFG-VK",
+                    if (model.losslessDllAvailable) "Lossless.dll imported - LSFG Native ready" else "Required for LSFG Native",
                     callbacks::onImportLosslessDll
                 )
             }

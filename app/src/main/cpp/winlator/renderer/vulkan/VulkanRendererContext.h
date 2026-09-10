@@ -5,6 +5,7 @@
 #include <chrono>
 #include "lsfg/lsfg_probe.h"
 namespace lsfg { class Engine; }
+namespace winfg { class Engine; }
 #include <cstddef>
 #include <vulkan/vulkan_android.h>
 
@@ -17,6 +18,8 @@ struct VkTable {
     PFN_vkCreateComputePipelines CreateComputePipelines;
     PFN_vkCmdDispatch CmdDispatch;
     PFN_vkUnmapMemory UnmapMemory;
+    PFN_vkCmdClearColorImage CmdClearColorImage;
+    PFN_vkResetDescriptorPool ResetDescriptorPool;
     PFN_vkCreateQueryPool CreateQueryPool;
     PFN_vkDestroyQueryPool DestroyQueryPool;
     PFN_vkGetQueryPoolResults GetQueryPoolResults;
@@ -439,9 +442,14 @@ public:
     };
     FrameGenPlan fgPlan_{};
     std::unique_ptr<lsfg::Engine> lsfgEngine_;
+    std::unique_ptr<winfg::Engine> winfgEngine_;
     uint64_t    fgSourceFrames_ = 0;
     std::string lsfgCachePath_;
     bool        lsfgEngineTried_ = false;
+    bool        winfgEngineTried_ = false;
+    std::atomic<int> fgEngineKind_{0};     // 0 = LSFG, 1 = Win-FG
+    std::atomic<int> fgModel_{3};
+    std::atomic<int> fgPerfPreset_{2};
 
     // Sync objects are indexed per PRESENT, not per composite: each pending
     // present needs its own image-available and render-finished semaphore.
@@ -456,12 +464,16 @@ public:
     // purpose: it is sampled once per SOURCE frame, so it always equals the
     // guest rate and contains no evidence that generation happened at all.
     float    fgPresentedRate_   = 0.0f;
+    float    fgSourceRate_      = 0.0f;
+    uint32_t fgSourceAccum_     = 0;
     uint32_t fgPresentAccum_    = 0;
     std::chrono::steady_clock::time_point fgRateWindowStart_{};
     bool     fgRateWindowOpen_  = false;
     void     trackPresentedRate(uint32_t presents);
 
     bool ensureLsfgEngine();
+    bool ensureWinFgEngine();
+    bool fgCapsOk() const;
     // One command buffer per pending present: slot 0 carries the composite,
     // the chain's shared passes and generated frame 0; each later generated
     // frame and the real frame are recorded and submitted on their own, so a
@@ -495,6 +507,8 @@ public:
     void setLsfgCachePath(const char* path);
     void setFrameGenArmed(bool armed, int multiplier);
     void setFrameGenTuning(float flowScale, float refreshHz);
+    void setFrameGenEngine(int kind);
+    void setWinFgTuning(int model, int perfPreset);
     void frameGenStats(float out[6]) const;
 
     VkRenderPass          renderPass  = VK_NULL_HANDLE;

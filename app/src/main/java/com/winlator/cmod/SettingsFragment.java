@@ -51,7 +51,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.ArrayUtils;
 import com.winlator.cmod.core.Callback;
 import com.winlator.cmod.core.FileUtils;
-import com.winlator.cmod.core.LsfgVkManager;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.TarCompressorUtils;
 import com.winlator.cmod.fexcore.FEXCoreEditPresetDialog;
@@ -479,7 +479,7 @@ public class SettingsFragment extends Fragment {
                 fexChoices,
                 preferences.getString("fexcore_preset", FEXCorePreset.COMPATIBILITY),
                 soundFontChoices,
-                LsfgVkManager.isGlobalDllAvailable(context),
+                LosslessDll.isGlobalDllAvailable(context),
                 winlatorPath,
                 shortcutPath,
                 preferences.getBoolean("enable_big_picture_mode", false),
@@ -1115,7 +1115,7 @@ public class SettingsFragment extends Fragment {
                         break;
 
                     case REQUEST_CODE_IMPORT_LOSSLESS_DLL:
-                        if (LsfgVkManager.importGlobalLosslessDll(requireContext(), uri)) {
+                        if (LosslessDll.importGlobalLosslessDll(requireContext(), uri)) {
                             AppUtils.showToast(requireContext(), "Lossless.dll imported");
                             refreshCompose();
                         } else {

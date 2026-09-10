@@ -181,6 +181,9 @@ bool Engine::prepare(uint32_t width, uint32_t height, VkFormat format) {
     builtFormat_    = format;
     builtFlowScale_ = scale;
     frameCount_ = 0;
+    lastCopiedCount_ = 0;
+    haveCopied_ = false;
+    primeHistory_ = false;
     planCalls_  = 0;
     warmStreak_ = 0;
     warm_ = false;
@@ -218,6 +221,18 @@ uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
     warmStreak_ = warm_ ? warmStreak_ + 1 : 0;
     generating_ = warm_ && warmStreak_ >= kRecurrenceFrames && plan_.generations > 0;
 
+    // After arming or a pacing gap, fill the two-frame input ring before
+    // interpolating so the first generated frame is never blended with stale history.
+    primeHistory_ = false;
+    if (generating_ && !historyFresh()) {
+        primeHistory_ = true;
+        generating_ = false;
+        if ((primeLogCount_++ % 60) == 0)
+            LSFG_LOGI("priming the input ring (last copied frame %llu, now at %llu)",
+                      (unsigned long long)(haveCopied_ ? lastCopiedCount_ : 0),
+                      (unsigned long long)frameCount_);
+    }
+
     if ((planCalls_++ % kTelemetryInterval) == 0) {
         const LsfgPacerStats stats = pacer_.Stats();
         const float wanted = stats.source_rate * (float)(plan_.generations + 1);
@@ -244,8 +259,13 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     lastCount_ = count;
     lastGenerations_ = generations;
 
-    // Seed both real inputs during warm-up, before the first interpolation.
-    copyPresentedFrame(cmd, source, chain_->Input(count), VkExtent2D{width, height});
+    const bool needHistory = generations > 0 || primeHistory_
+        || (governorEnabled_ && governor_.wantsHistory());
+    if (needHistory) {
+        copyPresentedFrame(cmd, source, chain_->Input(count), VkExtent2D{width, height});
+        lastCopiedCount_ = count;
+        haveCopied_ = true;
+    }
 
     // The SHARED chain is 24 of the 25 shaders - the whole flow pyramid - and
     // only `generate` runs per generated frame. Running it while producing
@@ -278,6 +298,9 @@ void Engine::reset() {
     pacer_.Reset();
     governor_.reset();
     peakGuestExtent_ = VkExtent2D{};
+    lastCopiedCount_ = 0;
+    haveCopied_ = false;
+    primeHistory_ = false;
     warmStreak_ = 0;
     warm_ = false;
     generating_ = false;

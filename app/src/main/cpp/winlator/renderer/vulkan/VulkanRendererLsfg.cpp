@@ -2,6 +2,14 @@
 #include "VulkanRendererContext.h"
 #include "lsfg/lsfg_engine.h"
 #include "lsfg/lsfg_vkd.h"
+#include "winfg/winfg_engine.h"
+
+#ifndef WINFG_UPSTREAM
+#define WINFG_UPSTREAM "unknown"
+#endif
+#ifndef WINFG_CHAIN_HASH
+#define WINFG_CHAIN_HASH "unknown"
+#endif
 
 VkRenderPass VulkanRendererContext::createCompatibleRenderPass(
     VkAttachmentLoadOp loadOp, VkImageLayout initialLayout, VkImageLayout finalLayout) {
@@ -162,6 +170,47 @@ bool VulkanRendererContext::ensureLsfgEngine() {
     return true;
 }
 
+bool VulkanRendererContext::ensureWinFgEngine() {
+    if (winfgEngine_) return winfgEngine_->valid();
+    if (winfgEngineTried_) return false;
+    winfgEngineTried_ = true;
+
+    auto engine = std::make_unique<winfg::Engine>();
+    if (!engine->init(vk_, physicalDevice, device, graphicsQueueFamilyIndex, graphicsQueue)) {
+        RLOG_E("winfg-native: engine init failed");
+        return false;
+    }
+    winfgEngine_ = std::move(engine);
+    fgConfigDirty_.store(true, std::memory_order_relaxed);
+    RLOG("winfg-native: engine ready (chain %s, src %s)", WINFG_UPSTREAM, WINFG_CHAIN_HASH);
+    return true;
+}
+
+bool VulkanRendererContext::fgCapsOk() const {
+    return fgEngineKind_.load(std::memory_order_relaxed) == 1
+        ? lsfgCaps_.storageOnSwapchainFormat
+        : lsfgCaps_.supported();
+}
+
+void VulkanRendererContext::setFrameGenEngine(int kind) {
+    std::lock_guard<std::mutex> lk(renderMutex);
+    kind = kind == 1 ? 1 : 0;
+    const int was = fgEngineKind_.exchange(kind, std::memory_order_relaxed);
+    if (was == kind) return;
+    vk_.DeviceWaitIdle(device);
+    lsfgEngine_.reset();
+    lsfgEngineTried_ = false;
+    winfgEngine_.reset();
+    winfgEngineTried_ = false;
+    fgConfigDirty_.store(true, std::memory_order_relaxed);
+}
+
+void VulkanRendererContext::setWinFgTuning(int model, int perfPreset) {
+    fgModel_.store(model, std::memory_order_relaxed);
+    fgPerfPreset_.store(perfPreset, std::memory_order_relaxed);
+    fgConfigDirty_.store(true, std::memory_order_relaxed);
+}
+
 void VulkanRendererContext::ensureFgQueryPool() {
     if (fgQueryPool_ != VK_NULL_HANDLE || !fgTimestampsOk_ || !vk_.CreateQueryPool) return;
     VkQueryPoolCreateInfo qi{}; qi.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
@@ -201,7 +250,9 @@ void VulkanRendererContext::readFgQueryResult() {
 }
 
 void VulkanRendererContext::recordFrameGenProcess(VkCommandBuffer cb) {
-    if (!compositeActive() || !lsfgEngine_ || compositeTargets.empty()) return;
+    const bool useWinFg = fgEngineKind_.load(std::memory_order_relaxed) == 1;
+    if (!compositeActive() || compositeTargets.empty()) return;
+    if (useWinFg ? !winfgEngine_ : !lsfgEngine_) return;
     const CompositeTarget& src = compositeTargets[compositeIndex];
     ensureFgQueryPool();
     if (fgQueryPool_ != VK_NULL_HANDLE && fgPlan_.generations > 0) {
@@ -210,11 +261,14 @@ void VulkanRendererContext::recordFrameGenProcess(VkCommandBuffer cb) {
     }
     // Take frame N as the chain's newest input and run everything that is
     // shared across generations (mipmaps -> alpha -> beta -> gamma -> delta).
-    lsfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations);
+    if (useWinFg) winfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations);
+    else          lsfgEngine_->process(cb, src.img, compositeW, compositeH, fgPlan_.generations);
 }
 
 void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_t g) {
-    if (!compositeActive() || !lsfgEngine_ || compositeTargets.empty()) return;
+    const bool useWinFg = fgEngineKind_.load(std::memory_order_relaxed) == 1;
+    if (!compositeActive() || compositeTargets.empty()) return;
+    if (useWinFg ? !winfgEngine_ : !lsfgEngine_) return;
     if (g >= fgPlan_.generations) return;
     const uint32_t w = compositeW, h = compositeH;
     {
@@ -222,7 +276,10 @@ void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_
         const CompositeTarget& dst = compositeTargets[slot];
         if (dst.img == VK_NULL_HANDLE || dst.storageView == VK_NULL_HANDLE) return;
 
-        lsfgEngine_->generateInto(cb, g, (uint32_t)slot, dst.img, dst.storageView, w, h);
+        if (useWinFg) winfgEngine_->generateInto(cb, g, fgPlan_.generations,
+                                                  dst.img, dst.storageView, w, h);
+        else          lsfgEngine_->generateInto(cb, g, (uint32_t)slot,
+                                                 dst.img, dst.storageView, w, h);
 
         if (fgQueryPool_ != VK_NULL_HANDLE && g + 1 == fgPlan_.generations) {
             vk_.CmdWriteTimestamp(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, fgQueryPool_, currentFrame * 2 + 1);
@@ -389,6 +446,12 @@ void VulkanRendererContext::frameGenStats(float out[6]) const {
     // from inside the guest. It is reported even with no LSFG engine present.
     out[3] = fgPresentedRate_;
     out[5] = fgChainMsPerGen_;
+    if (fgEngineKind_.load(std::memory_order_relaxed) == 1) {
+        if (!winfgEngine_) return;
+        out[0] = out[1] = (float)fgPlan_.generations;
+        out[2] = fgSourceRate_;
+        return;
+    }
     if (!lsfgEngine_) return;
     out[0] = (float)lsfgEngine_->acceptedGenerations();
     out[1] = (float)fgPlan_.generations;
@@ -402,8 +465,10 @@ void VulkanRendererContext::trackPresentedRate(uint32_t presents) {
         fgRateWindowStart_ = now;
         fgRateWindowOpen_  = true;
         fgPresentAccum_    = 0;
+        fgSourceAccum_     = 0;
     }
     fgPresentAccum_ += presents;
+    fgSourceAccum_++;
 
     const float elapsed = std::chrono::duration<float>(now - fgRateWindowStart_).count();
     if (elapsed < 0.5f) return;                    // half-second window
@@ -412,8 +477,13 @@ void VulkanRendererContext::trackPresentedRate(uint32_t presents) {
     fgPresentedRate_ = fgPresentedRate_ > 0.0f
         ? fgPresentedRate_ + (rate - fgPresentedRate_) * 0.25f
         : rate;
+    const float sourceRate = (float)fgSourceAccum_ / elapsed;
+    fgSourceRate_ = fgSourceRate_ > 0.0f
+        ? fgSourceRate_ + (sourceRate - fgSourceRate_) * 0.25f
+        : sourceRate;
     fgRateWindowStart_ = now;
     fgPresentAccum_    = 0;
+    fgSourceAccum_     = 0;
 }
 
 void VulkanRendererContext::setFrameGenArmed(bool armed, int multiplier) {
@@ -444,7 +514,7 @@ void VulkanRendererContext::setFrameGenArmed(bool armed, int multiplier) {
 bool VulkanRendererContext::compositeActive() const {
     // Every gate must hold, or we run the pre-LSFG path unchanged.
     if (!fgArmed_.load(std::memory_order_relaxed)) return false;
-    if (!lsfgCaps_.supported()) return false;
+    if (!fgCapsOk()) return false;
     return compositeArmed;
 }
 

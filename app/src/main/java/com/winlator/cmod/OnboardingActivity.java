@@ -42,6 +42,7 @@ import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.ImageFsInstaller;
 
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -101,6 +102,7 @@ public class OnboardingActivity extends AppCompatActivity {
     private String pendingInstallVersion;
     private int pendingInstallVersionCode;
     private boolean autoInstallDispatched;
+    private volatile int catalogRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -300,21 +302,32 @@ public class OnboardingActivity extends AppCompatActivity {
     }
 
     private void loadCatalog() {
+        int request = ++catalogRequest;
+        String url = preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
+        composeController.setCatalogLoading(true);
         io.execute(() -> {
+            if (request != catalogRequest) return;
+            String json = "[]";
+            boolean loaded = false;
             try {
-                String url = preferences.getString("downloadable_contents_url", ContentsManager.REMOTE_PROFILES);
                 try (Response response = http.newCall(new Request.Builder().url(url).build()).execute()) {
                     if (response.isSuccessful() && response.body() != null) {
-                        contentsManager.setRemoteProfiles(response.body().string());
+                        json = new JSONArray(response.body().string()).toString();
+                        loaded = true;
                     }
                 }
             } catch (Exception ignored) {
             }
-            contentsManager.syncContents();
+            if (request != catalogRequest) return;
+            contentsManager.setRemoteProfiles(json);
             rebuildCatalog();
+            boolean success = loaded;
             runOnUiThread(() -> {
+                if (isDestroyed() || request != catalogRequest) return;
                 syncComposeCatalog();
-                maybeAutoInstall();
+                composeController.setCatalogLoading(false);
+                if (success) maybeAutoInstall();
+                else Toast.makeText(this, "Unable to load component catalog. Select the source again to retry.", Toast.LENGTH_LONG).show();
             });
         });
     }

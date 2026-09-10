@@ -12,7 +12,8 @@ See [port scope and validation](docs/steam-update.md).
 VEGAS 2.7.3 by [isygold](https://github.com/isygold/vegas-releases) is bundled from
 [Bannerlator commit 601ea52b41c12b90d3c6a86a7bd566b27bb15e4c](https://github.com/The412Banner/Bannerlator/blob/601ea52b41c12b90d3c6a86a7bd566b27bb15e4c/app/src/main/assets/dxwrapper/vegas-2.7.3.tzst).
 The archive is unchanged and renamed to `dxvk-2.7.3-vegas.tzst` to use the existing
-DXVK installer and version selector. It contains x86 and x86-64 DLLs, including D3D8.
+DXVK installer. Vegas has its own DX Wrapper entry and version dropdown.
+It contains x86 and x86-64 DLLs, including D3D8.
 Credits: isygold, Bannerlator/The412Banner, and the DXVK contributors.
 
 # FEXCore and Box64 presets
@@ -25,7 +26,8 @@ WinNative-Emu/WinNative, utkarshdalal/GameNative, and the Box64 preset community
 
 # LSFG Native
 
-Imported from [Bannerlator commit 63af72abc20c9924d68771940c2d15467825fe22](https://github.com/The412Banner/Bannerlator/tree/63af72abc20c9924d68771940c2d15467825fe22) on 2026-09-07.
+Imported from [Bannerlator 3.0.9](https://github.com/The412Banner/Bannerlator/tree/e6f3410)
+on 2026-09-10.
 
 The native LSFG engine, shader extraction/cache code, Java cache bridge and adapted
 compositor integration are GPL-3.0-or-later. Credits: Bannerlator/The412Banner,
@@ -44,3 +46,9 @@ neither that DLL nor its proprietary shaders are bundled.
 Local integration changes adapt JNI names, renderer paths, compatible render-pass
 dependencies, cursor rotation, descriptor target indexing, swapchain acquisition
 limits, resource lifetime during reconfiguration, and input-history warm-up.
+
+# Win-FG Native
+
+The compositor-native Win-FG v0.3.0 sources are imported from Bannerlator 3.0.9
+and remain MIT-licensed. The license and FidelityFX optical-flow notice are in
+[winfg](app/src/main/cpp/winlator/renderer/vulkan/winfg/).

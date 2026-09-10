@@ -1,5 +1,7 @@
 package com.winlator.cmod.ui.settings
 
+import com.winlator.cmod.core.DXWrapper
+
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -259,7 +261,10 @@ internal suspend fun loadSettingsCatalog(
             ContentProfile.ContentType.CONTENT_TYPE_DXVK,
             context.resources.getStringArray(R.array.dxvk_version_entries).toList(),
             selectedDxvk
-        ),
+        ).let { catalog ->
+            VersionCatalog(catalog.all.filterNot { it == DXWrapper.VEGAS_VERSION },
+                catalog.installed.filterNot { it == DXWrapper.VEGAS_VERSION }.toSet())
+        },
         vkd3d = versions(
             ContentProfile.ContentType.CONTENT_TYPE_VKD3D,
             context.resources.getStringArray(R.array.vkd3d_version_entries).toList(),
@@ -728,30 +733,30 @@ internal fun FrameGenerationSettings(
     backend: String,
     multiplier: Int,
     flowScale: Float,
-    winFgModel: Int,
-    lsfgPerformanceMode: Boolean,
     lsfgAvailable: Boolean,
     onBackendChanged: (String) -> Unit,
     onMultiplierChanged: (Int) -> Unit,
-    onFlowScaleChanged: (Float) -> Unit,
-    onWinFgModelChanged: (Int) -> Unit,
-    onLsfgPerformanceModeChanged: (Boolean) -> Unit
+    onFlowScaleChanged: (Float) -> Unit
 ) {
-    val winFg = backend == "win_fg"
-    val multiplierLabels = if (winFg) listOf("Off", "2x") else listOf("Off", "2x", "3x", "4x")
-    val nativeLsfg = backend == "lsfg_native"
-    val backendLabel = if (nativeLsfg) "LSFG Native" else if (winFg) "win-fg" else "LSFG-VK"
-    SettingChoice("Frame Generation", backendLabel, listOf("LSFG-VK", "win-fg", "LSFG Native")) {
-        onBackendChanged(when (it) {
-            "LSFG Native" -> "lsfg_native"
-            "win-fg" -> "win_fg"
-            else -> "lsfg_vk"
-        })
+    val winFg = backend == "win_fg_native"
+    val selected = when {
+        multiplier < 2 -> "Off"
+        winFg -> "Win-FG Native"
+        else -> "LSFG Native ${multiplier}x"
     }
-    SettingsDivider()
-    SettingChoice("Frame Multiplier", if (multiplier < 2) "Off" else "${multiplier}x", multiplierLabels) {
-        val selected = it.removeSuffix("x").toIntOrNull() ?: 0
-        onMultiplierChanged(if (!winFg && !lsfgAvailable) 0 else selected)
+    SettingChoice("Frame Generation", selected,
+        listOf("Off", "Win-FG Native", "LSFG Native 2x", "LSFG Native 3x", "LSFG Native 4x")) {
+        when {
+            it == "Off" -> onMultiplierChanged(0)
+            it == "Win-FG Native" -> {
+                onBackendChanged("win_fg_native")
+                onMultiplierChanged(2)
+            }
+            else -> {
+                onBackendChanged("lsfg_native")
+                onMultiplierChanged(if (lsfgAvailable) it.substringAfterLast(' ').removeSuffix("x").toInt() else 0)
+            }
+        }
     }
     SettingsDivider()
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp)) {
@@ -766,20 +771,10 @@ internal fun FrameGenerationSettings(
             steps = 74
         )
     }
-    if (winFg) {
-        SettingsDivider()
-        SettingChoice("win-fg Model", if (winFgModel >= 4) "FSR3+" else "FSR3", listOf("FSR3", "FSR3+")) {
-            onWinFgModelChanged(if (it == "FSR3+") 4 else 3)
-        }
-    } else if (!nativeLsfg) {
-        SettingsDivider()
-        SettingToggle("Performance Mode", lsfgPerformanceMode, onChanged = onLsfgPerformanceModeChanged)
-    }
     Text(
-        if (winFg) "Bundled win-fg runtime"
-        else if (!lsfgAvailable) "Import Lossless.dll before enabling $backendLabel"
-        else if (nativeLsfg) "Requires the Vulkan renderer and a Vulkan 1.3 driver"
-        else "LSFG-VK ready",
+        if (winFg) "Win-FG Native is built in and runs at 2x"
+        else if (!lsfgAvailable) "Import Lossless.dll before enabling LSFG Native"
+        else "LSFG Native requires a Vulkan 1.3 driver",
         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -11,6 +11,7 @@ import android.widget.TextView;
 import com.winlator.cmod.R;
 import com.winlator.cmod.contents.AdrenotoolsManager;
 import com.winlator.cmod.core.AppUtils;
+import com.winlator.cmod.core.FrameGenManager;
 import com.winlator.cmod.core.UnitUtils;
 
 import java.util.ArrayList;
@@ -46,14 +47,6 @@ public class RendererOptionsDialog extends ContentDialog {
         void setLsfgEnabled(boolean value);
         float getLsfgFlowScale();
         void setLsfgFlowScale(float value);
-        boolean getLsfgPerformanceMode();
-        void setLsfgPerformanceMode(boolean value);
-        int getWinFgMultiplier();
-        void setWinFgMultiplier(int value);
-        float getWinFgFlowScale();
-        void setWinFgFlowScale(float value);
-        int getWinFgModel();
-        void setWinFgModel(int value);
     }
 
     private static final String[] PRESENT_MODE_IDS    = {"mailbox", "fifo"};
@@ -124,48 +117,23 @@ public class RendererOptionsDialog extends ContentDialog {
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
         View frameGenGroup = findViewById(R.id.GroupFrameGen);
-        Spinner spBackend = findViewById(R.id.SPFrameGenBackend);
         Spinner spMultiplier = findViewById(R.id.SPFrameGenMultiplier);
-        Spinner spModel = findViewById(R.id.SPWinFgModel);
         SeekBar sbFlowScale = findViewById(R.id.SBFrameGenFlowScale);
         TextView tvFlowScale = findViewById(R.id.TVLsfgFlowScale);
         TextView tvStatus = findViewById(R.id.TVFrameGenStatus);
-        View modelGroup = findViewById(R.id.GroupWinFgModel);
-        CheckBox cbPerformance = findViewById(R.id.CBFrameGenPerformanceMode);
-
         frameGenGroup.setVisibility(isNativeMode ? View.GONE : View.VISIBLE);
-        setAmoledAdapter(ctx, spBackend, new String[]{"LSFG-VK", "win-fg", "LSFG Native"});
-        setAmoledAdapter(ctx, spMultiplier, new String[]{"Off", "2x", "3x", "4x"});
-        setAmoledAdapter(ctx, spModel, new String[]{"FSR3", "FSR3+"});
-
-        boolean winFg = "win_fg".equals(config.getFrameGenBackend());
-        spBackend.setSelection("lsfg_native".equals(config.getFrameGenBackend()) ? 2 : winFg ? 1 : 0);
-        int multiplier = winFg ? config.getWinFgMultiplier() : config.getLsfgMultiplier();
-        spMultiplier.setSelection(multiplier < 2 ? 0 : Math.min(3, multiplier - 1));
-        spModel.setSelection(Math.max(0, Math.min(1, config.getWinFgModel() - 3)));
-        float flowScale = winFg ? config.getWinFgFlowScale() : config.getLsfgFlowScale();
+        setAmoledAdapter(ctx, spMultiplier, new String[]{
+                "Off", "Win-FG Native", "LSFG Native 2x", "LSFG Native 3x", "LSFG Native 4x"});
+        int multiplier = config.getLsfgMultiplier();
+        String backend = FrameGenManager.normalizeBackend(config.getFrameGenBackend());
+        spMultiplier.setSelection(multiplier < 2 ? 0
+                : FrameGenManager.BACKEND_WIN_FG_NATIVE.equals(backend) ? 1
+                : Math.min(4, multiplier));
+        float flowScale = config.getLsfgFlowScale();
+        tvStatus.setText("Win-FG Native is built in; LSFG Native requires an imported Lossless.dll");
         sbFlowScale.setMax(75);
         sbFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100));
         tvFlowScale.setText(String.format(java.util.Locale.US, "%.2f", flowScale));
-        cbPerformance.setChecked(config.getLsfgPerformanceMode());
-
-        Runnable updateFrameGenUi = () -> {
-            boolean useWinFg = spBackend.getSelectedItemPosition() == 1;
-            modelGroup.setVisibility(useWinFg ? View.VISIBLE : View.GONE);
-            cbPerformance.setVisibility(spBackend.getSelectedItemPosition() == 0 ? View.VISIBLE : View.GONE);
-            tvStatus.setText(useWinFg
-                    ? "Bundled win-fg runtime"
-                    : config.isLsfgDllAvailable()
-                            ? spBackend.getSelectedItemPosition() == 2
-                                    ? "Requires the Vulkan renderer and a Vulkan 1.3 driver" : "LSFG-VK ready"
-                            : "Import Lossless.dll before enabling LSFG");
-        };
-        spBackend.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                updateFrameGenUi.run();
-            }
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-        });
         sbFlowScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 tvFlowScale.setText(String.format(java.util.Locale.US, "%.2f", 0.25f + progress / 100f));
@@ -173,7 +141,6 @@ public class RendererOptionsDialog extends ContentDialog {
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
-        updateFrameGenUi.run();
 
         setOnConfirmCallback(() -> {
             if (!isNativeMode) {
@@ -183,23 +150,15 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setRendererFilterMode(spFilter.getSelectedItemPosition());
             config.setRendererSwapRB(cbSwapRB.isChecked());
 
-            boolean useWinFg = spBackend.getSelectedItemPosition() == 1;
-            int selectedMultiplier = spMultiplier.getSelectedItemPosition() == 0
-                    ? 0 : spMultiplier.getSelectedItemPosition() + 1;
-            float selectedFlowScale = 0.25f + sbFlowScale.getProgress() / 100f;
-            config.setFrameGenBackend(spBackend.getSelectedItemPosition() == 2 ? "lsfg_native" : useWinFg ? "win_fg" : "lsfg_vk");
-            if (useWinFg) {
-                config.setWinFgMultiplier(selectedMultiplier);
-                config.setWinFgFlowScale(selectedFlowScale);
-                config.setWinFgModel(spModel.getSelectedItemPosition() + 3);
-                config.setLsfgEnabled(false);
-            } else {
-                int lsfgMultiplier = config.isLsfgDllAvailable() ? selectedMultiplier : 0;
-                config.setLsfgMultiplier(lsfgMultiplier);
-                config.setLsfgEnabled(lsfgMultiplier >= 2);
-                config.setLsfgFlowScale(selectedFlowScale);
-                config.setLsfgPerformanceMode(cbPerformance.isChecked());
-            }
+            int selection = spMultiplier.getSelectedItemPosition();
+            boolean winFg = selection == 1;
+            int selectedMultiplier = selection < 1 ? 0 : winFg ? 2 : selection;
+            if (!winFg && selectedMultiplier >= 2 && !config.isLsfgDllAvailable()) selectedMultiplier = 0;
+            config.setFrameGenBackend(winFg
+                    ? FrameGenManager.BACKEND_WIN_FG_NATIVE : FrameGenManager.BACKEND_LSFG_NATIVE);
+            config.setLsfgMultiplier(selectedMultiplier);
+            config.setLsfgEnabled(!winFg && selectedMultiplier >= 2);
+            config.setLsfgFlowScale(0.25f + sbFlowScale.getProgress() / 100f);
         });
     }
 

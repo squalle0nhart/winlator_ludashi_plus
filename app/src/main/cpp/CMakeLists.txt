@@ -198,6 +198,9 @@ add_library(vulkan_renderer SHARED
         winlator/renderer/vulkan/lsfg/lsfg_probe.cpp
         winlator/renderer/vulkan/lsfg/lsfg_shaders.cpp
         winlator/renderer/vulkan/lsfg/lsfg_vkd.cpp
+        winlator/renderer/vulkan/winfg/framegen.cpp
+        winlator/renderer/vulkan/winfg/winfg_vkd.cpp
+        winlator/renderer/vulkan/winfg/winfg_engine.cpp
 
         ${VULKAN_CONTEXT_LEGACY}
         winlator/renderer/vulkan/VulkanRendererFilters.cpp
@@ -213,6 +216,28 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_postfx_frag.h
+)
+
+set(WINFG_UPSTREAM "v0.3.0")
+set(WINFG_CHAIN_SRC
+        winlator/renderer/vulkan/winfg/framegen.cpp
+        winlator/renderer/vulkan/winfg/framegen.hpp
+        winlator/renderer/vulkan/winfg/record_impl.inc
+        winlator/renderer/vulkan/winfg/config.hpp
+        winlator/renderer/vulkan/winfg/embedded_shaders.hpp
+        winlator/renderer/vulkan/winfg/winfg_engine.cpp
+)
+set(WINFG_HASH_INPUT "")
+foreach(f ${WINFG_CHAIN_SRC})
+    file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/${f}" _h)
+    string(APPEND WINFG_HASH_INPUT "${_h}")
+endforeach()
+string(SHA256 WINFG_CHAIN_HASH_FULL "${WINFG_HASH_INPUT}")
+string(SUBSTRING "${WINFG_CHAIN_HASH_FULL}" 0 12 WINFG_CHAIN_HASH)
+
+target_compile_definitions(vulkan_renderer PRIVATE
+        WINFG_UPSTREAM="${WINFG_UPSTREAM}"
+        WINFG_CHAIN_HASH="${WINFG_CHAIN_HASH}"
 )
 
 target_compile_options(vulkan_renderer PRIVATE

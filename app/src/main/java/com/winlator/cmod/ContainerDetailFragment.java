@@ -1,5 +1,7 @@
 package com.winlator.cmod;
 
+import com.winlator.cmod.core.DXWrapper;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
@@ -60,7 +62,7 @@ import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
-import com.winlator.cmod.core.LsfgVkManager;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.PreloaderDialog;
 import com.winlator.cmod.core.ProtonPackageManager;
 import com.winlator.cmod.core.StringUtils;
@@ -500,8 +502,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                             }
 
                             public boolean isLsfgDllAvailable() {
-                                return LsfgVkManager.isGlobalDllAvailable(getContext())
-                                        || LsfgVkManager.containerDllPath(rendererCfgHolder) != null;
+                                return LosslessDll.isGlobalDllAvailable(getContext())
+                                        || LosslessDll.containerDllPath(rendererCfgHolder) != null;
                             }
 
                             public int getLsfgMultiplier() {
@@ -526,38 +528,12 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
 
                             public void setLsfgFlowScale(float val) {
                                 rendererCfgHolder.setLsfgFlowScale(val);
-                                if (isEditMode())
-                                    rendererCfgHolder.saveData();
-                            }
-
-                            public boolean getLsfgPerformanceMode() {
-                                return rendererCfgHolder.getLsfgPerformanceMode();
-                            }
-
-                            public void setLsfgPerformanceMode(boolean val) {
-                                rendererCfgHolder.setLsfgPerformanceMode(val);
-                                if (isEditMode())
-                                    rendererCfgHolder.saveData();
+                                if (isEditMode()) rendererCfgHolder.saveData();
                             }
 
                             public String getFrameGenBackend() { return rendererCfgHolder.getFrameGenBackend(); }
                             public void setFrameGenBackend(String val) {
                                 rendererCfgHolder.setFrameGenBackend(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-                            public int getWinFgMultiplier() { return rendererCfgHolder.getWinFgMultiplier(); }
-                            public void setWinFgMultiplier(int val) {
-                                rendererCfgHolder.setWinFgMultiplier(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-                            public float getWinFgFlowScale() { return rendererCfgHolder.getWinFgFlowScale(); }
-                            public void setWinFgFlowScale(float val) {
-                                rendererCfgHolder.setWinFgFlowScale(val);
-                                if (isEditMode()) rendererCfgHolder.saveData();
-                            }
-                            public int getWinFgModel() { return rendererCfgHolder.getWinFgModel(); }
-                            public void setWinFgModel(int val) {
-                                rendererCfgHolder.setWinFgModel(val);
                                 if (isEditMode()) rendererCfgHolder.saveData();
                             }
                         }, rendererCfgHolder.isRendererNative()).show();
@@ -796,6 +772,9 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
                     graphicsDriverConfig = GraphicsDriverConfigDialog.toGraphicsDriverConfig(config);
                 }
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
+                KeyValueSet wrapperSettings = DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag());
+                wrapperSettings.put("version", DXWrapper.versionFor(dxwrapper, wrapperSettings.get("version"), DefaultVersion.DXVK));
+                vDXWrapperConfig.setTag(wrapperSettings.toString());
                 String dxwrapperConfig = vDXWrapperConfig.getTag().toString();
                 String audioDriver = StringUtils.parseIdentifier(sAudioDriver.getSelectedItem());
                 String emulator = StringUtils.parseIdentifier(sEmulator.getSelectedItem());
@@ -1111,9 +1090,12 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.contains("dxvk")) {
+                KeyValueSet wrapperSettings = DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag());
+                wrapperSettings.put("version", DXWrapper.versionFor(dxwrapper, wrapperSettings.get("version"), DefaultVersion.DXVK));
+                vDXWrapperConfig.setTag(wrapperSettings.toString());
+                if (DXWrapper.isVulkan(dxwrapper)) {
                     vDXWrapperConfig
-                            .setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC)).show());
+                            .setOnClickListener((v) -> (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, DXWrapper.VEGAS.equals(dxwrapper), null, new ContentsManager(vDXWrapperConfig.getContext()))).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }
@@ -1142,9 +1124,12 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String dxwrapper = StringUtils.parseIdentifier(sDXWrapper.getSelectedItem());
-                if (dxwrapper.contains("dxvk")) {
+                KeyValueSet wrapperSettings = DXVKConfigDialog.parseConfig(vDXWrapperConfig.getTag());
+                wrapperSettings.put("version", DXWrapper.versionFor(dxwrapper, wrapperSettings.get("version"), DefaultVersion.DXVK));
+                vDXWrapperConfig.setTag(wrapperSettings.toString());
+                if (DXWrapper.isVulkan(dxwrapper)) {
                     vDXWrapperConfig.setOnClickListener((v) ->
-                            (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, ContainerDetailFragment.this, contentsManager)).show());
+                            (new DXVKConfigDialog(vDXWrapperConfig, isARM64EC, DXWrapper.VEGAS.equals(dxwrapper), ContainerDetailFragment.this, contentsManager)).show());
                 } else {
                     vDXWrapperConfig.setOnClickListener((v) -> (new WineD3DConfigDialog(vDXWrapperConfig)).show());
                 }

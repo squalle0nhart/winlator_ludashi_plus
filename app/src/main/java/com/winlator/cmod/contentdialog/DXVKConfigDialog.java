@@ -1,5 +1,7 @@
 package com.winlator.cmod.contentdialog;
 
+import com.winlator.cmod.core.DXWrapper;
+
 import android.content.Context;
 import android.util.Log;
 import android.view.View;
@@ -47,7 +49,8 @@ public class DXVKConfigDialog extends ContentDialog {
     private final Context context;
     private final ContentInstallHost installHost;
     private final ContentsManager contentsManager;
-    private static List<String> dxvkVersions;
+    private List<String> dxvkVersions;
+    private final boolean vegas;
     private static final Pattern SEMVER = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
 
     private static Integer tryGetMajor(String s) {
@@ -83,17 +86,20 @@ public class DXVKConfigDialog extends ContentDialog {
     }
 
     public DXVKConfigDialog(View anchor, boolean isARM64EC) {
-        this(anchor, isARM64EC, null, new ContentsManager(anchor.getContext()));
+        this(anchor, isARM64EC, false, null, new ContentsManager(anchor.getContext()));
     }
 
-    public DXVKConfigDialog(View anchor, boolean isARM64EC, ContentInstallHost installHost, ContentsManager contentsManager) {
+    public DXVKConfigDialog(View anchor, boolean isARM64EC, boolean vegas, ContentInstallHost installHost, ContentsManager contentsManager) {
         super(anchor.getContext(), R.layout.dxvk_config_dialog);
         context = anchor.getContext();
+        this.vegas = vegas;
         this.installHost = installHost;
         this.contentsManager = contentsManager;
         findViewById(R.id.FrameLayout).getLayoutParams().width = Math.min(AppUtils.getPreferredDialogWidth(context), Math.round(UnitUtils.dpToPx(300)));
         setIcon(R.drawable.icon_monitor);
-        setTitle("DXVK "+context.getString(R.string.configuration));
+        setTitle((vegas ? "Vegas " : "DXVK ") + context.getString(R.string.configuration));
+
+        if (vegas) ((android.widget.TextView) findViewById(R.id.TVDXVKVersion)).setText("Vegas Version");
 
         final Spinner sDXVKVersion = findViewById(R.id.SDXVKVersion);
         final Spinner sVKD3DVersion = findViewById(R.id.SVKD3DVersion);
@@ -218,8 +224,13 @@ public class DXVKConfigDialog extends ContentDialog {
             findViewById(R.id.BTVkd3dRemove).setVisibility(View.GONE);
         }
 
+        if (vegas) {
+            findViewById(R.id.BTDXVKInstall).setVisibility(View.GONE);
+            findViewById(R.id.BTDXVKRemove).setVisibility(View.GONE);
+        }
+
         setOnConfirmCallback(() -> {
-            config.put("version", sDXVKVersion.getSelectedItem().toString());
+            config.put("version", vegas ? DXWrapper.VEGAS_VERSION : sDXVKVersion.getSelectedItem().toString());
             config.put("framerate", StringUtils.parseNumber(sFramerate.getSelectedItem()));
             config.put("async", ((swAsync.isChecked())&&(llAsync.getVisibility()==View.VISIBLE))?"1":"0");
             config.put("asyncCache", ((swAsyncCache.isChecked())&&(llAsyncCache.getVisibility()==View.VISIBLE))?"1":"0");
@@ -343,7 +354,12 @@ public class DXVKConfigDialog extends ContentDialog {
             itemList.add(entryName.substring(firstDashIndex + 1));
         }
 
-        itemList.removeIf(version -> !isVersionAllowedForArch(version, isARM64EC));
+        itemList.removeIf(version -> !isVersionAllowedForArch(version, isARM64EC)
+                || DXWrapper.VEGAS_VERSION.equals(version));
+        if (vegas) {
+            itemList.clear();
+            itemList.add("2.7.3");
+        }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(context, R.layout.spinner_item_amoled, itemList);
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item_amoled_compact);

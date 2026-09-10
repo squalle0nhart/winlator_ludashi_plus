@@ -64,6 +64,12 @@ class OnboardingComposeController internal constructor(
     private val initialContainerPreparing: MutableState<Boolean>,
     private val initialContainerReady: MutableState<Boolean>
 ) {
+    internal val catalogLoading = mutableStateOf(false)
+
+    fun setCatalogLoading(loading: Boolean) {
+        catalogLoading.value = loading
+    }
+
     fun updateCore(ready: Boolean, progress: Int) {
         coreReady.value = ready
         coreProgress.value = progress.coerceIn(0, 100)
@@ -145,6 +151,7 @@ object OnboardingComposeHost {
                     bundledInstalled,
                     bundledInUse,
                     components,
+                    controller.catalogLoading,
                     installing,
                     installLabel,
                     installProgress,
@@ -240,6 +247,7 @@ private fun OnboardingFlow(
     bundledInstalled: State<Boolean>,
     bundledInUse: State<Boolean>,
     components: State<List<OnboardingComponent>>,
+    catalogLoading: State<Boolean>,
     installing: State<String?>,
     installingLabel: State<String?>,
     installingProgress: State<Int>,
@@ -288,6 +296,12 @@ private fun OnboardingFlow(
             bundledInstalled = bundledInstalled,
             bundledInUse = bundledInUse,
             all = components.value,
+            catalogLoading = catalogLoading.value,
+            contentsUrl = contentsUrl,
+            onContentsUrlChanged = {
+                contentsUrl = it.trim().ifEmpty { ContentsManager.REMOTE_PROFILES }
+                cb.onContentsSourceSelected(contentsUrl)
+            },
             installing = installing.value,
             installingLabel = installingLabel.value,
             installingProgress = installingProgress.value,

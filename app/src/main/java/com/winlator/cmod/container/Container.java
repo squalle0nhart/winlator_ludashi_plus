@@ -1,5 +1,7 @@
 package com.winlator.cmod.container;
 
+import com.winlator.cmod.core.DXWrapper;
+
 import android.os.Environment;
 
 import com.winlator.cmod.box64.Box64Preset;
@@ -235,66 +237,16 @@ public class Container {
         putExtra("lsfgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
     }
 
-    public boolean getLsfgPerformanceMode() {
-        String value = getExtra("lsfgPerformanceMode", "true");
-        return !"0".equals(value) && !"false".equalsIgnoreCase(value);
-    }
-
-    public void setLsfgPerformanceMode(boolean performanceMode) {
-        putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
-    }
-
     public String getFrameGenBackend() {
-        String value = getExtra("frameGenBackend", "lsfg_vk");
-        return "bionic_fg".equalsIgnoreCase(value) || "native_fg".equalsIgnoreCase(value)
-                ? "win_fg" : value;
+        return com.winlator.cmod.core.FrameGenManager.normalizeBackend(getExtra("frameGenBackend", null));
     }
 
     public void setFrameGenBackend(String backend) {
-        putExtra("frameGenBackend", backend == null || backend.isEmpty() ? "lsfg_vk" : backend);
-    }
-
-    public int getWinFgMultiplier() {
-        String value = getExtra("winFgMultiplier", getExtra("bionicFgMultiplier", "0"));
-        try {
-            return Integer.parseInt(value) < 2 ? 0 : 2;
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
-    }
-
-    public void setWinFgMultiplier(int multiplier) {
-        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
-    }
-
-    public float getWinFgFlowScale() {
-        String value = getExtra("winFgFlowScale", getExtra("bionicFgFlowScale", "0.80"));
-        try {
-            return Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
-        } catch (NumberFormatException ignored) {
-            return 0.80f;
-        }
-    }
-
-    public void setWinFgFlowScale(float flowScale) {
-        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
-    }
-
-    public int getWinFgModel() {
-        String value = getExtra("winFgModel", getExtra("bionicFgModel", "3"));
-        try {
-            return Math.max(3, Math.min(4, Integer.parseInt(value)));
-        } catch (NumberFormatException ignored) {
-            return 3;
-        }
-    }
-
-    public void setWinFgModel(int model) {
-        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
+        putExtra("frameGenBackend", com.winlator.cmod.core.FrameGenManager.normalizeBackend(backend));
     }
 
     public String getDXWrapper() {
-        return dxwrapper;
+        return DXWrapper.migrate(dxwrapper, new KeyValueSet(dxwrapperConfig).get("version"));
     }
 
     public void setDXWrapper(String dxwrapper) {

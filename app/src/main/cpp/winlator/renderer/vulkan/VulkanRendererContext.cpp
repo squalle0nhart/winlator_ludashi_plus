@@ -1,6 +1,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #include "VulkanRendererContext.h"
+#include "winfg/winfg_engine.h"
 #include "lsfg/lsfg_engine.h"
 #include <stdexcept>
 #include <cstdlib>
@@ -101,6 +102,8 @@ void VulkanRendererContext::loadDeviceDispatch() {
     LOAD_D2(CreateComputePipelines);
     LOAD_D2(CmdDispatch);
     LOAD_D2(UnmapMemory);
+    LOAD_D2(CmdClearColorImage);
+    LOAD_D2(ResetDescriptorPool);
     LOAD_D2(CreateQueryPool);
     LOAD_D2(DestroyQueryPool);
     LOAD_D2(GetQueryPoolResults);
@@ -353,7 +356,7 @@ void VulkanRendererContext::createSwapchain() {
     lsfgCaps_.storageOnSwapchainFormat = lsfg::probeStorageFormat(vk_, physicalDevice, swapchainFmt);
     lsfg::explain(lsfgCaps_);
     RLOG("lsfg-native: %s", lsfgCaps_.reason);
-    const bool nativeFg = fgArmed_.load() && lsfgCaps_.supported();
+    const bool nativeFg = fgArmed_.load() && fgCapsOk();
     uint32_t imgCount=caps.minImageCount+1;
     if (nativeFg) imgCount = std::max(imgCount, std::min(caps.minImageCount + kMaxPresentsPerFrame, 8u));
     if (caps.maxImageCount>0&&imgCount>caps.maxImageCount) imgCount=caps.maxImageCount;
@@ -570,8 +573,7 @@ void VulkanRendererContext::setPostFXMode(int mode) {
     if (postFXMode == mode) return;
     postFXMode = mode;
     if (mode > 0) {
-        if (filterMode != 2 && filterMode != 3 && postfxPipeline == VK_NULL_HANDLE)
-            createPostFXPipeline();
+        createPostFXPipeline();
     } else {
         if (postfxPipeline != VK_NULL_HANDLE) {
             vk_.DeviceWaitIdle(device);
@@ -662,7 +664,9 @@ void VulkanRendererContext::recreateSyncObjects() {
 void VulkanRendererContext::cleanupSwapchain() {
     vk_.DeviceWaitIdle(device);
     lsfgEngine_.reset();
+    winfgEngine_.reset();
     lsfgEngineTried_ = false;
+    winfgEngineTried_ = false;
     compositeArmed = false;
     destroyCompositeTargets();
     destroyFgQueryPool();
@@ -1142,7 +1146,7 @@ void VulkanRendererContext::renderFrame() {
     // --- Frame gen: decide whether THIS frame composites off-swapchain. The
     // targets are created lazily on the first armed frame and torn down when it
     // disarms, so a session that never turns frame gen on never allocates them.
-    if (fgArmed_.load(std::memory_order_relaxed) && lsfgCaps_.supported() && swapchainTransferDst) {
+    if (fgArmed_.load(std::memory_order_relaxed) && fgCapsOk() && swapchainTransferDst) {
         const int mult = fgMultiplier_.load(std::memory_order_relaxed);
         const uint32_t want = (uint32_t)std::min(std::max(mult, 2), 4) + 1u;
         compositeArmed = ensureCompositeTargets(swapchainExt.width, swapchainExt.height, want);
@@ -1160,34 +1164,40 @@ void VulkanRendererContext::renderFrame() {
     // --- Frame gen: decide how many frames to synthesise for this source
     // frame, BEFORE acquiring, since that sets how many images we need.
     fgPlan_ = FrameGenPlan{};
-    if (compositeActive()) ensureLsfgEngine();
-    if (lsfgEngine_ && fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
-        lsfgEngine_->configure(
-            (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2), 0,
-            fgFlowScale_.load(std::memory_order_relaxed),
-            fgRefreshHz_.load(std::memory_order_relaxed));
-    }
-    if (compositeActive() && lsfgEngine_) {
-        lsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
-        if (lsfgEngine_->needsRebuild(swapchainExt.width, swapchainExt.height, swapchainFmt))
-            vk_.DeviceWaitIdle(device);
-    }
-    if (compositeActive() && ensureLsfgEngine() &&
-        lsfgEngine_->prepare(swapchainExt.width, swapchainExt.height, swapchainFmt)) {
-        // The governor judges whether an extra generated frame paid off, so it
-        // must be given the rate that actually reaches the PANEL, not the guest
-        // rate wearing a different name.
-        lsfgEngine_->setPresentedRate(fgPresentedRate_);
-        // Tell the engine how large the GUEST actually renders. Without this the
-        // flow pyramid is built at full composite resolution regardless - the
-        // device log read "flow 1920x1080 scale 1.00 (guest 0x0)" - which is the
-        // most expensive setting available and was never intended as a default.
+    const uint32_t capacity = (uint32_t)std::min<size_t>(
+        std::min(kMaxPresentsPerFrame - 1, fgSwapchainCapacity_),
+        compositeTargets.empty() ? 0 : compositeTargets.size() - 1);
+    if (fgEngineKind_.load(std::memory_order_relaxed) == 1) {
+        if (compositeActive() && ensureWinFgEngine()) {
+            if (fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
+                winfgEngine_->configure(
+                    (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2),
+                    fgModel_.load(std::memory_order_relaxed),
+                    fgPerfPreset_.load(std::memory_order_relaxed),
+                    fgFlowScale_.load(std::memory_order_relaxed));
+            }
+            if (winfgEngine_->prepare(swapchainExt.width, swapchainExt.height, swapchainFmt)) {
+                fgPlan_.generations = winfgEngine_->plan(capacity);
+                ++fgSourceFrames_;
+            }
+        }
+    } else if (compositeActive() && ensureLsfgEngine()) {
+        if (fgConfigDirty_.exchange(false, std::memory_order_relaxed)) {
+            lsfgEngine_->configure(
+                (uint32_t)std::max(fgMultiplier_.load(std::memory_order_relaxed), 2), 0,
+                fgFlowScale_.load(std::memory_order_relaxed),
+                fgRefreshHz_.load(std::memory_order_relaxed));
+        }
+        // The flow-pyramid size depends on the guest extent. Set it before the
+        // first prepare so the 25-pipeline chain is built once at the right size.
         if (containerWidth > 0 && containerHeight > 0)
             lsfgEngine_->setGuestExtent((uint32_t)containerWidth, (uint32_t)containerHeight);
-        const uint32_t capacity = (uint32_t)std::min<size_t>(
-            std::min(kMaxPresentsPerFrame - 1, fgSwapchainCapacity_),
-            compositeTargets.empty() ? 0 : compositeTargets.size() - 1);
-        fgPlan_.generations = lsfgEngine_->plan(capacity, ++fgSourceFrames_);
+        if (lsfgEngine_->needsRebuild(swapchainExt.width, swapchainExt.height, swapchainFmt))
+            vk_.DeviceWaitIdle(device);
+        if (lsfgEngine_->prepare(swapchainExt.width, swapchainExt.height, swapchainFmt)) {
+            lsfgEngine_->setPresentedRate(fgPresentedRate_);
+            fgPlan_.generations = lsfgEngine_->plan(capacity, ++fgSourceFrames_);
+        }
     }
     fgPlan_.presents = fgPlan_.generations + 1;
 

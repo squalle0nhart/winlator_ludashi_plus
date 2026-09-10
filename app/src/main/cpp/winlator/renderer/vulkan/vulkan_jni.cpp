@@ -10,11 +10,12 @@
 #include "VulkanRendererContext.h"
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureLsfg(
-    JNIEnv* env, jobject, jlong handle, jstring cachePath, jint multiplier,
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
+    JNIEnv* env, jobject, jlong handle, jint engineKind, jstring cachePath, jint multiplier,
     jfloat flowScale, jfloat refreshHz) {
     auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
     if (!ctx) return nullptr;
+    ctx->setFrameGenEngine((int)engineKind);
     if (multiplier < 2) {
         ctx->setFrameGenArmed(false, 0);
         return nullptr;
@@ -22,17 +23,21 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureLsfg(
     std::string unsupported;
     {
         std::unique_lock<std::shared_mutex> frameLock(ctx->frameMutex);
-        if (!ctx->lsfgCaps_.supported()) unsupported = ctx->lsfgCaps_.reason;
+        if (!ctx->fgCapsOk()) unsupported = engineKind == 1
+            ? "The compositor format does not support storage images"
+            : ctx->lsfgCaps_.reason;
     }
     if (!unsupported.empty()) {
         ctx->setFrameGenArmed(false, 0);
         return env->NewStringUTF(unsupported.c_str());
     }
-    if (!cachePath) return env->NewStringUTF("Shader cache is unavailable");
-    const char* path = env->GetStringUTFChars(cachePath, nullptr);
-    if (!path) return nullptr;
-    ctx->setLsfgCachePath(path);
-    env->ReleaseStringUTFChars(cachePath, path);
+    if (engineKind != 1) {
+        if (!cachePath) return env->NewStringUTF("Shader cache is unavailable");
+        const char* path = env->GetStringUTFChars(cachePath, nullptr);
+        if (!path) return nullptr;
+        ctx->setLsfgCachePath(path);
+        env->ReleaseStringUTFChars(cachePath, path);
+    }
     ctx->setFrameGenTuning(flowScale, refreshHz);
     ctx->setFrameGenArmed(true, std::clamp((int)multiplier, 2, 4));
     return nullptr;

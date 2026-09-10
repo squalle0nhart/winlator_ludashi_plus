@@ -49,9 +49,9 @@ public final class LsfgNative {
     private static native String nativeStatusName(int status);
     private static native String nativeVariantName(int variant);
 
-    /** Where the imported Lossless.dll lives — shared with the lsfg-vk engine. */
+    /** Where the imported Lossless.dll lives. */
     public static File losslessDll(Context context) {
-        return LsfgVkManager.globalDllFile(context);
+        return LosslessDll.globalDllFile(context);
     }
 
     /** Where the translated SPIR-V chain is cached. */

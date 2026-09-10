@@ -102,13 +102,7 @@
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:paddingBottom="8dp"/>
 
-                <Spinner
-                    android:id="@+id/SPFrameGenBackend"
-                    style="@style/ComboBoxCompact"
-                    android:background="@drawable/combo_box_no_arrow_dark"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:spinnerMode="dropdown"/>
+
 
                 <TextView
                     android:id="@+id/TVFrameGenStatus"
@@ -120,7 +114,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Frame Multiplier"
+                    android:text="Mode"
                     android:textAppearance="?android:attr/textAppearanceMedium"
                     android:paddingBottom="8dp"/>
 
@@ -155,33 +149,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-                <LinearLayout
-                    android:id="@+id/GroupWinFgModel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Model"
-                        android:paddingBottom="8dp"/>
-
-                    <Spinner
-                        android:id="@+id/SPWinFgModel"
-                        style="@style/ComboBoxCompact"
-                        android:background="@drawable/combo_box_no_arrow_dark"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:spinnerMode="dropdown"/>
-                </LinearLayout>
-
-                <CheckBox
-                    android:id="@+id/CBFrameGenPerformanceMode"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Performance Mode" />
             </LinearLayout>
 
         </LinearLayout>

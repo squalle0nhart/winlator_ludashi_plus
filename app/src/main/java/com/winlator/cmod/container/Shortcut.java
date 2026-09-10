@@ -408,68 +408,15 @@ public class Shortcut {
         putExtra("lsfgFlowScale", String.format(Locale.US, "%.2f", clamped));
     }
 
-    public boolean getLsfgPerformanceMode() {
-        String value = getExtra("lsfgPerformanceMode", null);
-        if (value == null || value.isEmpty()) return container.getLsfgPerformanceMode();
-        return value.equals("1") || value.equalsIgnoreCase("true");
-    }
-
-    public void setLsfgPerformanceMode(boolean performanceMode) {
-        putExtra("lsfgPerformanceMode", performanceMode ? "true" : "false");
-    }
-
     public String getFrameGenBackend() {
-        String value = getExtra("frameGenBackend", null);
-        if ("bionic_fg".equalsIgnoreCase(value) || "native_fg".equalsIgnoreCase(value)) return "win_fg";
-        return value == null || value.isEmpty() ? container.getFrameGenBackend() : value;
+        String backend = getExtra("frameGenBackend", null);
+        return backend == null || backend.isEmpty()
+                ? container.getFrameGenBackend()
+                : com.winlator.cmod.core.FrameGenManager.normalizeBackend(backend);
     }
 
     public void setFrameGenBackend(String backend) {
-        putExtra("frameGenBackend", backend == null || backend.isEmpty() ? "lsfg_vk" : backend);
+        putExtra("frameGenBackend", com.winlator.cmod.core.FrameGenManager.normalizeBackend(backend));
     }
 
-    public int getWinFgMultiplier() {
-        String value = getExtra("winFgMultiplier", getExtra("bionicFgMultiplier", null));
-        try {
-            return value == null || value.isEmpty()
-                    ? container.getWinFgMultiplier()
-                    : Integer.parseInt(value) < 2 ? 0 : 2;
-        } catch (NumberFormatException ignored) {
-            return container.getWinFgMultiplier();
-        }
-    }
-
-    public void setWinFgMultiplier(int multiplier) {
-        putExtra("winFgMultiplier", String.valueOf(multiplier < 2 ? 0 : 2));
-    }
-
-    public float getWinFgFlowScale() {
-        String value = getExtra("winFgFlowScale", getExtra("bionicFgFlowScale", null));
-        try {
-            return value == null || value.isEmpty()
-                    ? container.getWinFgFlowScale()
-                    : Math.max(0.25f, Math.min(1.0f, Float.parseFloat(value)));
-        } catch (NumberFormatException ignored) {
-            return container.getWinFgFlowScale();
-        }
-    }
-
-    public void setWinFgFlowScale(float flowScale) {
-        putExtra("winFgFlowScale", String.format(Locale.US, "%.2f", Math.max(0.25f, Math.min(1.0f, flowScale))));
-    }
-
-    public int getWinFgModel() {
-        String value = getExtra("winFgModel", getExtra("bionicFgModel", null));
-        try {
-            return value == null || value.isEmpty()
-                    ? container.getWinFgModel()
-                    : Math.max(3, Math.min(4, Integer.parseInt(value)));
-        } catch (NumberFormatException ignored) {
-            return container.getWinFgModel();
-        }
-    }
-
-    public void setWinFgModel(int model) {
-        putExtra("winFgModel", String.valueOf(Math.max(3, Math.min(4, model))));
-    }
 }

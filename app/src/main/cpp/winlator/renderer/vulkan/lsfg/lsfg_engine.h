@@ -97,6 +97,8 @@ public:
 private:
     float effectiveFlowScale(uint32_t width) const;
 
+    bool historyFresh() const { return haveCopied_ && lastCopiedCount_ + 1 == frameCount_; }
+
     Device      device_{};
     std::string cachePath_;
     std::unique_ptr<LsfgShaders> shaders_;
@@ -121,6 +123,10 @@ private:
     float    presentedRate_{};
 
     uint64_t frameCount_{};
+    uint64_t lastCopiedCount_{};
+    bool     haveCopied_{};
+    bool     primeHistory_{};
+    uint64_t primeLogCount_{};
     uint64_t lastCount_{};
     size_t   lastGenerations_{};
     uint64_t planCalls_{};

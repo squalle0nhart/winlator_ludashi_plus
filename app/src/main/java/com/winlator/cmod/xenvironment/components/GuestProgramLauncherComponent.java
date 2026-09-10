@@ -495,14 +495,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
             }
         }
 
-        if (shortcut != null) {
-            FrameGenManager.ensureRuntimeInstalled(context, shortcut);
-            FrameGenManager.writeConfig(shortcut);
-            FrameGenManager.applyLaunchEnv(shortcut, execEnvVars);
-        } else {
-            new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_LS_frame_generation.json").delete();
-            new File(rootDir, ".local/share/vulkan/implicit_layer.d/VkLayer_win_framegen.json").delete();
-        }
+        FrameGenManager.applyLaunchEnv(execEnvVars);
 
         String emulator = container.getEmulator();
         if (shortcut != null)

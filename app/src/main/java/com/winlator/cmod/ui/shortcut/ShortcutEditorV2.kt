@@ -2,6 +2,8 @@
 
 package com.winlator.cmod.ui.shortcut
 
+import com.winlator.cmod.core.DXWrapper
+
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -80,7 +82,7 @@ import com.winlator.cmod.container.Shortcut
 import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
-import com.winlator.cmod.core.LsfgVkManager
+import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.OpenGLDriverDefaults
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
@@ -169,10 +171,6 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var frameGenBackend by mutableStateOf(shortcut.getFrameGenBackend())
     var lsfgMultiplier by mutableIntStateOf(shortcut.getLsfgMultiplier())
     var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
-    var lsfgPerformanceMode by mutableStateOf(shortcut.getLsfgPerformanceMode())
-    var winFgMultiplier by mutableIntStateOf(shortcut.getWinFgMultiplier())
-    var winFgFlowScale by mutableStateOf(shortcut.getWinFgFlowScale())
-    var winFgModel by mutableIntStateOf(shortcut.getWinFgModel())
 
     var graphicsDriver by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())))
     private val defaultDriverVersion = runCatching {
@@ -205,7 +203,8 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var oboeExclusive by mutableStateOf(shortcut.getExtra("oboeExclusive", container.getExtra("oboeExclusive", "0")) == "1")
     var wrapper by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("dxwrapper", container.getDXWrapper())))
     var wrapperConfig by mutableStateOf(shortcut.getExtra("dxwrapperConfig", container.getDXWrapperConfig()))
-    var dxvkVersion by mutableStateOf(readConfig(wrapperConfig, "version", ',').ifBlank { DefaultVersion.DXVK })
+    init { wrapper = DXWrapper.migrate(wrapper, readConfig(wrapperConfig, "version", ',')) }
+    var dxvkVersion by mutableStateOf(DXWrapper.versionFor(wrapper, readConfig(wrapperConfig, "version", ','), DefaultVersion.DXVK))
     var vkd3dVersion by mutableStateOf(readConfig(wrapperConfig, "vkd3dVersion", ',').ifBlank { DefaultVersion.VKD3D })
     var vkd3dLevel by mutableStateOf(readConfig(wrapperConfig, "vkd3dLevel", ',').ifBlank { "12_1" })
     var frameRate by mutableStateOf(readConfig(wrapperConfig, "framerate", ',').ifBlank { "0" })
@@ -391,12 +390,8 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     fun saveFrameGeneration() {
         shortcut.setFrameGenBackend(frameGenBackend)
         shortcut.setLsfgMultiplier(lsfgMultiplier)
-        shortcut.setLsfgEnabled(frameGenBackend == "lsfg_vk" && lsfgMultiplier >= 2)
+        shortcut.setLsfgEnabled(frameGenBackend == "lsfg_native" && lsfgMultiplier >= 2)
         shortcut.setLsfgFlowScale(lsfgFlowScale)
-        shortcut.setLsfgPerformanceMode(lsfgPerformanceMode)
-        shortcut.setWinFgMultiplier(winFgMultiplier)
-        shortcut.setWinFgFlowScale(winFgFlowScale)
-        shortcut.setWinFgModel(winFgModel)
         save()
     }
 
@@ -848,19 +843,14 @@ private fun ShortcutCategoryV2(
             }
             if (s.renderer != "EGL") {
                 SettingsCard {
-                    val winFg = s.frameGenBackend == "win_fg"
                     FrameGenerationSettings(
                         backend = s.frameGenBackend,
-                        multiplier = if (winFg) s.winFgMultiplier else s.lsfgMultiplier,
-                        flowScale = if (winFg) s.winFgFlowScale else s.lsfgFlowScale,
-                        winFgModel = s.winFgModel,
-                        lsfgPerformanceMode = s.lsfgPerformanceMode,
-                        lsfgAvailable = LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(s.shortcut) != null,
+                        multiplier = s.lsfgMultiplier,
+                        flowScale = s.lsfgFlowScale,
+                        lsfgAvailable = LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(s.shortcut) != null,
                         onBackendChanged = { s.frameGenBackend = it; s.saveFrameGeneration() },
-                        onMultiplierChanged = { if (winFg) s.winFgMultiplier = it else s.lsfgMultiplier = it; s.saveFrameGeneration() },
-                        onFlowScaleChanged = { if (winFg) s.winFgFlowScale = it else s.lsfgFlowScale = it; s.saveFrameGeneration() },
-                        onWinFgModelChanged = { s.winFgModel = it; s.saveFrameGeneration() },
-                        onLsfgPerformanceModeChanged = { s.lsfgPerformanceMode = it; s.saveFrameGeneration() }
+                        onMultiplierChanged = { s.lsfgMultiplier = it; s.saveFrameGeneration() },
+                        onFlowScaleChanged = { s.lsfgFlowScale = it; s.saveFrameGeneration() }
                     )
                 }
             }
@@ -914,13 +904,17 @@ private fun ShortcutCategoryV2(
         "Compatibility" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
                 val shown = wrapperEntries.firstOrNull { StringUtils.parseIdentifier(it).equals(s.wrapper, true) } ?: s.wrapper
-                SettingChoice("DX Wrapper", shown, wrapperEntries) { s.wrapper = StringUtils.parseIdentifier(it); s.extra("dxwrapper", s.wrapper) }
-                if (s.wrapper.contains("dxvk", true)) {
+                SettingChoice("DX Wrapper", shown, wrapperEntries) { s.wrapper = StringUtils.parseIdentifier(it); s.selectDxvkVersion(DXWrapper.versionFor(s.wrapper, s.dxvkVersion, DefaultVersion.DXVK)); s.extra("dxwrapper", s.wrapper) }
+                if (DXWrapper.isVulkan(s.wrapper)) {
                     catalog?.let { c ->
                         val dxvkCatalog = filterDxvkForVkd3d(c.dxvk, s.vkd3dVersion)
                         SettingsDivider()
-                        SettingInstallChoice("DXVK Version", s.dxvkVersion, dxvkCatalog, s.installing, "DXVK",
-                            { v -> installRuntime("DXVK", v) { installed -> s.selectDxvkVersion(installed) } }) { s.selectDxvkVersion(it) }
+                        if (s.wrapper == DXWrapper.VEGAS) {
+                            SettingChoice("Vegas Version", "2.7.3", listOf("2.7.3")) {}
+                        } else {
+                            SettingInstallChoice("DXVK Version", s.dxvkVersion, dxvkCatalog, s.installing, "DXVK",
+                                { v -> installRuntime("DXVK", v) { installed -> s.selectDxvkVersion(installed) } }) { s.selectDxvkVersion(it) }
+                        }
                         SettingsDivider()
                         SettingInstallChoice("VKD3D Version", s.vkd3dVersion, c.vkd3d, s.installing, "VKD3D",
                             { v -> installRuntime("VKD3D", v) { installed ->

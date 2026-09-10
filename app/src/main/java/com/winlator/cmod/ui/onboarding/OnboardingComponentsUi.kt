@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.winlator.cmod.core.ProtonPackageManager
+import com.winlator.cmod.ui.settings.DownloadableContentsSourceCard
 
 private val bundledRuntimeId = "bundled:${ProtonPackageManager.DEFAULT_IDENTIFIER}"
 private val bundledRuntimeName = ProtonPackageManager.getPackage(ProtonPackageManager.DEFAULT_IDENTIFIER)?.title
@@ -139,6 +141,9 @@ internal fun OnboardingComponentsScreen(
     bundledInstalled: State<Boolean>,
     bundledInUse: State<Boolean>,
     all: List<OnboardingComponent>,
+    catalogLoading: Boolean,
+    contentsUrl: String,
+    onContentsUrlChanged: (String) -> Unit,
     installing: String?,
     installingLabel: String?,
     installingProgress: Int,
@@ -171,7 +176,7 @@ internal fun OnboardingComponentsScreen(
                 Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                Column(Modifier.weight(.9f).fillMaxHeight()) {
+                Column(Modifier.weight(.9f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                     Text("Choose components", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Text(
                         if (managerMode) "Install and manage runtime versions."
@@ -180,6 +185,8 @@ internal fun OnboardingComponentsScreen(
                     )
                     Spacer(Modifier.height(14.dp))
                     SourceSelector { cb.onBrowseLocal() }
+                    Spacer(Modifier.height(10.dp))
+                    DownloadableContentsSourceCard(contentsUrl, onContentsUrlChanged)
                     if (showLocalInstallProgress) {
                         Spacer(Modifier.height(10.dp))
                         InstallProgressCard(installingLabel, installingProgress)
@@ -217,7 +224,7 @@ internal fun OnboardingComponentsScreen(
                 }
                 ComponentList(
                     visible,
-                    all.isEmpty(),
+                    catalogLoading,
                     installing,
                     installingLabel,
                     installingProgress,
@@ -240,6 +247,8 @@ internal fun OnboardingComponentsScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     SourceSelector { cb.onBrowseLocal() }
+                    Spacer(Modifier.height(10.dp))
+                    DownloadableContentsSourceCard(contentsUrl, onContentsUrlChanged)
                     if (showLocalInstallProgress) {
                         Spacer(Modifier.height(10.dp))
                         InstallProgressCard(installingLabel, installingProgress)
@@ -264,7 +273,10 @@ internal fun OnboardingComponentsScreen(
                         )
                     }
                 }
-                if (all.isEmpty()) item { LoadingCard() }
+                if (catalogLoading) item { LoadingCard() }
+                else if (visible.isEmpty()) item {
+                    Text("No components available in this category.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 else items(visible, key = { it.id }) {
                     ComponentCard(
                         it,

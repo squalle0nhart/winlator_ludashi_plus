@@ -2,6 +2,8 @@
 
 package com.winlator.cmod.ui.container
 
+import com.winlator.cmod.core.DXWrapper
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -66,7 +68,7 @@ import com.winlator.cmod.core.DefaultVersion
 import com.winlator.cmod.core.FileUtils
 import com.winlator.cmod.core.GPUInformation
 import com.winlator.cmod.core.ImageUtils
-import com.winlator.cmod.core.LsfgVkManager
+import com.winlator.cmod.core.LosslessDll
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.core.WineInfo
 import com.winlator.cmod.core.WineRegistryEditor
@@ -174,13 +176,9 @@ private class ContainerEditorStateV2(
     var displayXPresentAtRefreshRate by mutableStateOf(editing?.getDisplayXPresentAtRefreshRate() ?: true)
     var displayXBackPressure by mutableStateOf(editing?.getDisplayXBackPressure() ?: false)
     var displayXPrecisePresentation by mutableStateOf(editing?.getDisplayXPrecisePresentation() ?: false)
-    var frameGenBackend by mutableStateOf(editing?.getFrameGenBackend() ?: "lsfg_vk")
+    var frameGenBackend by mutableStateOf(editing?.getFrameGenBackend() ?: "lsfg_native")
     var lsfgMultiplier by mutableIntStateOf(editing?.getLsfgMultiplier() ?: 0)
     var lsfgFlowScale by mutableStateOf(editing?.getLsfgFlowScale() ?: 0.80f)
-    var lsfgPerformanceMode by mutableStateOf(editing?.getLsfgPerformanceMode() ?: true)
-    var winFgMultiplier by mutableIntStateOf(editing?.getWinFgMultiplier() ?: 0)
-    var winFgFlowScale by mutableStateOf(editing?.getWinFgFlowScale() ?: 0.80f)
-    var winFgModel by mutableIntStateOf(editing?.getWinFgModel() ?: 3)
 
     var graphicsDriver by mutableStateOf(
         editing?.graphicsDriver ?: if (preferredDriver == DefaultVersion.WRAPPER_ADRENO) {
@@ -208,7 +206,8 @@ private class ContainerEditorStateV2(
 
     var wrapper by mutableStateOf(editing?.dxWrapper ?: Container.DEFAULT_DXWRAPPER)
     var wrapperConfig by mutableStateOf(editing?.dxWrapperConfig ?: Container.DEFAULT_DXWRAPPERCONFIG)
-    var dxvkVersion by mutableStateOf(readConfig(wrapperConfig, "version", ',').ifBlank { DefaultVersion.DXVK })
+    init { wrapper = DXWrapper.migrate(wrapper, readConfig(wrapperConfig, "version", ',')) }
+    var dxvkVersion by mutableStateOf(DXWrapper.versionFor(wrapper, readConfig(wrapperConfig, "version", ','), DefaultVersion.DXVK))
     var vkd3dVersion by mutableStateOf(readConfig(wrapperConfig, "vkd3dVersion", ',').ifBlank { DefaultVersion.VKD3D })
     var vkd3dLevel by mutableStateOf(readConfig(wrapperConfig, "vkd3dLevel", ',').ifBlank { "12_1" })
     var frameRate by mutableStateOf(readConfig(wrapperConfig, "framerate", ',').ifBlank { "0" })
@@ -316,7 +315,7 @@ private class ContainerEditorStateV2(
         renderer, rendererPresentMode, rendererDriver, filterMode, surfaceFormat, trueDisplayX,
         displayXPerformanceMode, displayXPresentAtRefreshRate, displayXBackPressure,
         displayXPrecisePresentation, frameGenBackend, lsfgMultiplier,
-        lsfgFlowScale, lsfgPerformanceMode, winFgMultiplier, winFgFlowScale, winFgModel, graphicsDriver, graphicsConfig,
+        lsfgFlowScale, graphicsDriver, graphicsConfig,
         wrapper, wrapperConfig, emulator, fexVersion, boxVersion, fexPreset, boxPreset, exclusive, xinput, dinput,
         syncCpu, startup, openGlDefaultInitialized, autoMesaGlVersionOverride, envVars,
         cpu64.joinToString(), cpu32.joinToString(), components.entries.sortedBy { it.key }.joinToString()
@@ -463,12 +462,8 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
         container.setDisplayXPrecisePresentation(state.displayXPrecisePresentation)
         container.setFrameGenBackend(state.frameGenBackend)
         container.setLsfgMultiplier(state.lsfgMultiplier)
-        container.setLsfgEnabled(state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2)
+        container.setLsfgEnabled(state.frameGenBackend == "lsfg_native" && state.lsfgMultiplier >= 2)
         container.setLsfgFlowScale(state.lsfgFlowScale)
-        container.setLsfgPerformanceMode(state.lsfgPerformanceMode)
-        container.setWinFgMultiplier(state.winFgMultiplier)
-        container.setWinFgFlowScale(state.winFgFlowScale)
-        container.setWinFgModel(state.winFgModel)
         container.setDXWrapper(state.wrapper)
         container.setDXWrapperConfig(state.wrapperConfig)
         container.setAudioDriver(state.audio)
@@ -561,13 +556,9 @@ internal fun ContainerEditorV2(editId: Int?, onBack: () -> Unit, onCreated: () -
                     .put("displayXBackPressure", if (state.displayXBackPressure) "1" else "0")
                     .put("displayXPrecisePresentation", if (state.displayXPrecisePresentation) "1" else "0")
                     .put("frameGenBackend", state.frameGenBackend)
-                    .put("lsfgEnabled", if (state.frameGenBackend == "lsfg_vk" && state.lsfgMultiplier >= 2) "true" else "false")
+                    .put("lsfgEnabled", if (state.frameGenBackend == "lsfg_native" && state.lsfgMultiplier >= 2) "true" else "false")
                     .put("lsfgMultiplier", state.lsfgMultiplier.toString())
                     .put("lsfgFlowScale", String.format(Locale.US, "%.2f", state.lsfgFlowScale))
-                    .put("lsfgPerformanceMode", if (state.lsfgPerformanceMode) "true" else "false")
-                    .put("winFgMultiplier", state.winFgMultiplier.toString())
-                    .put("winFgFlowScale", String.format(Locale.US, "%.2f", state.winFgFlowScale))
-                    .put("winFgModel", state.winFgModel.toString())
                     .put("oboeProfile", state.oboeProfile)
                     .put("oboeApi", state.oboeApi)
                     .put("oboeAdaptive", if (state.oboeAdaptive) "1" else "0")
@@ -907,19 +898,14 @@ private fun ContainerCategoryV2(
             }
             if (s.renderer != "EGL") {
                 SettingsCard {
-                    val winFg = s.frameGenBackend == "win_fg"
                     FrameGenerationSettings(
                         backend = s.frameGenBackend,
-                        multiplier = if (winFg) s.winFgMultiplier else s.lsfgMultiplier,
-                        flowScale = if (winFg) s.winFgFlowScale else s.lsfgFlowScale,
-                        winFgModel = s.winFgModel,
-                        lsfgPerformanceMode = s.lsfgPerformanceMode,
-                        lsfgAvailable = LsfgVkManager.isGlobalDllAvailable(context) || LsfgVkManager.containerDllPath(s.editing) != null,
+                        multiplier = s.lsfgMultiplier,
+                        flowScale = s.lsfgFlowScale,
+                        lsfgAvailable = LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(s.editing) != null,
                         onBackendChanged = { s.frameGenBackend = it },
-                        onMultiplierChanged = { if (winFg) s.winFgMultiplier = it else s.lsfgMultiplier = it },
-                        onFlowScaleChanged = { if (winFg) s.winFgFlowScale = it else s.lsfgFlowScale = it },
-                        onWinFgModelChanged = { s.winFgModel = it },
-                        onLsfgPerformanceModeChanged = { s.lsfgPerformanceMode = it }
+                        onMultiplierChanged = { s.lsfgMultiplier = it },
+                        onFlowScaleChanged = { s.lsfgFlowScale = it }
                     )
                 }
             }
@@ -986,13 +972,17 @@ private fun ContainerCategoryV2(
         "Compatibility" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
                 val shownWrapper = wrapperEntries.firstOrNull { StringUtils.parseIdentifier(it).equals(s.wrapper, true) } ?: s.wrapper
-                SettingChoice("DX Wrapper", shownWrapper, wrapperEntries) { s.wrapper = StringUtils.parseIdentifier(it) }
-                if (s.wrapper.contains("dxvk", true)) catalog?.let { c ->
+                SettingChoice("DX Wrapper", shownWrapper, wrapperEntries) { s.wrapper = StringUtils.parseIdentifier(it); s.selectDxvkVersion(DXWrapper.versionFor(s.wrapper, s.dxvkVersion, DefaultVersion.DXVK)) }
+                if (DXWrapper.isVulkan(s.wrapper)) catalog?.let { c ->
                     val dxvkCatalog = filterDxvkForVkd3d(c.dxvk, s.vkd3dVersion)
                     SettingsDivider()
-                    SettingInstallChoice("DXVK Version", s.dxvkVersion, dxvkCatalog, installing, "DXVK", { v ->
-                        installRuntime("DXVK", v) { installed -> s.selectDxvkVersion(installed) }
-                    }) { s.selectDxvkVersion(it) }
+                    if (s.wrapper == DXWrapper.VEGAS) {
+                        SettingChoice("Vegas Version", "2.7.3", listOf("2.7.3")) {}
+                    } else {
+                        SettingInstallChoice("DXVK Version", s.dxvkVersion, dxvkCatalog, installing, "DXVK", { v ->
+                            installRuntime("DXVK", v) { installed -> s.selectDxvkVersion(installed) }
+                        }) { s.selectDxvkVersion(it) }
+                    }
                     SettingsDivider()
                     SettingInstallChoice("VKD3D Version", s.vkd3dVersion, c.vkd3d, installing, "VKD3D", { v ->
                         installRuntime("VKD3D", v) { installed ->

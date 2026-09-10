@@ -1,5 +1,7 @@
 package com.winlator.cmod;
 
+import com.winlator.cmod.core.DXWrapper;
+
 import static com.winlator.cmod.core.AppUtils.showToast;
 
 import android.Manifest;
@@ -70,7 +72,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FrameGenManager;
-import com.winlator.cmod.core.LsfgVkManager;
+import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
 import com.winlator.cmod.core.KeyValueSet;
@@ -570,6 +572,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
+        dxwrapper = DXWrapper.migrate(dxwrapper, this.dxwrapperConfig.get("version"));
+        this.dxwrapperConfig.put("version", DXWrapper.versionFor(dxwrapper, this.dxwrapperConfig.get("version"), DefaultVersion.DXVK));
 
         if (!wineInfo.isWin64()) {
             onExtractFileListener = (file, size) -> {
@@ -1006,7 +1010,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         String dxwrapper = this.dxwrapper;
 
-        if (dxwrapper.contains("dxvk")) {
+        if (DXWrapper.isVulkan(dxwrapper)) {
             String dxvkWrapper = "dxvk-" + dxwrapperConfig.get("version");
             String vkd3dWrapper = "vkd3d-" + dxwrapperConfig.get("vkd3dVersion");
             String ddrawrapper = dxwrapperConfig.get("ddrawrapper");
@@ -1246,21 +1250,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         final XServerRendererView renderer = xServerView;
         renderer.setCursorVisible(false);
 
-        boolean lsfgNative = FrameGenManager.BACKEND_LSFG_NATIVE.equals(shortcut != null
-                ? FrameGenManager.getBackend(shortcut) : FrameGenManager.getBackend(container));
-        if (lsfgNative) {
-            int multiplier = shortcut != null ? shortcut.getLsfgMultiplier()
-                    : container != null ? container.getLsfgMultiplier() : 0;
-            if (renderer instanceof VulkanXServerView) {
-                File dll = LsfgVkManager.isGlobalDllAvailable(this) ? LsfgVkManager.globalDllFile(this)
-                        : shortcut != null ? LsfgVkManager.containerDllFile(shortcut)
-                        : LsfgVkManager.containerDllFile(container);
-                float flowScale = shortcut != null ? shortcut.getLsfgFlowScale()
-                        : container != null ? container.getLsfgFlowScale() : 0.80f;
-                ((VulkanXServerView) renderer).setLsfgNative(dll, multiplier, flowScale);
-            } else if (multiplier >= 2) {
-                Toast.makeText(this, "LSFG Native requires the Vulkan renderer", Toast.LENGTH_LONG).show();
-            }
+        int multiplier = shortcut != null ? shortcut.getLsfgMultiplier()
+                : container != null ? container.getLsfgMultiplier() : 0;
+        String frameGenBackend = shortcut != null ? shortcut.getFrameGenBackend()
+                : container != null ? container.getFrameGenBackend()
+                : FrameGenManager.BACKEND_LSFG_NATIVE;
+        if (renderer instanceof VulkanXServerView) {
+            File dll = LosslessDll.isGlobalDllAvailable(this) ? LosslessDll.globalDllFile(this)
+                    : shortcut != null ? LosslessDll.containerDllFile(shortcut)
+                    : LosslessDll.containerDllFile(container);
+            float flowScale = shortcut != null ? shortcut.getLsfgFlowScale()
+                    : container != null ? container.getLsfgFlowScale() : 0.80f;
+            ((VulkanXServerView) renderer).setFrameGenNative(frameGenBackend, dll, multiplier, flowScale);
+        } else if (multiplier >= 2) {
+            Toast.makeText(this, "Native frame generation requires the Vulkan renderer", Toast.LENGTH_LONG).show();
         }
 
         if (renderer instanceof VulkanXServerView) {
@@ -2571,7 +2574,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File rootDir = imageFs.getRootDir();
 
-        if (dxwrapper.contains("dxvk")) {
+        if (DXWrapper.isVulkan(dxwrapper)) {
             DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
             String version = dxwrapperConfig.get("version");
             if (version.equals("1.11.1-sarek")) {
@@ -2740,7 +2743,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File rootDir = imageFs.getRootDir();
         File windowsDir = new File(rootDir, ImageFs.WINEPREFIX + "/drive_c/windows");
 
-        if (dxwrapper.contains("dxvk")) {
+        if (DXWrapper.isVulkan(dxwrapper)) {
             Log.d(TAG, "Extracting DXVK wrapper files, version: " + dxwrapper);
 
             String dxvkWrapper = dxwrapper.split(";")[0];
