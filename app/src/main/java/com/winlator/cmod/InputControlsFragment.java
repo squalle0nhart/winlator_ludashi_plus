@@ -31,6 +31,7 @@ import com.winlator.cmod.ui.inputcontrols.InputControlsComposeHost;
 import com.winlator.cmod.ui.inputcontrols.InputControlsModel;
 import com.winlator.cmod.ui.inputcontrols.InputProfileItem;
 import com.winlator.cmod.widget.InputControlsView;
+import com.winlator.cmod.winhandler.WinHandler;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -143,6 +144,14 @@ public class InputControlsFragment extends Fragment {
             }
 
             @Override
+            public void onTriggerModeChanged(int mode) {
+                preferences.edit().putInt("trigger_type", mode).apply();
+                if (currentProfile != null) currentProfile.setTriggerType(mode);
+                for (ExternalController controller : visibleControllers) controller.setTriggerType(mode);
+                refreshCompose();
+            }
+
+            @Override
             public void onAddProfile() {
                 ContentDialog.prompt(requireContext(), R.string.profile_name, null, name -> {
                     currentProfile = manager.createProfile(name);
@@ -225,6 +234,11 @@ public class InputControlsFragment extends Fragment {
             public void onRemoveController(int index) {
                 removeController(index);
             }
+
+            @Override
+            public void onControllerSlotChanged(int index, int slot) {
+                assignControllerSlot(index, slot);
+            }
         };
     }
 
@@ -242,7 +256,8 @@ public class InputControlsFragment extends Fragment {
                     index,
                     controller.getName(),
                     controller.getControllerBindingCount(),
-                    controller.isConnected()
+                    controller.isConnected(),
+                    getControllerSlot(controller.getId())
             ));
         }
 
@@ -254,8 +269,29 @@ public class InputControlsFragment extends Fragment {
                 profileItems,
                 currentProfile != null ? currentProfile.id : 0,
                 opacity,
+                preferences.getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS),
                 controllerItems
         );
+    }
+
+    private int getControllerSlot(String descriptor) {
+        for (int slot = 0; slot < 4; slot++) {
+            if (descriptor.equals(preferences.getString(WinHandler.PREF_CONTROLLER_SLOT_PREFIX + slot, null))) return slot;
+        }
+        return -1;
+    }
+
+    private void assignControllerSlot(int index, int slot) {
+        if (index < 0 || index >= visibleControllers.size()) return;
+        String descriptor = visibleControllers.get(index).getId();
+        SharedPreferences.Editor editor = preferences.edit();
+        for (int i = 0; i < 4; i++) {
+            String key = WinHandler.PREF_CONTROLLER_SLOT_PREFIX + i;
+            if (descriptor.equals(preferences.getString(key, null))) editor.remove(key);
+        }
+        if (slot >= 0 && slot < 4) editor.putString(WinHandler.PREF_CONTROLLER_SLOT_PREFIX + slot, descriptor);
+        editor.apply();
+        refreshCompose();
     }
 
     private ArrayList<ExternalController> collectVisibleControllers() {

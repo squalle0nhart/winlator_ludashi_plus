@@ -97,6 +97,7 @@ import com.winlator.cmod.ui.settings.dxvkAsyncMode
 import com.winlator.cmod.ui.settings.envPut
 import com.winlator.cmod.ui.settings.envValue
 import com.winlator.cmod.ui.settings.filterDxvkForVkd3d
+import com.winlator.cmod.ui.settings.graphicsDriverLabel
 import com.winlator.cmod.ui.settings.installAdrenoDriver
 import com.winlator.cmod.ui.settings.installRuntimeComponent
 import com.winlator.cmod.ui.settings.installWineRuntimeComponent
@@ -909,7 +910,7 @@ private fun ContainerCategoryV2(
             SettingsCard {
                 SettingChoice(
                     "Graphics Driver",
-                    graphicsEntries.firstOrNull { StringUtils.parseIdentifier(it).equals(s.graphicsDriver, true) } ?: s.graphicsDriver,
+                    graphicsDriverLabel(graphicsEntries, s.graphicsDriver),
                     graphicsEntries
                 ) { s.selectGraphicsDriver(StringUtils.parseIdentifier(it)) }
                 catalog?.let { c ->

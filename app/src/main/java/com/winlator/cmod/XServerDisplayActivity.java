@@ -189,6 +189,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private SharedPreferences preferences;
     private OnExtractFileListener onExtractFileListener;
     private WinHandler winHandler;
+    private byte triggerType = ExternalController.TRIGGER_IS_AXIS;
     private TaskManagerSidebar taskManagerSidebar;
     private WineRequestHandler wineRequestHandler;
     private float globalCursorSpeed = 1.0f;
@@ -654,6 +655,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             isRelativeMouseMovement = shortcut.getExtra("enableRelativeMouse").equals("1");
             isMouseDisabled = shortcut.getExtra("disableMouse").equals("1");
         }
+
+        int globalTriggerType = preferences.getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS);
+        try {
+            triggerType = ExternalController.normalizeTriggerType(Integer.parseInt(shortcut != null
+                    ? shortcut.getExtra("triggerType", String.valueOf(globalTriggerType))
+                    : String.valueOf(globalTriggerType)));
+        } catch (NumberFormatException ignored) {
+            triggerType = ExternalController.TRIGGER_IS_AXIS;
+        }
+        winHandler.setTriggerType(triggerType);
 
         this.graphicsDriverConfig = GraphicsDriverConfigDialog.parseGraphicsDriverConfig(graphicsDriverConfig);
         this.dxwrapperConfig = DXVKConfigDialog.parseConfig(dxwrapperConfig);
@@ -2407,6 +2418,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (inputControlsView == null || inputControlsManager == null) return;
 
         Spinner spInputControlsProfile = findViewById(R.id.SPInputControlsProfile);
+        Spinner spTriggerMode = findViewById(R.id.SPTriggerMode);
         Switch swShowTouchscreenControls = findViewById(R.id.SWShowTouchscreenControls);
         Switch swEnableTimeout = findViewById(R.id.SWEnableTouchscreenTimeout);
         Switch swEnableHaptics = findViewById(R.id.SWEnableTouchscreenHaptics);
@@ -2434,6 +2446,21 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spInputControlsProfile.setSelection(selectedPosition, false);
         };
         loadProfileSpinner.run();
+
+        if (spTriggerMode != null) {
+            spTriggerMode.setAdapter(createSidebarSpinnerAdapter(new String[]{"As Button", "As Axis", "Both"}));
+            spTriggerMode.setSelection(triggerType, false);
+            spTriggerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    applyTriggerType(position, true);
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                }
+            });
+        }
 
         if (swShowTouchscreenControls != null)
             swShowTouchscreenControls.setChecked(inputControlsView.isShowTouchscreenControls());
@@ -2700,6 +2727,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
             timeoutHandler.removeCallbacks(hideControlsRunnable);
         }
 
+        profile.setTriggerType(triggerType);
         inputControlsView.setProfile(profile);
         inputControlsView.setVisibility(View.VISIBLE);
         inputControlsView.requestFocus();
@@ -2709,6 +2737,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         inputControlsView.invalidate();
         winHandler.sendGamepadState();
+    }
+
+    private void applyTriggerType(int mode, boolean persist) {
+        triggerType = ExternalController.normalizeTriggerType(mode);
+        if (winHandler != null) winHandler.setTriggerType(triggerType);
+        if (inputControlsView != null && inputControlsView.getProfile() != null)
+            inputControlsView.getProfile().setTriggerType(triggerType);
+        if (!persist) return;
+        if (shortcut != null) {
+            shortcut.putExtra("triggerType", String.valueOf(triggerType));
+            shortcut.saveData();
+        } else {
+            preferences.edit().putInt("trigger_type", triggerType).apply();
+        }
     }
 
     private void hideInputControls() {
@@ -2818,15 +2860,24 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         File graphicsRuntimeMarker = new File(rootDir,
                 "usr/lib/.winlator-graphics-runtime-f194ef97-a20866cf-v3");
-        if (firstTimeBoot || !graphicsRuntimeMarker.isFile()) {
-            Log.d("XServerDisplayActivity", "Installing paired Pipetto wrapper and common graphics runtime");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/wrapper" + ".tzst",
-                    rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers" + ".tzst", rootDir);
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/extra_libs" + ".tzst",
-                    rootDir);
-            FileUtils.writeString(graphicsRuntimeMarker,
-                    "wrapper=f194ef9761ce004a6828f3409c08a67308b31019;extra_libs=a20866cf;layers=9d57736d;opengl=split-v1");
+        String wrapperArchive = resolveGraphicsDriverArchiveName(graphicsDriver);
+        boolean installCommonRuntime = firstTimeBoot || !graphicsRuntimeMarker.isFile();
+        boolean wrapperChanged = !wrapperArchive.equals(container.getExtra("installedGraphicsWrapper"));
+        if (installCommonRuntime || wrapperChanged) {
+            Log.d("XServerDisplayActivity", "Installing graphics wrapper " + wrapperArchive);
+            boolean installed = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                    "graphics_driver/" + wrapperArchive + ".tzst", rootDir);
+            if (installCommonRuntime) {
+                installed &= TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "layers.tzst", rootDir);
+                installed &= TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this,
+                        "graphics_driver/extra_libs.tzst", rootDir);
+            }
+            if (installed) {
+                container.putExtra("installedGraphicsWrapper", wrapperArchive);
+                container.saveData();
+                if (installCommonRuntime) FileUtils.writeString(graphicsRuntimeMarker,
+                        "wrapper=f194ef9761ce004a6828f3409c08a67308b31019;extra_libs=a20866cf;layers=9d57736d;opengl=split-v1");
+            }
         }
 
         extractOpenGLDriver(rootDir);
@@ -2904,6 +2955,22 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (!vkbasaltConfig.isEmpty()) {
             envVars.put("ENABLE_VKBASALT", "1");
             envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
+        }
+    }
+
+    static String resolveGraphicsDriverArchiveName(String graphicsDriver) {
+        if (graphicsDriver == null) return "wrapper";
+        switch (graphicsDriver.toLowerCase(java.util.Locale.ENGLISH)) {
+            case "wrapper-winnative":
+            case "wrapper-original":
+            case "wrapper-v2":
+                return "wrapper-original";
+            case "wrapper-leegao":
+                return "wrapper-leegao";
+            case "wrapper-legacy":
+                return "wrapper-legacy";
+            default:
+                return "wrapper";
         }
     }
 

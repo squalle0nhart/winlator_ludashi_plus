@@ -75,7 +75,8 @@ data class InputControllerItem(
     val index: Int,
     val name: String,
     val bindings: Int,
-    val connected: Boolean
+    val connected: Boolean,
+    val playerSlot: Int
 )
 
 @Immutable
@@ -83,6 +84,7 @@ data class InputControlsModel(
     val profiles: List<InputProfileItem>,
     val selectedProfileId: Int,
     val opacityPercent: Int,
+    val triggerMode: Int,
     val controllers: List<InputControllerItem>
 )
 
@@ -90,6 +92,7 @@ data class InputControlsModel(
 interface InputControlsCallbacks {
     fun onProfileSelected(profileId: Int)
     fun onOpacityChanged(percent: Int)
+    fun onTriggerModeChanged(mode: Int)
     fun onAddProfile()
     fun onEditProfile()
     fun onDuplicateProfile()
@@ -99,6 +102,7 @@ interface InputControlsCallbacks {
     fun onOpenEditor()
     fun onOpenController(index: Int)
     fun onRemoveController(index: Int)
+    fun onControllerSlotChanged(index: Int, slot: Int)
 }
 
 object InputControlsComposeHost {
@@ -153,6 +157,7 @@ private fun InputControlsScreen(model: InputControlsModel, callbacks: InputContr
                 ) {
                     item { ProfileSection(model, selectedName, callbacks) }
                     item { OpacityCard(model.opacityPercent, callbacks::onOpacityChanged) }
+                    item { TriggerModeCard(model.triggerMode, callbacks::onTriggerModeChanged) }
                     item { TransferActions(callbacks) }
                     item { EditorButton(callbacks) }
                 }
@@ -189,6 +194,7 @@ private fun PortraitContent(model: InputControlsModel, selectedName: String, cal
     ) {
         item { ProfileSection(model, selectedName, callbacks) }
         item { OpacityCard(model.opacityPercent, callbacks::onOpacityChanged) }
+        item { TriggerModeCard(model.triggerMode, callbacks::onTriggerModeChanged) }
         item { TransferActions(callbacks) }
         item { EditorButton(callbacks) }
         item {
@@ -328,6 +334,28 @@ private fun OpacityCard(initialPercent: Int, onOpacityChanged: (Int) -> Unit) {
 }
 
 @Composable
+private fun TriggerModeCard(mode: Int, onModeChanged: (Int) -> Unit) {
+    val modes = listOf("As Button", "As Axis", "Both")
+    var expanded by remember { mutableStateOf(false) }
+    SettingsCard(title = "Trigger mode") {
+        Box {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(modes.getOrElse(mode) { "Analog" }, modifier = Modifier.weight(1f))
+                Icon(Icons.Outlined.KeyboardArrowDown, null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                modes.forEachIndexed { index, label ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = {
+                        expanded = false
+                        onModeChanged(index)
+                    })
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun EmptyControllers() {
     Surface(
         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
@@ -344,6 +372,7 @@ private fun EmptyControllers() {
 
 @Composable
 private fun ControllerCard(controller: InputControllerItem, callbacks: InputControlsCallbacks) {
+    var expanded by remember { mutableStateOf(false) }
     Surface(
         onClick = { callbacks.onOpenController(controller.index) },
         modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
@@ -360,6 +389,19 @@ private fun ControllerCard(controller: InputControllerItem, callbacks: InputCont
             Column(Modifier.weight(1f)) {
                 Text(controller.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${controller.bindings} bindings", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Box {
+                OutlinedButton(onClick = { expanded = true }) {
+                    Text(if (controller.playerSlot < 0) "Auto" else "P${controller.playerSlot + 1}")
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    listOf("Auto", "Player 1", "Player 2", "Player 3", "Player 4").forEachIndexed { index, label ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = {
+                            expanded = false
+                            callbacks.onControllerSlotChanged(controller.index, index - 1)
+                        })
+                    }
+                }
             }
             if (controller.bindings > 0) IconButton(onClick = { callbacks.onRemoveController(controller.index) }) { Icon(Icons.Outlined.Delete, "Remove controller") }
             Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

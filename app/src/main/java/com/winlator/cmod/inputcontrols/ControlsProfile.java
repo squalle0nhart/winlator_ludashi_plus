@@ -3,6 +3,7 @@ package com.winlator.cmod.inputcontrols;
 import android.content.Context;
 
 import androidx.annotation.NonNull;
+import androidx.preference.PreferenceManager;
 
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.widget.InputControlsView;
@@ -30,10 +31,14 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
     private boolean virtualGamepad = false;
     private final Context context;
     private GamepadState gamepadState;
+    private byte triggerType;
 
     public ControlsProfile(Context context, int id) {
         this.context = context;
         this.id = id;
+        triggerType = ExternalController.normalizeTriggerType(PreferenceManager
+                .getDefaultSharedPreferences(context)
+                .getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS));
     }
 
     public String getName() {
@@ -71,9 +76,21 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
 
     public ExternalController addController(String id) {
         ExternalController controller = getController(id);
-        if (controller == null) controllers.add(controller = ExternalController.getController(id));
+        if (controller == null) {
+            controllers.add(controller = ExternalController.getController(id));
+            applyTriggerType(controller);
+        }
         controllersLoaded = true;
         return controller;
+    }
+
+    private void applyTriggerType(ExternalController controller) {
+        if (controller != null) controller.setTriggerType(triggerType);
+    }
+
+    public void setTriggerType(int triggerType) {
+        this.triggerType = ExternalController.normalizeTriggerType(triggerType);
+        for (ExternalController controller : controllers) applyTriggerType(controller);
     }
 
     public void removeController(ExternalController controller) {
@@ -198,6 +215,7 @@ public class ControlsProfile implements Comparable<ControlsProfile> {
                 ExternalController controller = new ExternalController();
                 controller.setId(id);
                 controller.setName(controllerJSONObject.getString("name"));
+                applyTriggerType(controller);
 
                 JSONArray controllerBindingsJSONArray = controllerJSONObject.getJSONArray("controllerBindings");
                 for (int j = 0; j < controllerBindingsJSONArray.length(); j++) {

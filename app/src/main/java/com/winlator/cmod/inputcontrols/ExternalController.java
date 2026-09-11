@@ -32,9 +32,15 @@ public class ExternalController {
     public static final byte IDX_BUTTON_R3 = 9;
     public static final byte IDX_BUTTON_L2 = 10;
     public static final byte IDX_BUTTON_R2 = 11;
+    public static final byte TRIGGER_IS_BUTTON = 0;
+    public static final byte TRIGGER_IS_AXIS = 1;
+    public static final byte TRIGGER_IS_BOTH = 2;
     private String name;
     private String id;
     private int deviceId = -1;
+    private byte triggerType = TRIGGER_IS_AXIS;
+    private float analogTriggerL;
+    private float analogTriggerR;
     private final ArrayList<ExternalControllerBinding> controllerBindings = new ArrayList<>();
     public final GamepadState state = new GamepadState();
     public final GamepadState remappedState = new GamepadState();
@@ -56,6 +62,16 @@ public class ExternalController {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public void setTriggerType(int triggerType) {
+        this.triggerType = normalizeTriggerType(triggerType);
+        updateTriggerState();
+    }
+
+    public static byte normalizeTriggerType(int triggerType) {
+        return triggerType >= TRIGGER_IS_BUTTON && triggerType <= TRIGGER_IS_BOTH
+                ? (byte) triggerType : TRIGGER_IS_AXIS;
     }
 
 
@@ -189,12 +205,22 @@ public class ExternalController {
 
 
     private void processTriggerButton(MotionEvent event) {
-        float l = event.getAxisValue(MotionEvent.AXIS_LTRIGGER) == 0f ? event.getAxisValue(MotionEvent.AXIS_BRAKE) : event.getAxisValue(MotionEvent.AXIS_LTRIGGER);
-        float r = event.getAxisValue(MotionEvent.AXIS_RTRIGGER) == 0f ? event.getAxisValue(MotionEvent.AXIS_GAS) : event.getAxisValue(MotionEvent.AXIS_RTRIGGER);
-        state.triggerL = l;
-        state.triggerR = r;
-        state.setPressed(IDX_BUTTON_L2, l == 1.0f);
-        state.setPressed(IDX_BUTTON_R2, r == 1.0f);
+        analogTriggerL = Math.max(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE));
+        analogTriggerR = Math.max(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS));
+        updateTriggerState();
+    }
+
+    private void updateTriggerState() {
+        state.triggerL = resolveTriggerValue(triggerType, analogTriggerL, triggerLPressedViaButton);
+        state.triggerR = resolveTriggerValue(triggerType, analogTriggerR, triggerRPressedViaButton);
+        state.setPressed(IDX_BUTTON_L2, state.triggerL > 0.5f);
+        state.setPressed(IDX_BUTTON_R2, state.triggerR > 0.5f);
+    }
+
+    static float resolveTriggerValue(byte triggerType, float analogValue, boolean buttonPressed) {
+        if (triggerType == TRIGGER_IS_BUTTON) return buttonPressed ? 1.0f : 0.0f;
+        if (triggerType == TRIGGER_IS_BOTH && analogValue == 0.0f && buttonPressed) return 1.0f;
+        return analogValue;
     }
 
     public boolean isXboxController() {
@@ -368,8 +394,12 @@ public class ExternalController {
         int buttonIdx = getButtonIdxByKeyCode(keyCode);
         if (buttonIdx != -1) {
             if (buttonIdx == IDX_BUTTON_L2) {
+                triggerLPressedViaButton = pressed;
+                updateTriggerState();
                 return true;
             } else if (buttonIdx == IDX_BUTTON_R2) {
+                triggerRPressedViaButton = pressed;
+                updateTriggerState();
                 return true;
             } else
                 state.setPressed(buttonIdx, pressed);

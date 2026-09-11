@@ -35,6 +35,7 @@ import com.winlator.cmod.ui.settings.SettingToggle
 import com.winlator.cmod.ui.settings.SettingsCard
 import com.winlator.cmod.ui.settings.SettingsCatalog
 import com.winlator.cmod.ui.settings.SettingsDivider
+import com.winlator.cmod.ui.settings.graphicsDriverLabel
 import com.winlator.cmod.ui.settings.installAdrenoDriver
 import com.winlator.cmod.ui.settings.installRuntimeComponent
 import com.winlator.cmod.ui.settings.loadSettingsCatalog
@@ -63,7 +64,7 @@ internal fun ContainerRuntimePane(
     var screenChoice by remember {
         mutableStateOf(screenEntries.firstOrNull { normalizeResolution(it).equals(screen, true) } ?: "Custom")
     }
-    var graphics by remember { mutableStateOf(graphicsEntries.firstOrNull() ?: "Wrapper") }
+    var graphics by remember { mutableStateOf(graphicsDriverLabel(graphicsEntries, container.getGraphicsDriver())) }
     var graphicsConfig by remember { mutableStateOf(container.getGraphicsDriverConfig()) }
     var driverVersion by remember { mutableStateOf(readConfig(graphicsConfig, "version", ';').ifBlank { "System" }) }
     var vulkanVersion by remember { mutableStateOf(readConfig(graphicsConfig, "vulkanVersion", ';').ifBlank { Container.DEFAULT_VULKAN_VERSION }) }

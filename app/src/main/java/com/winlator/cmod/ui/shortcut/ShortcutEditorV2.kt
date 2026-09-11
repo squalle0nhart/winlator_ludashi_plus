@@ -71,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
+import androidx.preference.PreferenceManager
 import com.winlator.cmod.R
 import com.winlator.cmod.ShortcutsFragment
 import com.winlator.cmod.XrActivity
@@ -87,6 +88,7 @@ import com.winlator.cmod.core.OpenGLDriverDefaults
 import com.winlator.cmod.core.StringUtils
 import com.winlator.cmod.fexcore.FEXCorePresetManager
 import com.winlator.cmod.inputcontrols.InputControlsManager
+import com.winlator.cmod.inputcontrols.ExternalController
 import com.winlator.cmod.midi.MidiManager
 import com.winlator.cmod.ui.settings.ContainersSettingsActivity
 import com.winlator.cmod.ui.settings.CpuSelectorRow
@@ -108,6 +110,7 @@ import com.winlator.cmod.ui.settings.dxvkAsyncMode
 import com.winlator.cmod.ui.settings.envPut
 import com.winlator.cmod.ui.settings.envValue
 import com.winlator.cmod.ui.settings.filterDxvkForVkd3d
+import com.winlator.cmod.ui.settings.graphicsDriverLabel
 import com.winlator.cmod.ui.settings.installAdrenoDriver
 import com.winlator.cmod.ui.settings.installRuntimeComponent
 import com.winlator.cmod.ui.settings.isDxvkCompatibleWithVkd3d
@@ -149,6 +152,8 @@ private val execArgumentPresetsV2 = listOf(
     "--force-d3d11",
     "/d3d9"
 )
+
+private val triggerModeEntries = listOf("As Button", "As Axis", "Both")
 
 private data class ShortcutCategoryItemV2(val label: String, val icon: ImageVector)
 
@@ -228,6 +233,16 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var boxPreset by mutableStateOf(shortcut.getExtra("box64Preset", container.getBox64Preset()))
 
     var controlsProfile by mutableStateOf(shortcut.getExtra("controlsProfile", "0"))
+    var triggerMode by mutableIntStateOf(
+        shortcut.getExtra(
+            "triggerType",
+            PreferenceManager.getDefaultSharedPreferences(container.manager.context)
+                .getInt("trigger_type", ExternalController.TRIGGER_IS_AXIS.toInt()).toString()
+        ).toIntOrNull()?.coerceIn(
+            ExternalController.TRIGGER_IS_BUTTON.toInt(),
+            ExternalController.TRIGGER_IS_BOTH.toInt()
+        ) ?: ExternalController.TRIGGER_IS_AXIS.toInt()
+    )
     var fullscreen by mutableStateOf(shortcut.getExtra("fullscreenStretched", "0") == "1")
     private var inputType by mutableIntStateOf(shortcut.getExtra("inputType", container.getInputType().toString()).toIntOrNull() ?: container.getInputType())
     var exclusive by mutableStateOf(shortcut.getExtra("exclusiveXInput").let { if (it.isBlank()) container.isExclusiveXInput() else it == "1" })
@@ -858,7 +873,7 @@ private fun ShortcutCategoryV2(
                 }
             }
             SettingsCard {
-                SettingChoice("Graphics Driver", graphicsEntries.firstOrNull { StringUtils.parseIdentifier(it).equals(s.graphicsDriver, true) } ?: s.graphicsDriver, graphicsEntries) {
+                SettingChoice("Graphics Driver", graphicsDriverLabel(graphicsEntries, s.graphicsDriver), graphicsEntries) {
                     s.selectGraphicsDriver(StringUtils.parseIdentifier(it))
                 }
                 catalog?.let { c ->
@@ -1006,6 +1021,11 @@ private fun ShortcutCategoryV2(
         "Input" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsCard {
                 SettingMappedChoice("Controls Profile", s.controlsProfile, profiles) { s.controlsProfile = it; s.extra("controlsProfile", it.takeUnless { id -> id == "0" }) }
+                SettingsDivider()
+                SettingChoice("Trigger Mode", triggerModeEntries[s.triggerMode], triggerModeEntries) {
+                    s.triggerMode = triggerModeEntries.indexOf(it)
+                    s.extra("triggerType", s.triggerMode.toString())
+                }
                 SettingsDivider()
                 SettingToggle("Exclusive Input", s.exclusive) {
                     s.exclusive = it

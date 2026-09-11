@@ -761,6 +761,26 @@
                             android:src="@drawable/icon_settings"
                             app:tint="#0066FF" />
                     </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Trigger mode"
+                            android:textColor="?attr/ingameSidebarOnSurface"
+                            android:textSize="15sp" />
+                        <Spinner
+                            android:id="@+id/SPTriggerMode"
+                            android:layout_width="132dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/sidebar_spinner"
+                            android:spinnerMode="dropdown" />
+                    </LinearLayout>
                     <Switch
                         android:id="@+id/SWShowTouchscreenControls"
                         android:layout_width="match_parent"
