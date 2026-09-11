@@ -22,8 +22,6 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -92,6 +90,7 @@ import com.winlator.cmod.renderer.ViewTransformation;
 import com.winlator.cmod.core.WineUtils;
 import com.winlator.cmod.inputcontrols.ControlsProfile;
 import com.winlator.cmod.inputcontrols.ExternalController;
+import com.winlator.cmod.inputcontrols.GyroInput;
 import com.winlator.cmod.inputcontrols.InputControlsManager;
 import com.winlator.cmod.math.Mathf;
 import com.winlator.cmod.math.XForm;
@@ -223,7 +222,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private boolean isMouseDisabled = false;
     private boolean simulateTouchScreen = false;
 
-    private SensorManager sensorManager;
+    private GyroInput gyroInput;
 
     private long startTime;
     private SharedPreferences playtimePrefs;
@@ -575,6 +574,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             shortcut = new Shortcut(container, new File(shortcutPath));
         }
 
+        gyroInput = new GyroInput(this, winHandler, preferences, this::isGyroActivatorPressed);
+        gyroInput.setConfig(loadGyroConfig(shortcut != null));
+
         taskAffinityMask = (short) ProcessHelper.getAffinityMask(container.getCPUList(true));
         taskAffinityMaskWoW64 = (short) ProcessHelper.getAffinityMask(container.getCPUListWoW64(true));
 
@@ -906,6 +908,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
 
+        if (gyroInput != null) gyroInput.onResume();
+
         if (environment != null) {
             xServerView.onResume();
             environment.onResume();
@@ -918,6 +922,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public void onPause() {
+        if (gyroInput != null) gyroInput.onPause();
         if (taskManagerSidebar != null) taskManagerSidebar.stop();
         super.onPause();
 
@@ -1086,6 +1091,140 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 })
                 .setPositiveButton(R.string.ok, null)
                 .show();
+    }
+
+    private GyroInput.Config loadGyroConfig(boolean gameScope) {
+        String containerValue = container != null ? container.getExtra(GyroInput.EXTRA, "") : "";
+        String value = gameScope && shortcut != null
+                ? shortcut.getExtra(GyroInput.EXTRA, containerValue) : containerValue;
+        return GyroInput.Config.decode(value);
+    }
+
+    private boolean isGyroActivatorPressed() {
+        if (gyroInput == null || winHandler == null) return false;
+        switch (gyroInput.getConfig().activator) {
+            case GyroInput.ACTIVATOR_L1:
+                return winHandler.isButtonPressed(KeyEvent.KEYCODE_BUTTON_L1);
+            case GyroInput.ACTIVATOR_L2:
+                return winHandler.isButtonPressed(KeyEvent.KEYCODE_BUTTON_L2);
+            case GyroInput.ACTIVATOR_R1:
+                return winHandler.isButtonPressed(KeyEvent.KEYCODE_BUTTON_R1);
+            case GyroInput.ACTIVATOR_R3:
+                return winHandler.isButtonPressed(KeyEvent.KEYCODE_BUTTON_THUMBR);
+            default:
+                return true;
+        }
+    }
+
+    private void showGyroSettingsDialog() {
+        if (gyroInput == null) return;
+        ContentDialog dialog = new ContentDialog(this, R.layout.gyro_settings_dialog);
+        dialog.setTitle("Gyroscope / Motion Aim");
+        View gyroPanel = dialog.findViewById(R.id.FrameLayout);
+        gyroPanel.getLayoutParams().width = AppUtils.getPreferredDialogWidth(this);
+        gyroPanel.getLayoutParams().height = Math.round(
+                getResources().getDisplayMetrics().heightPixels * 0.65f);
+
+        Spinner scope = dialog.findViewById(R.id.SGyroScope);
+        Spinner target = dialog.findViewById(R.id.SGyroTarget);
+        Spinner mode = dialog.findViewById(R.id.SGyroMode);
+        Spinner activator = dialog.findViewById(R.id.SGyroActivator);
+        Spinner activation = dialog.findViewById(R.id.SGyroActivation);
+        scope.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"This game", "Container default"}));
+        target.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Right stick", "Left stick", "Mouse"}));
+        mode.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Rate", "Tilt to Aim"}));
+        activator.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Always on", "L1", "L2", "R1", "R3"}));
+        activation.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Hold", "Toggle"}));
+
+        View scopeRow = dialog.findViewById(R.id.LLGyroScope);
+        if (shortcut == null) scopeRow.setVisibility(View.GONE);
+        bindGyroConfig(dialog, loadGyroConfig(shortcut != null));
+        scope.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            private boolean initial = true;
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (initial) {
+                    initial = false;
+                    return;
+                }
+                bindGyroConfig(dialog, loadGyroConfig(position == 0));
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        activator.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                activation.setEnabled(position != GyroInput.ACTIVATOR_ALWAYS);
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        TextView availability = dialog.findViewById(R.id.TVGyroAvailability);
+        availability.setText(gyroInput.isAvailable() ? "Device gyroscope detected"
+                : "No gyroscope detected on this device");
+        View calibrate = dialog.findViewById(R.id.BTGyroCalibrate);
+        calibrate.setEnabled(gyroInput.isAvailable());
+        calibrate.setOnClickListener(v -> {
+            availability.setText("Calibrating… keep the device still");
+            calibrate.setEnabled(false);
+            if (!gyroInput.calibrate(() -> {
+                availability.setText("Drift calibration saved for this device");
+                calibrate.setEnabled(true);
+                Toast.makeText(this, "Gyroscope calibration saved", Toast.LENGTH_SHORT).show();
+            })) {
+                availability.setText("Could not start gyroscope calibration");
+                calibrate.setEnabled(true);
+            }
+        });
+
+        dialog.setOnDismissListener(ignored -> {
+            GyroInput.Config config = readGyroConfig(dialog);
+            if (shortcut != null && scope.getSelectedItemPosition() == 0) {
+                shortcut.putExtra(GyroInput.EXTRA, config.encode());
+                shortcut.saveData();
+            } else {
+                container.putExtra(GyroInput.EXTRA, config.encode());
+                container.saveData();
+            }
+            gyroInput.setConfig(loadGyroConfig(shortcut != null));
+        });
+        dialog.show();
+    }
+
+    private void bindGyroConfig(ContentDialog dialog, GyroInput.Config config) {
+        ((CheckBox)dialog.findViewById(R.id.CBGyroEnabled)).setChecked(config.enabled);
+        ((Spinner)dialog.findViewById(R.id.SGyroTarget)).setSelection(config.target);
+        ((Spinner)dialog.findViewById(R.id.SGyroMode)).setSelection(config.mode);
+        ((Spinner)dialog.findViewById(R.id.SGyroActivator)).setSelection(config.activator);
+        ((Spinner)dialog.findViewById(R.id.SGyroActivation)).setSelection(config.activation);
+        ((SeekBar)dialog.findViewById(R.id.SBGyroSensitivity)).setValue(config.sensitivity * 100f);
+        ((SeekBar)dialog.findViewById(R.id.SBGyroDeadzone)).setValue(config.deadzone * 100f);
+        ((SeekBar)dialog.findViewById(R.id.SBGyroSmoothing)).setValue(config.smoothing * 100f);
+        ((CheckBox)dialog.findViewById(R.id.CBGyroInvertX)).setChecked(config.invertX);
+        ((CheckBox)dialog.findViewById(R.id.CBGyroInvertY)).setChecked(config.invertY);
+    }
+
+    private GyroInput.Config readGyroConfig(ContentDialog dialog) {
+        GyroInput.Config config = new GyroInput.Config();
+        config.enabled = ((CheckBox)dialog.findViewById(R.id.CBGyroEnabled)).isChecked();
+        config.target = ((Spinner)dialog.findViewById(R.id.SGyroTarget)).getSelectedItemPosition();
+        config.mode = ((Spinner)dialog.findViewById(R.id.SGyroMode)).getSelectedItemPosition();
+        config.activator = ((Spinner)dialog.findViewById(R.id.SGyroActivator)).getSelectedItemPosition();
+        config.activation = ((Spinner)dialog.findViewById(R.id.SGyroActivation)).getSelectedItemPosition();
+        config.sensitivity = ((SeekBar)dialog.findViewById(R.id.SBGyroSensitivity)).getValue() / 100f;
+        config.deadzone = ((SeekBar)dialog.findViewById(R.id.SBGyroDeadzone)).getValue() / 100f;
+        config.smoothing = ((SeekBar)dialog.findViewById(R.id.SBGyroSmoothing)).getValue() / 100f;
+        config.invertX = ((CheckBox)dialog.findViewById(R.id.CBGyroInvertX)).isChecked();
+        config.invertY = ((CheckBox)dialog.findViewById(R.id.CBGyroInvertY)).isChecked();
+        return config;
     }
 
     @Override
@@ -1671,6 +1810,14 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (btSubVibration != null) {
             btSubVibration.setOnClickListener(v -> {
                 showVibrationDialog();
+                drawerLayout.closeDrawers();
+            });
+        }
+
+        View btSubGyroscope = findViewById(R.id.BTSubGyroscope);
+        if (btSubGyroscope != null) {
+            btSubGyroscope.setOnClickListener(v -> {
+                showGyroSettingsDialog();
                 drawerLayout.closeDrawers();
             });
         }

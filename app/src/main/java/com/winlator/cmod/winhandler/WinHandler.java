@@ -78,6 +78,11 @@ public class WinHandler {
     private int fallbackSlot = -1;
 
     private final Map<Integer, ExternalController> controllers = new HashMap<>();
+    private final GamepadState gyroSyntheticState = new GamepadState();
+    private boolean gyroActive;
+    private boolean gyroRightStick;
+    private float gyroX;
+    private float gyroY;
     private final InputManager inputManager;
     private final InputManager.InputDeviceListener inputDeviceListener;
 
@@ -551,30 +556,114 @@ public class WinHandler {
         if (useVirtualGamepad) {
             int slot = assignSlot(OSC_DEVICE_ID);
             if (slot >= 0 && writers[slot] != null) {
-                writers[slot].writeGamepadState(gamepadState);
+                writeGamepadState(OSC_DEVICE_ID, gamepadState, writers[slot]);
             }
-        } else {
+        } else if (!gyroActive) {
             releaseSlot(OSC_DEVICE_ID);
         }
     }
 
     public void sendGamepadState(ExternalController controller) {
         if (controller == null) return;
+        ControlsProfile activeProfile = activity.getInputControlsView().getProfile();
+        if (deviceToSlot.containsKey(OSC_DEVICE_ID)
+                && (activeProfile == null || !activeProfile.isVirtualGamepad())) releaseSlot(OSC_DEVICE_ID);
         ControlsProfile profile = activity.getInputControlsView().getProfile();
         if (profile != null) {
             ExternalController profileController = profile.getController(controller.getDeviceId());
             if (profileController != null && profileController.getControllerBindingCount() > 0) {
                 int slot = assignSlot(controller.getDeviceId());
                 if (slot >= 0 && writers[slot] != null) {
-                    writers[slot].writeGamepadState(controller.remappedState);
+                    writeGamepadState(controller.getDeviceId(), controller.remappedState, writers[slot]);
                 }
                 return;
             }
         }
         int slot = assignSlot(controller.getDeviceId());
         if (slot >= 0 && writers[slot] != null) {
-            writers[slot].writeGamepadState(controller.state);
+            writeGamepadState(controller.getDeviceId(), controller.state, writers[slot]);
         }
+    }
+
+    private void writeGamepadState(int deviceId, GamepadState state, FakeInputWriter writer) {
+        Integer slot = deviceToSlot.get(deviceId);
+        int firstSlot = MAX_CONTROLLERS;
+        for (Integer value : deviceToSlot.values()) firstSlot = Math.min(firstSlot, value);
+        if (!gyroActive || slot == null || slot != firstSlot) {
+            writer.writeGamepadState(state);
+            return;
+        }
+        float oldX = gyroRightStick ? state.thumbRX : state.thumbLX;
+        float oldY = gyroRightStick ? state.thumbRY : state.thumbLY;
+        if (gyroRightStick) {
+            state.thumbRX = gyroX;
+            state.thumbRY = gyroY;
+        } else {
+            state.thumbLX = gyroX;
+            state.thumbLY = gyroY;
+        }
+        writer.writeGamepadState(state);
+        if (gyroRightStick) {
+            state.thumbRX = oldX;
+            state.thumbRY = oldY;
+        } else {
+            state.thumbLX = oldX;
+            state.thumbLY = oldY;
+        }
+    }
+
+    public void sendGyroStick(boolean rightStick, float x, float y) {
+        gyroActive = true;
+        gyroRightStick = rightStick;
+        gyroX = Math.max(-1, Math.min(1, x));
+        gyroY = Math.max(-1, Math.min(1, y));
+        resendGyroController();
+    }
+
+    public void clearGyroStick() {
+        if (!gyroActive) return;
+        gyroActive = false;
+        resendGyroController();
+    }
+
+    private void resendGyroController() {
+        int firstDevice = Integer.MIN_VALUE;
+        int firstSlot = MAX_CONTROLLERS;
+        for (Map.Entry<Integer, Integer> entry : deviceToSlot.entrySet()) {
+            if (entry.getValue() < firstSlot) {
+                firstDevice = entry.getKey();
+                firstSlot = entry.getValue();
+            }
+        }
+        if (firstDevice != OSC_DEVICE_ID) {
+            ExternalController controller = controllers.get(firstDevice);
+            if (controller != null) {
+                sendGamepadState(controller);
+                return;
+            }
+        }
+        ControlsProfile profile = activity.getInputControlsView().getProfile();
+        GamepadState state = profile != null && profile.isVirtualGamepad()
+                ? profile.getGamepadState() : gyroSyntheticState;
+        int slot = assignSlot(OSC_DEVICE_ID);
+        if (slot >= 0 && writers[slot] != null) writeGamepadState(OSC_DEVICE_ID, state, writers[slot]);
+    }
+
+    public boolean isButtonPressed(int keyCode) {
+        int button = ExternalController.getButtonIdxByKeyCode(keyCode);
+        if (button < 0) return false;
+        ControlsProfile profile = activity.getInputControlsView().getProfile();
+        if (profile != null && pressed(profile.getGamepadState(), button)) return true;
+        for (ExternalController controller : controllers.values()) {
+            if (pressed(controller.state, button) || pressed(controller.remappedState, button)) return true;
+        }
+        return false;
+    }
+
+    private static boolean pressed(GamepadState state, int button) {
+        if (button == ExternalController.IDX_BUTTON_L2 && state.triggerL > 0.5f) return true;
+        if (button == ExternalController.IDX_BUTTON_R2 && state.triggerR > 0.5f) return true;
+        return state.isPressed(button);
     }
 
     private int assignSlot(int deviceId) {

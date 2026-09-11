@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/TVGyroAvailability"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"
+            android:textSize="13sp" />
+
+        <CheckBox
+            android:id="@+id/CBGyroEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Enable motion aim" />
+
+        <LinearLayout
+            android:id="@+id/LLGyroScope"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Save for" />
+            <Spinner
+                android:id="@+id/SGyroScope"
+                style="@style/ComboBox"
+                android:layout_width="170dp"
+                android:layout_height="42dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Output" />
+            <Spinner
+                android:id="@+id/SGyroTarget"
+                style="@style/ComboBox"
+                android:layout_width="170dp"
+                android:layout_height="42dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Motion mode" />
+            <Spinner
+                android:id="@+id/SGyroMode"
+                style="@style/ComboBox"
+                android:layout_width="170dp"
+                android:layout_height="42dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Activator" />
+            <Spinner
+                android:id="@+id/SGyroActivator"
+                style="@style/ComboBox"
+                android:layout_width="170dp"
+                android:layout_height="42dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Activation" />
+            <Spinner
+                android:id="@+id/SGyroActivation"
+                style="@style/ComboBox"
+                android:layout_width="170dp"
+                android:layout_height="42dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Sensitivity"
+            android:textStyle="bold" />
+        <com.winlator.cmod.widget.SeekBar
+            android:id="@+id/SBGyroSensitivity"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            app:sbMaxValue="500"
+            app:sbMinValue="5"
+            app:sbStep="5"
+            app:suffix="%" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Deadzone"
+            android:textStyle="bold" />
+        <com.winlator.cmod.widget.SeekBar
+            android:id="@+id/SBGyroDeadzone"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            app:sbMaxValue="50"
+            app:sbMinValue="0"
+            app:sbStep="1"
+            app:suffix="%" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Smoothing"
+            android:textStyle="bold" />
+        <com.winlator.cmod.widget.SeekBar
+            android:id="@+id/SBGyroSmoothing"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            app:sbMaxValue="95"
+            app:sbMinValue="0"
+            app:sbStep="1"
+            app:suffix="%" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <CheckBox
+                android:id="@+id/CBGyroInvertX"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Invert X" />
+            <CheckBox
+                android:id="@+id/CBGyroInvertY"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Invert Y" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/BTGyroCalibrate"
+            style="@style/ButtonPositive"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:text="Calibrate device drift" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Keep the device still while calibrating. Calibration is shared by all containers and games."
+            android:textSize="12sp" />
+    </LinearLayout>
+</ScrollView>
