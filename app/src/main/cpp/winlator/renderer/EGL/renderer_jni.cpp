@@ -493,3 +493,8 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_winlator_cmod_widget_EGLXServerView_nativeSetFilterMode(JNIEnv *env, jobject thiz, jint mode) {
     renderer.filterMode = mode;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_EGLXServerView_nativeSetSharpness(JNIEnv *env, jobject thiz, jfloat sharpness) {
+    renderer.sharpness = std::max(0.0f, std::min(1.0f, (float)sharpness));
+}

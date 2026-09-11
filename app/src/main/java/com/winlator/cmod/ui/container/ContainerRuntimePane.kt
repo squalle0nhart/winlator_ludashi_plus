@@ -92,6 +92,8 @@ internal fun ContainerRuntimePane(
     var vkd3dLevel by remember { mutableStateOf(readConfig(wrapperConfig, "vkd3dLevel", ',').ifBlank { "12_1" }) }
     var frameRate by remember { mutableStateOf(readConfig(wrapperConfig, "framerate", ',').ifBlank { "0" }) }
     var maxFrameLatency by remember { mutableStateOf(readConfig(wrapperConfig, "maxFrameLatency", ',') == "1") }
+    var anisotropy by remember { mutableStateOf(readConfig(wrapperConfig, "anisotropy", ',').ifBlank { "0" }) }
+    var lodBias by remember { mutableStateOf(readConfig(wrapperConfig, "lodBias", ',').ifBlank { "0" }) }
     var async by remember { mutableStateOf(readConfig(wrapperConfig, "async", ',') == "1") }
     var asyncCache by remember { mutableStateOf(readConfig(wrapperConfig, "asyncCache", ',') == "1") }
     var ddrawWrapper by remember { mutableStateOf(readConfig(wrapperConfig, "ddrawrapper", ',').ifBlank { "wined3d" }) }
@@ -176,9 +178,10 @@ internal fun ContainerRuntimePane(
                     }
                 }
                 SettingsDivider()
-                val filters = if (renderer == "EGL") listOf("Bilinear", "Nearest neighbor") else listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution")
-                SettingChoice("Texture Filter", filters.getOrElse(filterMode) { filters.first() }, filters) {
-                    filterMode = filters.indexOf(it).coerceAtLeast(0); container.setRendererFilterMode(filterMode); container.saveData()
+                val filters = if (renderer == "EGL") listOf(0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution", 5 to "SGSR HQ (edge direction)") else listOf(0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution", 5 to "SGSR HQ (edge direction)", 3 to "AMD FidelityFX Super Resolution", 4 to "Lanczos 2 (16-tap)")
+                val labels = filters.map { it.second }
+                SettingChoice("Texture Filter", filters.firstOrNull { it.first == filterMode }?.second ?: labels.first(), labels) {
+                    filterMode = filters.firstOrNull { entry -> entry.second == it }?.first ?: 0; container.setRendererFilterMode(filterMode); container.saveData()
                 }
                 SettingsDivider()
                 SettingToggle("Swap red/blue channels", swapRB) { swapRB = it; container.setRendererSwapRB(it); container.saveData() }
@@ -235,6 +238,12 @@ internal fun ContainerRuntimePane(
                     SettingsDivider(); SettingChoice("VKD3D Feature Level", vkd3dLevel, listOf("12_0", "12_1", "12_2")) { vkd3dLevel = it; saveWrapper("vkd3dLevel", it) }
                     SettingsDivider(); SettingText("Frame Rate", frameRate) { frameRate = it.filter(Char::isDigit).take(4); saveWrapper("framerate", frameRate.ifBlank { "0" }) }
                     SettingsDivider(); SettingToggle("Max Frame Latency", maxFrameLatency) { maxFrameLatency = it; saveWrapper("maxFrameLatency", if (it) "1" else "0") }
+                    SettingsDivider(); SettingChoice("Anisotropic filtering", if (anisotropy == "0") "Game default" else "${anisotropy}×", listOf("Game default", "2×", "4×", "8×", "16×")) {
+                        anisotropy = if (it == "Game default") "0" else it.removeSuffix("×"); saveWrapper("anisotropy", anisotropy)
+                    }
+                    SettingsDivider(); SettingChoice("Texture sharpness", if (lodBias == "0") "Game default" else if (lodBias == "auto") "Auto" else lodBias, listOf("Game default", "Auto", "-0.25", "-0.5", "-0.75", "-1.0")) {
+                        lodBias = when (it) { "Game default" -> "0"; "Auto" -> "auto"; else -> it }; saveWrapper("lodBias", lodBias)
+                    }
                     SettingsDivider(); SettingToggle("Async", async) { async = it; saveWrapper("async", if (it) "1" else "0") }
                     SettingsDivider(); SettingToggle("Async Cache", asyncCache) { asyncCache = it; saveWrapper("asyncCache", if (it) "1" else "0") }
                     SettingsDivider(); SettingChoice("DDraw Wrapper", ddrawWrapper, listOf("wined3d", "cnc-ddraw", "dd7to9", "none")) { ddrawWrapper = it; saveWrapper("ddrawrapper", it) }

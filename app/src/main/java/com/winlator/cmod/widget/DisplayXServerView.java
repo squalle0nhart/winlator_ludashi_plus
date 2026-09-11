@@ -29,7 +29,7 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
     private boolean pipMode = false;
-    private volatile int fpsLimit = 0;
+    private volatile float fpsLimit = 0;
 
     private static volatile boolean nativeLibLoaded = false;
 
@@ -338,11 +338,11 @@ public class DisplayXServerView extends XServerRendererView implements SurfaceHo
         if (action != null) nativeQueueEvent(action);
     }
 
-    public void setFpsLimit(int fps) {
+    public void setFpsLimit(float fps) {
         this.fpsLimit = fps;
     }
 
-    public int getFpsLimit() {
+    public float getFpsLimit() {
         return fpsLimit;
     }
 

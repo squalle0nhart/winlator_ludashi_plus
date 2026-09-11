@@ -26,6 +26,7 @@ import androidx.annotation.Nullable;
 
 import com.winlator.cmod.R;
 import com.winlator.cmod.XServerDisplayActivity;
+import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.container.Container;
 import com.winlator.cmod.container.Shortcut;
 import com.winlator.cmod.widget.XServerRendererView;
@@ -41,6 +42,7 @@ public class FpsLimiterControl extends LinearLayout {
 
     private final SeekBar slider;
     private final TextView valueLabel;
+    private final TextView hintLabel;
     private final NumericEditText customValue;
 
     private boolean initializing = true;
@@ -73,7 +75,7 @@ public class FpsLimiterControl extends LinearLayout {
         sliderGroup.addView(valueRow, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         TextView title = new TextView(context);
-        title.setText("FPS Limit");
+        title.setText("Max FPS");
         title.setTextColor(onSurface);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -84,6 +86,15 @@ public class FpsLimiterControl extends LinearLayout {
         valueLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         valueLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         valueRow.addView(valueLabel, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+
+        TextView help = new TextView(context);
+        help.setText("  ?");
+        help.setTextColor(primary);
+        help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        help.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        help.setOnClickListener(v -> AppUtils.showHelpBox(context, v,
+                "The FPS limiter caps real game frames. With Win-FG Native or LSFG Native, generated frames are added after the cap, so displayed FPS can be Max FPS × multiplier."));
+        valueRow.addView(help, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         slider = new SeekBar(context);
         slider.setMax(CUSTOM_POSITION);
@@ -113,6 +124,11 @@ public class FpsLimiterControl extends LinearLayout {
         LayoutParams customParams = new LayoutParams(LayoutParams.MATCH_PARENT, dp(44));
         customParams.topMargin = dp(8);
         sliderGroup.addView(customValue, customParams);
+
+        hintLabel = new TextView(context);
+        hintLabel.setTextColor(onSurfaceVariant);
+        hintLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        sliderGroup.addView(hintLabel, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         customValue.setOnTouchListener((v, event) -> {
             disallowParentIntercept(v);
@@ -181,11 +197,11 @@ public class FpsLimiterControl extends LinearLayout {
 
         XServerRendererView renderer = activity.getXServerView();
         if (stateLoaded && renderer != null) {
-            applyEffectiveLimit(renderer);
+            activity.bindFpsLimiterControl(this);
             postDelayed(() -> {
                 XServerDisplayActivity host = findActivity();
                 if (host != null && host.getXServerView() != null) {
-                    applyEffectiveLimit(host.getXServerView());
+                    host.applyFpsLimit(getChosenLimit());
                 }
             }, 600);
             return;
@@ -259,19 +275,12 @@ public class FpsLimiterControl extends LinearLayout {
             }
         }
 
-        XServerRendererView renderer = activity.getXServerView();
-        if (renderer != null) renderer.setFpsLimit(chosen);
+        activity.applyFpsLimit(chosen);
     }
 
     private void applyCurrentLimit() {
         XServerDisplayActivity activity = findActivity();
-        if (activity != null && activity.getXServerView() != null) {
-            activity.getXServerView().setFpsLimit(getChosenLimit());
-        }
-    }
-
-    private void applyEffectiveLimit(XServerRendererView renderer) {
-        renderer.setFpsLimit(getChosenLimit());
+        if (activity != null) activity.applyFpsLimit(getChosenLimit());
     }
 
     private int getChosenLimit() {
@@ -283,6 +292,28 @@ public class FpsLimiterControl extends LinearLayout {
         return custom > 0 ? custom : SLIDER_MAX_FPS;
     }
 
+    public int getLimit() { return getChosenLimit(); }
+
+    public void setLimit(int limit) {
+        initializing = true;
+        if (limit >= SLIDER_MAX_FPS || (limit > 0 && limit % STEP_FPS != 0)) {
+            slider.setProgress(CUSTOM_POSITION);
+            customValue.setText(String.valueOf(Math.max(1, limit)));
+        } else {
+            slider.setProgress(Math.max(0, limit) / STEP_FPS);
+            customValue.setText("");
+        }
+        initializing = false;
+        updateLimitUi();
+        saveAndApply();
+    }
+
+    public void refreshHint() {
+        XServerDisplayActivity activity = findActivity();
+        hintLabel.setText(activity != null ? activity.getFpsLimiterHint()
+                : "Limits the real game frames presented by the renderer.");
+    }
+
     private void updateLimitUi() {
         int position = slider.getProgress();
         boolean customMode = position >= CUSTOM_POSITION;
@@ -291,6 +322,7 @@ public class FpsLimiterControl extends LinearLayout {
         if (position <= 0) valueLabel.setText("Off");
         else if (customMode) valueLabel.setText("Custom");
         else valueLabel.setText((position * STEP_FPS) + " FPS");
+        refreshHint();
     }
 
     private void resolveShortcutFile(XServerDisplayActivity activity) {

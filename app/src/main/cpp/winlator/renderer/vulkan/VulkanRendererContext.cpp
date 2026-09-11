@@ -13,6 +13,7 @@
 #include "window_vert.h"
 #include "window_frag.h"
 #include "window_sgsr_frag.h"
+#include "window_sgsr_quality_frag.h"
 #include "window_fsr1_frag.h"
 #include "window_stretch_frag.h"
 #include "window_postfx_frag.h"
@@ -53,6 +54,7 @@ VulkanRendererContext::~VulkanRendererContext() {
     vk_.DestroySampler(device, sampler, nullptr);
     vk_.DestroyDescriptorPool(device, winTexPool, nullptr);
     if (sgsrPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, sgsrPipeline, nullptr);
+    if (sgsrQualityPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, sgsrQualityPipeline, nullptr);
     if (fsr1Pipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, fsr1Pipeline, nullptr);
     if (stretchPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, stretchPipeline, nullptr);
     if (postfxPipeline != VK_NULL_HANDLE) vk_.DestroyPipeline(device, postfxPipeline, nullptr);
@@ -490,6 +492,31 @@ void VulkanRendererContext::createSgsrPipeline() {
     if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&sgsrPipeline)!=VK_SUCCESS) throw std::runtime_error("sgsr_pipeline");
     vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
     RLOG("createSgsrPipeline: done");
+}
+
+void VulkanRendererContext::createSgsrQualityPipeline() {
+    if (sgsrQualityPipeline != VK_NULL_HANDLE) return;
+    auto vert=makeShader(window_vert_code,sizeof(window_vert_code));
+    auto frag=makeShader(window_sgsr_quality_frag_code,sizeof(window_sgsr_quality_frag_code));
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[0].stage=VK_SHADER_STAGE_VERTEX_BIT; stages[0].module=vert; stages[0].pName="main";
+    stages[1].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; stages[1].stage=VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module=frag; stages[1].pName="main";
+    VkPipelineVertexInputStateCreateInfo vi{}; vi.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo ia{}; ia.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; ia.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    VkDynamicState dyn[]={VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo ds{}; ds.sType=VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO; ds.dynamicStateCount=2; ds.pDynamicStates=dyn;
+    VkPipelineViewportStateCreateInfo vp{}; vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; vp.viewportCount=1; vp.scissorCount=1;
+    VkPipelineRasterizationStateCreateInfo rast{}; rast.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; rast.polygonMode=VK_POLYGON_MODE_FILL; rast.lineWidth=1.f; rast.cullMode=VK_CULL_MODE_NONE; rast.frontFace=VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    VkPipelineMultisampleStateCreateInfo ms{}; ms.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; ms.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState ba{}; ba.colorWriteMask=0xF; ba.blendEnable=VK_FALSE;
+    VkPipelineColorBlendStateCreateInfo cb{}; cb.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; cb.attachmentCount=1; cb.pAttachments=&ba;
+    VkGraphicsPipelineCreateInfo pi{}; pi.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pi.stageCount=2; pi.pStages=stages; pi.pVertexInputState=&vi; pi.pInputAssemblyState=&ia;
+    pi.pViewportState=&vp; pi.pRasterizationState=&rast; pi.pMultisampleState=&ms;
+    pi.pColorBlendState=&cb; pi.pDynamicState=&ds; pi.layout=pipeLayout; pi.renderPass=renderPass; pi.subpass=0;
+    if (vk_.CreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&pi,nullptr,&sgsrQualityPipeline)!=VK_SUCCESS) throw std::runtime_error("sgsr_quality_pipeline");
+    vk_.DestroyShaderModule(device,frag,nullptr); vk_.DestroyShaderModule(device,vert,nullptr);
+    RLOG("createSgsrQualityPipeline: done");
 }
 
 void VulkanRendererContext::createFsr1Pipeline() {
@@ -999,12 +1026,13 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     float rotCosR, rotSinR;
     getPreRotationCosSin(rotCosR, rotSinR);
 
-    bool useSgsr    = (filterMode == 2) && (sgsrPipeline    != VK_NULL_HANDLE);
+    bool useSgsr    = (filterMode == 2 || filterMode == 5)
+            && ((filterMode == 5 ? sgsrQualityPipeline : sgsrPipeline) != VK_NULL_HANDLE);
     bool useFsr1    = (filterMode == 3) && (fsr1Pipeline    != VK_NULL_HANDLE);
     bool usePostFX  = (postFXMode  > 0) && (postfxPipeline  != VK_NULL_HANDLE);
     bool useStretch = (stretchMode == 1) && (stretchPipeline != VK_NULL_HANDLE);
 
-    VkPipeline activePipeline = useSgsr   ? sgsrPipeline
+    VkPipeline activePipeline = useSgsr   ? (filterMode == 5 ? sgsrQualityPipeline : sgsrPipeline)
                               : useFsr1   ? fsr1Pipeline
                               : usePostFX ? postfxPipeline
                               : useStretch? stretchPipeline
@@ -1740,19 +1768,20 @@ void VulkanRendererContext::dumpRendererInfo() {
         "SupportedPresentModes: [%s] current=%d",pmList.c_str(),(int)requestedPresentMode);
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "Filter: mode=%d (%s)",
-        filterMode, filterMode==3?"FSR1":filterMode==2?"SGSR":filterMode==1?"NEAREST":"LINEAR");
+        filterMode, filterMode==5?"SGSR_HQ":filterMode==3?"FSR1":filterMode==2?"SGSR":filterMode==1?"NEAREST":"LINEAR");
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,
         "Surface: %dx%d container: %dx%d",surfaceWidth,surfaceHeight,containerWidth,containerHeight);
     __android_log_print(ANDROID_LOG_DEBUG,WLOG_TAG,"=== END RENDERER INFO ===");
 }
 
 void VulkanRendererContext::setFilterMode(int mode) {
-    auto modeName=[](int m){ return m==1?"NEAREST":m==2?"SGSR":m==3?"FSR1":"LINEAR"; };
+    auto modeName=[](int m){ return m==1?"NEAREST":m==2?"SGSR":m==3?"FSR1":m==5?"SGSR_HQ":"LINEAR"; };
     RLOG("setFilterMode: %d -> %d (%s->%s)", filterMode, mode, modeName(filterMode), modeName(mode));
     if (filterMode==mode) { RLOG("setFilterMode: already set, skipping"); return; }
     filterMode=mode;
     if (mode == 2 && sgsrPipeline == VK_NULL_HANDLE) createSgsrPipeline();
     if (mode == 3 && fsr1Pipeline == VK_NULL_HANDLE) createFsr1Pipeline();
+    if (mode == 5 && sgsrQualityPipeline == VK_NULL_HANDLE) createSgsrQualityPipeline();
     vk_.DeviceWaitIdle(device);
     if (sampler!=VK_NULL_HANDLE){vk_.DestroySampler(device,sampler,nullptr);sampler=VK_NULL_HANDLE;}
     createSampler();

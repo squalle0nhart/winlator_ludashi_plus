@@ -52,3 +52,10 @@ limits, resource lifetime during reconfiguration, and input-history warm-up.
 The compositor-native Win-FG v0.3.0 sources are imported from Bannerlator 3.0.9
 and remain MIT-licensed. The license and FidelityFX optical-flow notice are in
 [winfg](app/src/main/cpp/winlator/renderer/vulkan/winfg/).
+
+# Bannerlator 3.1.0 display and image-quality update
+
+Frame-generation display fitting, texture-filtering controls, panel-shaped container
+defaults, and SGSR HQ are adapted from [Bannerlator 3.1.0](https://github.com/The412Banner/Bannerlator/tree/3.1.0)
+(GPL-3.0, imported 2026-09-11). SGSR HQ follows Qualcomm's edge-direction variant of
+Snapdragon Game Super Resolution; that shader is BSD-3-Clause and retains its copyright notice.

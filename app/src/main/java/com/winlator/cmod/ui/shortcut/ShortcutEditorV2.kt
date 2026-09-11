@@ -209,6 +209,8 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var vkd3dLevel by mutableStateOf(readConfig(wrapperConfig, "vkd3dLevel", ',').ifBlank { "12_1" })
     var frameRate by mutableStateOf(readConfig(wrapperConfig, "framerate", ',').ifBlank { "0" })
     var maxFrameLatency by mutableStateOf(readConfig(wrapperConfig, "maxFrameLatency", ',') == "1")
+    var anisotropy by mutableStateOf(readConfig(wrapperConfig, "anisotropy", ',').ifBlank { "0" })
+    var lodBias by mutableStateOf(readConfig(wrapperConfig, "lodBias", ',').ifBlank { "0" })
     var async by mutableStateOf(readConfig(wrapperConfig, "async", ',') == "1")
     var asyncCache by mutableStateOf(readConfig(wrapperConfig, "asyncCache", ',') == "1")
     var ddrawWrapper by mutableStateOf(readConfig(wrapperConfig, "ddrawrapper", ',').ifBlank { "wined3d" })
@@ -779,7 +781,7 @@ private fun ShortcutCategoryV2(
                 SettingsDivider()
                 SettingChoice("Renderer", s.renderer, listOf("Vulkan", "EGL", "DisplayX")) {
                     s.renderer = it
-                    if (it == "EGL" && s.filterMode > 1) s.filterMode = 0
+                    if (it == "EGL" && s.filterMode !in listOf(0, 1, 2, 5)) s.filterMode = 0
                     s.saveRenderer()
                 }
                 SettingsDivider()
@@ -833,10 +835,11 @@ private fun ShortcutCategoryV2(
                         }
                     }
                     SettingsDivider()
-                    val filters = if (s.renderer == "EGL") listOf("Bilinear", "Nearest neighbor")
-                    else listOf("Bilinear", "Nearest neighbor", "Snapdragon Super Resolution", "AMD FidelityFX Super Resolution", "Lanczos 2 (16-tap)")
-                    SettingChoice("Texture Filter", filters.getOrElse(s.filterMode) { filters.first() }, filters) {
-                        s.filterMode = filters.indexOf(it).coerceAtLeast(0)
+                    val filters = if (s.renderer == "EGL") listOf(0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution", 5 to "SGSR HQ (edge direction)")
+                    else listOf(0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution", 5 to "SGSR HQ (edge direction)", 3 to "AMD FidelityFX Super Resolution", 4 to "Lanczos 2 (16-tap)")
+                    val labels = filters.map { it.second }
+                    SettingChoice("Texture Filter", filters.firstOrNull { it.first == s.filterMode }?.second ?: labels.first(), labels) {
+                        s.filterMode = filters.firstOrNull { entry -> entry.second == it }?.first ?: 0
                         s.saveRenderer()
                     }
                 }
@@ -937,6 +940,14 @@ private fun ShortcutCategoryV2(
                     SettingText("Frame Rate", s.frameRate) { s.frameRate = it.filter(Char::isDigit).take(4); s.wrapperValue("framerate", s.frameRate.ifBlank { "0" }) }
                     SettingsDivider()
                     SettingToggle("Max Frame Latency", s.maxFrameLatency) { s.maxFrameLatency = it; s.wrapperValue("maxFrameLatency", if (it) "1" else "0") }
+                    SettingsDivider()
+                    SettingChoice("Anisotropic filtering", if (s.anisotropy == "0") "Game default" else "${s.anisotropy}×", listOf("Game default", "2×", "4×", "8×", "16×")) {
+                        s.anisotropy = if (it == "Game default") "0" else it.removeSuffix("×"); s.wrapperValue("anisotropy", s.anisotropy)
+                    }
+                    SettingsDivider()
+                    SettingChoice("Texture sharpness", if (s.lodBias == "0") "Game default" else if (s.lodBias == "auto") "Auto" else s.lodBias, listOf("Game default", "Auto", "-0.25", "-0.5", "-0.75", "-1.0")) {
+                        s.lodBias = when (it) { "Game default" -> "0"; "Auto" -> "auto"; else -> it }; s.wrapperValue("lodBias", s.lodBias)
+                    }
                     val asyncMode = dxvkAsyncMode(s.dxvkVersion)
                     if (asyncMode != DxvkAsyncMode.NONE) {
                         SettingsDivider()

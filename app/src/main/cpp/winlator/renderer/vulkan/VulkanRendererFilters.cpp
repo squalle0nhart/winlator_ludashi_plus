@@ -224,13 +224,14 @@ void VulkanRendererContext::recordCmdBuf(VkCommandBuffer cb, uint32_t imgIdx,
     float rotCosR, rotSinR;
     getPreRotationCosSin(rotCosR, rotSinR);
 
-    const bool useSgsr = filterMode == 2 && sgsrPipeline != VK_NULL_HANDLE;
+    const bool useSgsr = (filterMode == 2 || filterMode == 5)
+            && ((filterMode == 5 ? sgsrQualityPipeline : sgsrPipeline) != VK_NULL_HANDLE);
     const bool useFsr = filterMode == 3 && fsr1Pipeline != VK_NULL_HANDLE;
     const bool useLanczos = filterMode == 4 && lanczosPipeline != VK_NULL_HANDLE;
     const bool usePostFX = postFXMode > 0 && postfxPipeline != VK_NULL_HANDLE;
     const bool useStretch = stretchMode == 1 && stretchPipeline != VK_NULL_HANDLE;
 
-    VkPipeline activePipeline = useSgsr ? sgsrPipeline
+    VkPipeline activePipeline = useSgsr ? (filterMode == 5 ? sgsrQualityPipeline : sgsrPipeline)
                               : useFsr ? fsr1Pipeline
                               : useLanczos ? lanczosPipeline
                               : usePostFX ? postfxPipeline

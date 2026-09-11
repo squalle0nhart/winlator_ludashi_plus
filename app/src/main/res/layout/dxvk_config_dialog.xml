@@ -182,5 +182,42 @@
             android:entries="@array/dxvk_framerate_entries"
             android:spinnerMode="dropdown"/>
 
+        <View
+            style="@style/FieldSeparator"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Texture filtering"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Anisotropic filtering" />
+
+        <Spinner
+            android:id="@+id/SAnisotropy"
+            style="@style/ComboBoxCompact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dropdown" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Texture sharpness" />
+
+        <Spinner
+            android:id="@+id/SLodBias"
+            style="@style/ComboBoxCompact"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dropdown" />
+
     </LinearLayout>
 </ScrollView>

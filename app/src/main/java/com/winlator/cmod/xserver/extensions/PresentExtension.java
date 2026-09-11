@@ -152,13 +152,13 @@ public class PresentExtension implements Extension,
         new java.util.concurrent.ConcurrentHashMap<>();
 
     private void scheduleIdleNotify(Window window, Pixmap pixmap, int serial,
-                                     int idleFence, int targetFps, XServerRendererView renderer) {
+                                     int idleFence, float targetFps, XServerRendererView renderer) {
         if (targetFps <= 0) {
             sendIdleNotify(window, pixmap, serial, idleFence);
             return;
         }
 
-        final long frameNs = 1_000_000_000L / targetFps;
+        final long frameNs = (long)(1_000_000_000d / targetFps);
         long now = System.nanoTime();
 
         WindowTiming wt = windowTimings.computeIfAbsent(window.id, k -> new WindowTiming());
@@ -284,7 +284,7 @@ public class PresentExtension implements Extension,
         if (!depthCompat) throw new BadMatch();
 
         XServerRendererView renderer = client.xServer.getXServerView();
-        int targetFps;
+        float targetFps;
         if (renderer instanceof VulkanXServerView) {
             targetFps = ((VulkanXServerView) renderer).getFpsLimit();
         } else if (renderer instanceof EGLXServerView) {
@@ -296,7 +296,7 @@ public class PresentExtension implements Extension,
         }
 
         long ust = System.nanoTime() / 1000;
-        long msc = ust / (targetFps > 0 ? (1_000_000L / targetFps) : (1_000_000L / 60));
+        long msc = (long)(ust / (targetFps > 0 ? (1_000_000d / targetFps) : (1_000_000d / 60)));
 
         synchronized (content.renderLock) {
             boolean supportsDirectScanout =

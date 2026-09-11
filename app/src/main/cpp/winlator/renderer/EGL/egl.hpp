@@ -94,7 +94,7 @@ class EGLRenderer {
         void destroyEGLSurface();
         void destroyEGLContext();
         void renderCursor();
-        void renderDrawable(int textureId, int length, float xform[], bool isFromWindow, bool swapColors);
+        void renderDrawable(int textureId, int length, float xform[], bool isFromWindow, bool swapColors, int width, int height);
         void updateTextureDrawable(int textureId, int width, int height, void *data);
         int allocateTexture(int width, int height);
         int allocateTextureDirect(AHardwareBuffer* hardwareBuffer);
@@ -110,6 +110,7 @@ class EGLRenderer {
         float magnifierZoom = 1.0f;
         bool cursorVisible = true;
         int filterMode = 0;
+        float sharpness = 0.5f;
         WindowManager *windowManager;
         CursorManager *cursorManager;
         JNICache *cache;

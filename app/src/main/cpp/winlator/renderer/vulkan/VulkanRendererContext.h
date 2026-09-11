@@ -517,6 +517,7 @@ public:
 
     VkPipeline            pipeline        = VK_NULL_HANDLE;
     VkPipeline            sgsrPipeline    = VK_NULL_HANDLE;
+    VkPipeline            sgsrQualityPipeline = VK_NULL_HANDLE;
     VkPipeline            fsr1Pipeline    = VK_NULL_HANDLE;
     VkPipeline            lanczosPipeline = VK_NULL_HANDLE;
     VkPipeline            stretchPipeline = VK_NULL_HANDLE;
@@ -583,6 +584,7 @@ public:
     void createDSLayout();
     void createPipeline(bool blend, VkPipeline& out);
     void createSgsrPipeline();
+    void createSgsrQualityPipeline();
     void createFsr1Pipeline();
     void createLanczosPipeline();
     void createStretchPipeline();

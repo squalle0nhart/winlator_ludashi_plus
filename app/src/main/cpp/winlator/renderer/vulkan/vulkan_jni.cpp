@@ -9,6 +9,13 @@
 #include "../../../adrenotools/include/adrenotools/driver.h"
 #include "VulkanRendererContext.h"
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeSetWinFgTuning(
+    JNIEnv*, jobject, jlong handle, jint model, jint perfPreset) {
+    auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (ctx) ctx->setWinFgTuning((int)model, (int)perfPreset);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     JNIEnv* env, jobject, jlong handle, jint engineKind, jstring cachePath, jint multiplier,

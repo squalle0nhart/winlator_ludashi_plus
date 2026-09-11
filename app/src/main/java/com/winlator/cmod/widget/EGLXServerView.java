@@ -296,13 +296,14 @@ public class EGLXServerView extends XServerRendererView implements SurfaceHolder
     public native void nativeRequestRender();
     @FastNative
     public native void nativeSetFilterMode(int mode);
+    public native void nativeSetSharpness(float sharpness);
     public native void nativeQueueEvent(Runnable action);
 
     private int fpsWindowId = -1;
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
     private boolean pipMode = false;
-    private volatile int fpsLimit = 0;
+    private volatile float fpsLimit = 0;
 
     @Override
     public void requestRender() {
@@ -312,11 +313,14 @@ public class EGLXServerView extends XServerRendererView implements SurfaceHolder
     public void setFilterMode(int mode) {
         nativeSetFilterMode(mode);
     }
-    public void setFpsLimit(int fps) {
+    public void setSharpness(float sharpness) {
+        nativeSetSharpness(sharpness);
+    }
+    public void setFpsLimit(float fps) {
         this.fpsLimit = fps;
     }
 
-    public int getFpsLimit() {
+    public float getFpsLimit() {
         return fpsLimit;
     }
 

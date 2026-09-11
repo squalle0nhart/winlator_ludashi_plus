@@ -72,6 +72,7 @@ import com.winlator.cmod.core.AppUtils;
 import com.winlator.cmod.core.DefaultVersion;
 import com.winlator.cmod.core.EnvVars;
 import com.winlator.cmod.core.FrameGenManager;
+import com.winlator.cmod.core.FrameGenDisplayFit;
 import com.winlator.cmod.core.LosslessDll;
 import com.winlator.cmod.core.FileUtils;
 import com.winlator.cmod.core.GPUInformation;
@@ -107,6 +108,7 @@ import com.winlator.cmod.widget.XServerRendererView;
 import com.winlator.cmod.widget.VulkanXServerView;
 import com.winlator.cmod.widget.EGLXServerView;
 import com.winlator.cmod.widget.DisplayXServerView;
+import com.winlator.cmod.ui.FpsLimiterControl;
 import com.winlator.cmod.winhandler.MouseEventFlags;
 import com.winlator.cmod.winhandler.TaskManagerSidebar;
 import com.winlator.cmod.winhandler.WinHandler;
@@ -168,6 +170,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
     private WinlatorHUD modernHud = null;
     private Runnable editInputControlsCallback;
     private Shortcut shortcut;
+    private String activeFrameGenBackend = FrameGenManager.BACKEND_LSFG_NATIVE;
+    private int activeFrameGenMultiplier;
+    private float activeFrameGenFlowScale = 0.80f;
+    private File activeFrameGenDll;
+    private int requestedFpsLimit;
+    private FpsLimiterControl fpsLimiterControl;
     private String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
     private HashMap<String, String> graphicsDriverConfig;
     private String audioDriver = Container.DEFAULT_AUDIO_DRIVER;
@@ -272,13 +280,23 @@ public class XServerDisplayActivity extends AppCompatActivity {
         }
     }
 
+    private void setRendererFilterMode(int mode) {
+        if (xServerView instanceof VulkanXServerView) ((VulkanXServerView)xServerView).setFilterMode(mode);
+        else if (xServerView instanceof EGLXServerView) ((EGLXServerView)xServerView).setFilterMode(mode);
+    }
+
+    private void setRendererSharpness(float sharpness) {
+        if (xServerView instanceof VulkanXServerView) ((VulkanXServerView)xServerView).setSharpness(sharpness);
+        else if (xServerView instanceof EGLXServerView) ((EGLXServerView)xServerView).setSharpness(sharpness);
+    }
+
     private int restoreRendererFilterMode() {
         String legacyMode = shortcut != null ? shortcut.getExtra("graphicsFilterMode", null)
                 : container != null ? container.getExtra("graphicsFilterMode", null) : null;
         if (legacyMode != null) {
             try {
                 int mode = Integer.parseInt(legacyMode);
-                if (mode >= 0 && mode <= 3) {
+                if (mode >= 0 && mode <= 5) {
                     if (shortcut != null) shortcut.putExtra("graphicsFilterMode", null);
                     else container.putExtra("graphicsFilterMode", null);
                     persistRendererFilterMode(mode);
@@ -349,6 +367,73 @@ public class XServerDisplayActivity extends AppCompatActivity {
         Log.d("XServerDisplayActivity", "Picking refresh rate " + maxRefresh);
 
         return maxRefresh;
+    }
+
+    private float[] supportedRefreshRatesPrecise() {
+        android.view.Display display = getWindowManager().getDefaultDisplay();
+        android.view.Display.Mode current = display.getMode();
+        java.util.TreeSet<Float> rates = new java.util.TreeSet<>();
+        for (android.view.Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() == current.getPhysicalWidth()
+                    && mode.getPhysicalHeight() == current.getPhysicalHeight()) rates.add(mode.getRefreshRate());
+        }
+        float[] result = new float[rates.size()];
+        int i = 0;
+        for (float rate : rates) result[i++] = rate;
+        return result;
+    }
+
+    private boolean frameGenerationActive() { return activeFrameGenMultiplier >= 2; }
+
+    private boolean savedMatchRefreshRate() {
+        if (container == null) return false;
+        String fallback = container.getExtra("matchRefreshRate", "0");
+        return shortcut != null ? "1".equals(shortcut.getExtra("matchRefreshRate", fallback))
+                : "1".equals(fallback);
+    }
+
+    private boolean frameGenAutoRefresh() {
+        return frameGenerationActive()
+                ? shortcut == null || !"1".equals(shortcut.getExtra("fgAutoRefreshOptOut", "0"))
+                : savedMatchRefreshRate();
+    }
+
+    public void bindFpsLimiterControl(FpsLimiterControl control) {
+        fpsLimiterControl = control;
+        requestedFpsLimit = control.getLimit();
+        applyFpsLimit(requestedFpsLimit);
+    }
+
+    public void applyFpsLimit(int fps) {
+        requestedFpsLimit = Math.max(0, fps);
+        float top = pickHighestRefreshRate();
+        float target = top;
+        if (requestedFpsLimit > 0 && frameGenAutoRefresh()) {
+            int wanted = requestedFpsLimit * (frameGenerationActive() ? activeFrameGenMultiplier : 1);
+            float picked = FrameGenDisplayFit.pickRefreshRate(supportedRefreshRatesPrecise(), wanted);
+            if (picked > 0f) target = picked;
+        }
+        android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
+        if (Math.abs(params.preferredRefreshRate - target) > 0.01f) {
+            params.preferredRefreshRate = target;
+            getWindow().setAttributes(params);
+        }
+        float paced = frameGenerationActive()
+                ? FrameGenDisplayFit.pacedFps(requestedFpsLimit, activeFrameGenMultiplier, target)
+                : requestedFpsLimit;
+        if (xServerView != null) xServerView.setFpsLimit(paced);
+        if (xServerView instanceof VulkanXServerView)
+            ((VulkanXServerView)xServerView).setFrameGenRefreshRate(target);
+        updateFrameGenUi();
+        if (fpsLimiterControl != null) fpsLimiterControl.refreshHint();
+    }
+
+    public String getFpsLimiterHint() {
+        if (!frameGenerationActive()) return "Limits the real game frames presented by the renderer.";
+        String engine = FrameGenManager.BACKEND_WIN_FG_NATIVE.equals(activeFrameGenBackend)
+                ? "Win-FG Native" : "LSFG Native";
+        return engine + " limits real game frames; " + activeFrameGenMultiplier
+                + "x frame generation can display up to " + (requestedFpsLimit * activeFrameGenMultiplier) + " FPS.";
     }
 
     @Override
@@ -1255,15 +1340,20 @@ public class XServerDisplayActivity extends AppCompatActivity {
         String frameGenBackend = shortcut != null ? shortcut.getFrameGenBackend()
                 : container != null ? container.getFrameGenBackend()
                 : FrameGenManager.BACKEND_LSFG_NATIVE;
+        activeFrameGenMultiplier = multiplier;
+        activeFrameGenBackend = FrameGenManager.normalizeBackend(frameGenBackend);
         if (renderer instanceof VulkanXServerView) {
             File dll = LosslessDll.isGlobalDllAvailable(this) ? LosslessDll.globalDllFile(this)
                     : shortcut != null ? LosslessDll.containerDllFile(shortcut)
                     : LosslessDll.containerDllFile(container);
             float flowScale = shortcut != null ? shortcut.getLsfgFlowScale()
                     : container != null ? container.getLsfgFlowScale() : 0.80f;
+            activeFrameGenDll = dll;
+            activeFrameGenFlowScale = flowScale;
+            ((VulkanXServerView) renderer).setFrameGenStatusListener(this::updateFrameGenUi);
             ((VulkanXServerView) renderer).setFrameGenNative(frameGenBackend, dll, multiplier, flowScale);
         } else if (multiplier >= 2) {
-            Toast.makeText(this, "Native frame generation requires the Vulkan renderer", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Frame generation can't run: set Renderer to Vulkan, then relaunch the game.", Toast.LENGTH_LONG).show();
         }
 
         if (renderer instanceof VulkanXServerView) {
@@ -1441,12 +1531,12 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
         Switch upscaler = findViewById(R.id.SWEnableFSR);
         Spinner upscalerMode = findViewById(R.id.SPUpscalerMode);
-        boolean upscalerActive = xServerView instanceof VulkanXServerView
-                && upscaler != null && upscaler.isChecked();
-        String upscalerStatus = !(xServerView instanceof VulkanXServerView) ? "Unavailable"
-                : upscalerActive && upscalerMode != null
-                        && upscalerMode.getSelectedItemPosition() == 1 ? "FSR active"
-                : upscalerActive ? "SGSR active" : "Off";
+        boolean upscalerAvailable = xServerView instanceof VulkanXServerView
+                || xServerView instanceof EGLXServerView;
+        boolean upscalerActive = upscalerAvailable && upscaler != null && upscaler.isChecked();
+        String upscalerStatus = !upscalerAvailable ? "Unavailable"
+                : upscalerActive && upscalerMode != null ? upscalerMode.getSelectedItem() + " active"
+                : "Off";
         setRuntimeStatus(R.id.TVRuntimeUpscalerStatus, "Upscaler", upscalerStatus,
                 upscalerActive ? active : normal);
 
@@ -1988,16 +2078,13 @@ public class XServerDisplayActivity extends AppCompatActivity {
         View    llFrameGenOptions  = findViewById(R.id.LLFrameGenOptions);
         Spinner spFrameGenFPS      = findViewById(R.id.SPFrameGenFPS);
 
-        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
-        if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.GONE);
+        if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.VISIBLE);
+        if (spFrameGenFPS  != null) spFrameGenFPS.setVisibility(View.VISIBLE);
         if (spColorMode    != null) spColorMode.setVisibility(View.GONE);
-        if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
+        if (llStandardOptions != null) llStandardOptions.setVisibility(
+                vkRenderer != null || eglRenderer != null ? View.VISIBLE : View.GONE);
         if (btSaveGraphicsPreset != null) btSaveGraphicsPreset.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
         if (eglRenderer != null) {
-            if (swEnableFSR        != null) swEnableFSR.setVisibility(View.GONE);
-            if (spUpscalerMode     != null) spUpscalerMode.setVisibility(View.GONE);
-            if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(View.GONE);
-            if (sbSharpness        != null) sbSharpness.setVisibility(View.GONE);
             if (spPostFXMode       != null) spPostFXMode.setVisibility(View.GONE);
         }
 
@@ -2018,8 +2105,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             if (displayXRenderer != null) displayXRenderer.setFpsLimit(initialFpsLimit);
             spNativeFPS.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    if (llStandardOptions != null) llStandardOptions.setVisibility(isVulkanRenderer ? View.VISIBLE : View.GONE);
-                    if (llFrameGenOptions != null) llFrameGenOptions.setVisibility(View.GONE);
+                    if (llStandardOptions != null) llStandardOptions.setVisibility(
+                            vkRenderer != null || eglRenderer != null ? View.VISIBLE : View.GONE);
                     int fpsLimit = pos < fpsValues.length ? fpsValues[pos] : 0;
                     if (vkRenderer != null) vkRenderer.setFpsLimit(fpsLimit);
                     if (eglRenderer != null) eglRenderer.setFpsLimit(fpsLimit);
@@ -2038,9 +2125,10 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 if (container == null) return;
                 container.putExtra("graphicsFpsPreset",
                     String.valueOf(spNativeFPS != null ? spNativeFPS.getSelectedItemPosition() : 0));
-                if (vkRenderer != null) {
+                if (vkRenderer != null || eglRenderer != null) {
                     container.setRendererFilterMode(swEnableFSR != null && swEnableFSR.isChecked()
-                            ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 3) : 0);
+                            ? (spUpscalerMode != null && spUpscalerMode.getSelectedItemPosition() == 1 ? 5
+                            : spUpscalerMode != null && spUpscalerMode.getSelectedItemPosition() == 2 ? 3 : 2) : 0);
                     container.putExtra("graphicsSharpness",
                         String.valueOf(sbSharpness != null ? sbSharpness.getValue() : 50f));
                     container.putExtra("graphicsPostFXMode",
@@ -2052,9 +2140,15 @@ public class XServerDisplayActivity extends AppCompatActivity {
             });
         }
 
-        if (vkRenderer == null) return;
+        if (vkRenderer == null && eglRenderer == null) {
+            setupSidebarFrameGeneration(spFrameGenFPS, llFrameGenOptions);
+            return;
+        }
 
-        final String[] upscalerLabels = {"SGSR", "FSR"};
+        final String[] upscalerLabels = vkRenderer != null
+                ? new String[]{"SGSR", "SGSR HQ", "FSR"}
+                : new String[]{"SGSR", "SGSR HQ"};
+        final int[] upscalerModes = vkRenderer != null ? new int[]{2, 5, 3} : new int[]{2, 5};
         if (spUpscalerMode != null) {
             ArrayAdapter<String> a = createSidebarSpinnerAdapter(upscalerLabels);
             a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -2062,8 +2156,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
             spUpscalerMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
                     if (swEnableFSR != null && swEnableFSR.isChecked()) {
-                        int mode = pos + 2;
-                        vkRenderer.setFilterMode(mode);
+                        int mode = upscalerModes[Math.min(pos, upscalerModes.length - 1)];
+                        setRendererFilterMode(mode);
                         persistRendererFilterMode(mode);
                         updateRuntimeStatusUi(runtimeFexMode);
                     }
@@ -2076,8 +2170,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
         float  initSharp  = savedSharp.isEmpty() ? 50f : Float.parseFloat(savedSharp);
         if (sbSharpness != null) {
             sbSharpness.setValue(initSharp);
-            vkRenderer.setSharpness(initSharp / 100f);
-            sbSharpness.setOnValueChangeListener((sb, v) -> vkRenderer.setSharpness(v / 100f));
+            setRendererSharpness(initSharp / 100f);
+            sbSharpness.setOnValueChangeListener((sb, v) -> setRendererSharpness(v / 100f));
         }
 
         Runnable updateSharpnessVis = () -> {
@@ -2089,28 +2183,33 @@ public class XServerDisplayActivity extends AppCompatActivity {
         };
 
         int savedFilterMode = restoreRendererFilterMode();
-        boolean fsrOn = savedFilterMode == 2 || savedFilterMode == 3;
+        boolean fsrOn = savedFilterMode == 2 || savedFilterMode == 3 || savedFilterMode == 5;
         int baseFilterMode = fsrOn ? 0 : savedFilterMode;
-        if (spUpscalerMode != null)
-            spUpscalerMode.setSelection(fsrOn ? savedFilterMode - 2 : 1, false);
+        int upscalerSelection = 0;
+        for (int i = 0; i < upscalerModes.length; i++) if (upscalerModes[i] == savedFilterMode) upscalerSelection = i;
+        if (spUpscalerMode != null) spUpscalerMode.setSelection(upscalerSelection, false);
         if (swEnableFSR != null) {
             swEnableFSR.setChecked(fsrOn);
             if (spUpscalerMode != null)
                 spUpscalerMode.setVisibility(fsrOn ? View.VISIBLE : View.GONE);
-            vkRenderer.setFilterMode(fsrOn && spUpscalerMode != null
-                    ? spUpscalerMode.getSelectedItemPosition() + 2
-                    : baseFilterMode);
+            setRendererFilterMode(fsrOn && spUpscalerMode != null
+                    ? upscalerModes[spUpscalerMode.getSelectedItemPosition()] : baseFilterMode);
             swEnableFSR.setOnCheckedChangeListener((btn, checked) -> {
                 if (spUpscalerMode != null)
                     spUpscalerMode.setVisibility(checked ? View.VISIBLE : View.GONE);
                 int mode = checked
-                    ? (spUpscalerMode != null ? spUpscalerMode.getSelectedItemPosition() + 2 : 3)
+                    ? (spUpscalerMode != null ? upscalerModes[spUpscalerMode.getSelectedItemPosition()] : 2)
                     : baseFilterMode;
-                vkRenderer.setFilterMode(mode);
+                setRendererFilterMode(mode);
                 persistRendererFilterMode(mode);
                 updateSharpnessVis.run();
                 updateRuntimeStatusUi(runtimeFexMode);
             });
+        }
+
+        if (vkRenderer == null) {
+            setupSidebarFrameGeneration(spFrameGenFPS, llFrameGenOptions);
+            return;
         }
 
         final String[] pfxLabels = {"None", "DLS", "CRT", "HDR", "Natural"};
@@ -2141,11 +2240,136 @@ public class XServerDisplayActivity extends AppCompatActivity {
         if (lblSharpnessHeader != null) lblSharpnessHeader.setVisibility(sharpVis);
         if (sbSharpness        != null) sbSharpness.setVisibility(sharpVis);
 
-        final String[] frameGenLabels = {"2x Interpolation", "Always On"};
-        if (spFrameGenFPS != null) {
-            ArrayAdapter<String> a = createSidebarSpinnerAdapter(frameGenLabels);
-            a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spFrameGenFPS.setAdapter(a);
+        setupSidebarFrameGeneration(spFrameGenFPS, llFrameGenOptions);
+    }
+
+    private void setupSidebarFrameGeneration(Spinner spinner, View panel) {
+        if (panel != null) panel.setVisibility(View.VISIBLE);
+        if (spinner == null) return;
+        String[] labels = {"Off", "Win-FG Native", "LSFG Native 2x", "LSFG Native 3x", "LSFG Native 4x"};
+        ArrayAdapter<String> adapter = createSidebarSpinnerAdapter(labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        int initial = activeFrameGenMultiplier < 2 ? 0
+                : FrameGenManager.BACKEND_WIN_FG_NATIVE.equals(activeFrameGenBackend) ? 1
+                : Math.min(4, activeFrameGenMultiplier);
+        spinner.setSelection(initial, false);
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String backend = position == 1 ? FrameGenManager.BACKEND_WIN_FG_NATIVE
+                        : FrameGenManager.BACKEND_LSFG_NATIVE;
+                int multiplier = position == 0 ? 0 : position == 1 ? 2 : position;
+                setActiveFrameGeneration(backend, multiplier);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        Switch auto = findViewById(R.id.SWFrameGenAuto);
+        if (auto != null) {
+            auto.setChecked(frameGenAutoRefresh());
+            auto.setOnCheckedChangeListener((button, checked) -> {
+                if (frameGenerationActive()) {
+                    if (shortcut != null) {
+                        shortcut.putExtra("fgAutoRefreshOptOut", checked ? "0" : "1");
+                        shortcut.saveData();
+                    }
+                } else if (shortcut != null) {
+                    shortcut.putExtra("matchRefreshRate", checked ? "1" : "0");
+                    shortcut.saveData();
+                } else if (container != null) {
+                    container.putExtra("matchRefreshRate", checked ? "1" : "0");
+                    container.saveData();
+                }
+                applyFpsLimit(requestedFpsLimit);
+            });
+        }
+        View help = findViewById(R.id.BTFrameGenHelp);
+        if (help != null) help.setOnClickListener(v -> AppUtils.showHelpBox(this, v,
+                "Frame Generation inserts frames between real game frames. Win-FG Native is fixed at 2x; LSFG Native supports 2x–4x and requires Lossless.dll plus a Vulkan 1.3 driver. Keep Max FPS × multiplier at or below the screen refresh rate."));
+        View fixCap = findViewById(R.id.BTFrameGenFixCap);
+        if (fixCap != null) fixCap.setOnClickListener(v -> {
+            if (fpsLimiterControl != null) fpsLimiterControl.setLimit(
+                    FrameGenDisplayFit.maxFps(pickHighestRefreshRate(), activeFrameGenMultiplier));
+        });
+        View fixMultiplier = findViewById(R.id.BTFrameGenFixMultiplier);
+        if (fixMultiplier != null) fixMultiplier.setOnClickListener(v -> {
+            int fit = FrameGenDisplayFit.fittingMultiplier(pickHighestRefreshRate(), requestedFpsLimit,
+                    activeFrameGenMultiplier);
+            if (fit >= 2) spinner.setSelection(fit);
+        });
+        updateFrameGenUi();
+    }
+
+    private void setActiveFrameGeneration(String backend, int multiplier) {
+        activeFrameGenBackend = FrameGenManager.normalizeBackend(backend);
+        activeFrameGenMultiplier = multiplier;
+        if (shortcut != null) {
+            shortcut.setFrameGenBackend(activeFrameGenBackend);
+            shortcut.setLsfgMultiplier(multiplier);
+            shortcut.setLsfgEnabled(multiplier >= 2
+                    && FrameGenManager.BACKEND_LSFG_NATIVE.equals(activeFrameGenBackend));
+            shortcut.saveData();
+        } else if (container != null) {
+            container.setFrameGenBackend(activeFrameGenBackend);
+            container.setLsfgMultiplier(multiplier);
+            container.setLsfgEnabled(multiplier >= 2
+                    && FrameGenManager.BACKEND_LSFG_NATIVE.equals(activeFrameGenBackend));
+            container.saveData();
+        }
+        if (xServerView instanceof VulkanXServerView)
+            ((VulkanXServerView)xServerView).setFrameGenNative(activeFrameGenBackend,
+                    activeFrameGenDll, multiplier, activeFrameGenFlowScale);
+        applyFpsLimit(requestedFpsLimit);
+    }
+
+    private void updateFrameGenUi() {
+        TextView status = findViewById(R.id.TVFrameGenFitStatus);
+        TextView fixCap = findViewById(R.id.BTFrameGenFixCap);
+        TextView fixMultiplier = findViewById(R.id.BTFrameGenFixMultiplier);
+        Switch auto = findViewById(R.id.SWFrameGenAuto);
+        if (status == null) return;
+        if (fixCap != null) fixCap.setVisibility(View.GONE);
+        if (fixMultiplier != null) fixMultiplier.setVisibility(View.GONE);
+        if (auto != null && auto.isChecked() != frameGenAutoRefresh()) auto.setChecked(frameGenAutoRefresh());
+
+        if (!frameGenerationActive()) {
+            status.setText("Off");
+            return;
+        }
+        String problem = xServerView instanceof VulkanXServerView
+                ? ((VulkanXServerView)xServerView).getFrameGenError()
+                : "Frame generation can't run: set Renderer to Vulkan, then relaunch the game.";
+        if (!problem.isEmpty()) {
+            status.setText(problem);
+            status.setTextColor(Color.rgb(255, 152, 0));
+            return;
+        }
+        int made = requestedFpsLimit * activeFrameGenMultiplier;
+        int screen = Math.round(pickHighestRefreshRate());
+        if (requestedFpsLimit > 0 && made > screen) {
+            status.setText("⚠ " + requestedFpsLimit + " × " + activeFrameGenMultiplier + " = " + made
+                    + " FPS is above your " + screen + " Hz screen. Frames queue up, causing stutter and input lag.");
+            status.setTextColor(Color.rgb(255, 152, 0));
+            if (fixCap != null) {
+                fixCap.setText("Set Max FPS to "
+                        + FrameGenDisplayFit.maxFps(screen, activeFrameGenMultiplier));
+                fixCap.setVisibility(View.VISIBLE);
+            }
+            int fit = FrameGenDisplayFit.fittingMultiplier(screen, requestedFpsLimit, activeFrameGenMultiplier);
+            if (fixMultiplier != null && fit >= 2
+                    && FrameGenManager.BACKEND_LSFG_NATIVE.equals(activeFrameGenBackend)) {
+                fixMultiplier.setText("Use " + fit + "x");
+                fixMultiplier.setVisibility(View.VISIBLE);
+            }
+        } else {
+            float picked = requestedFpsLimit > 0
+                    ? FrameGenDisplayFit.pickRefreshRate(supportedRefreshRatesPrecise(), made) : 0f;
+            status.setText(frameGenAutoRefresh()
+                    ? "Auto (match FPS) is on for frame generation"
+                            + (picked > 0 ? ": " + requestedFpsLimit + " × " + activeFrameGenMultiplier
+                                    + " → " + Math.round(picked) + " Hz." : ".")
+                    : "Auto (match FPS) is off for this game; the saved setting returns when frame generation stops.");
+            status.setTextColor(Color.rgb(184, 196, 206));
         }
     }
 
@@ -2575,7 +2799,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         File rootDir = imageFs.getRootDir();
 
         if (DXWrapper.isVulkan(dxwrapper)) {
-            DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars);
+            DXVKConfigDialog.setEnvVars(this, dxwrapperConfig, envVars, autoTextureLodBias());
             String version = dxwrapperConfig.get("version");
             if (version.equals("1.11.1-sarek")) {
                 Log.d("GraphicsDriverExtraction", "Disabling Wrapper PATCH_OPCONSTCOMP SPIR-V pass");
@@ -2681,6 +2905,16 @@ public class XServerDisplayActivity extends AppCompatActivity {
             envVars.put("ENABLE_VKBASALT", "1");
             envVars.put("VKBASALT_CONFIG", vkbasaltConfig);
         }
+    }
+
+    private float autoTextureLodBias() {
+        int mode = shortcut != null ? shortcut.getRendererFilterMode()
+                : container != null ? container.getRendererFilterMode() : 0;
+        if (mode < 2 || xServer == null) return 0f;
+        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
+        return DXVKConfigDialog.autoLodBias(xServer.screenInfo.width, xServer.screenInfo.height,
+                metrics.widthPixels, metrics.heightPixels);
     }
 
     @Override

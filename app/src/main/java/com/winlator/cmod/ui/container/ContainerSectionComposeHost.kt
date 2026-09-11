@@ -807,16 +807,15 @@ private fun RendererOptionsPanel(
 ) {
     val presentEntries = arrayOf("Mailbox", "Fifo")
     val presentIds = arrayOf("mailbox", "fifo")
-    val filterEntries = if (nativeRenderer) {
-        arrayOf("Bilinear", "Nearest neighbor")
+    val filterOptions = if (nativeRenderer) {
+        arrayOf(0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution", 5 to "SGSR HQ (edge direction)")
     } else {
         arrayOf(
-            "Bilinear",
-            "Nearest neighbor",
-            "Snapdragon Super Resolution",
-            "AMD FidelityFX Super Resolution"
+            0 to "Bilinear", 1 to "Nearest neighbor", 2 to "Snapdragon Super Resolution",
+            5 to "SGSR HQ (edge direction)", 3 to "AMD FidelityFX Super Resolution", 4 to "Lanczos 2 (16-tap)"
         )
     }
+    val filterEntries = filterOptions.map { it.second }.toTypedArray()
     Surface(
         modifier = Modifier.padding(start = 65.dp, end = 12.dp, bottom = 10.dp),
         shape = RoundedCornerShape(12.dp),
@@ -844,9 +843,9 @@ private fun RendererOptionsPanel(
             }
             InlineChoice(
                 label = "Texture Filter",
-                selected = filterEntries.getOrElse(filterMode) { filterEntries[0] },
+                selected = filterOptions.firstOrNull { it.first == filterMode }?.second ?: filterEntries[0],
                 entries = filterEntries
-            ) { value -> onFilterMode(filterEntries.indexOf(value).coerceAtLeast(0)) }
+            ) { value -> onFilterMode(filterOptions.firstOrNull { it.second == value }?.first ?: 0) }
             ThinDivider()
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),

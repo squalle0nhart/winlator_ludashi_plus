@@ -53,6 +53,6 @@ public abstract class XServerRendererView extends SurfaceView {
     public abstract void setPipMode(boolean pipMode);
     public abstract void setFrameRating(Object frameRating);
 
-    public abstract void setFpsLimit(int fps);
-    public abstract int getFpsLimit();
+    public abstract void setFpsLimit(float fps);
+    public abstract float getFpsLimit();
 }

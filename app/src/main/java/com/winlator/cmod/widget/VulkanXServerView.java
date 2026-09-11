@@ -71,12 +71,15 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private float pendingLsfgFlowScale = 0.80f;
     private File pendingLsfgDll;
     private String pendingFrameGenBackend = FrameGenManager.BACKEND_LSFG_NATIVE;
+    private float pendingFrameGenRefreshHz;
+    private volatile String frameGenError = "";
+    private Runnable frameGenStatusListener;
     private boolean pendingSwapRB         = false;
 
     private WinlatorHUD hudRef = null;
     private FrameRating classicHudRef = null;
     private int fpsWindowId = -1;
-    private int fpsLimit = 0;
+    private volatile float fpsLimit = 0;
 
     private static volatile boolean nativeLibLoaded = false;
 
@@ -602,6 +605,18 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         });
     }
 
+    public void setFrameGenRefreshRate(float refreshHz) {
+        pendingFrameGenRefreshHz = refreshHz;
+        queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) applyFrameGenNative(); } });
+    }
+
+    public String getFrameGenError() { return frameGenError; }
+
+    public void setFrameGenStatusListener(Runnable listener) {
+        frameGenStatusListener = listener;
+        if (listener != null) post(listener);
+    }
+
     // Runs on an existing worker, under lock; cache translation never blocks the UI.
     private void applyFrameGenNative() {
         boolean winFg = FrameGenManager.BACKEND_WIN_FG_NATIVE.equals(pendingFrameGenBackend);
@@ -616,14 +631,28 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                 multiplier = 0;
             }
         }
-        float refreshHz = getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
+        float refreshHz = pendingFrameGenRefreshHz > 0f ? pendingFrameGenRefreshHz
+                : getDisplay() != null ? getDisplay().getRefreshRate() : 0f;
         if (winFg) nativeSetWinFgTuning(nativeHandle, 3, 2);
         String nativeError = nativeConfigureFrameGen(nativeHandle, winFg ? 1 : 0, cachePath,
                 multiplier, pendingLsfgFlowScale, refreshHz);
         if (error == null) error = nativeError;
         if (error != null) {
-            final String message = (winFg ? "Win-FG Native: " : "LSFG Native: ") + error;
-            post(() -> Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show());
+            boolean oldDriver = error.contains("Vulkan version below") || error.contains("storage images")
+                    || error.contains("shader") || error.contains("feature");
+            frameGenError = (winFg ? "Win-FG Native" : "LSFG Native") + " can't run: "
+                    + (oldDriver ? (error.contains("Vulkan version below")
+                            ? "this Renderer Driver lacks Vulkan 1.3. " : "this Renderer Driver lacks a required Vulkan feature. ")
+                            + "Set Renderer Driver to a Turnip driver, then relaunch the game."
+                            : error + (error.endsWith(".") ? "" : "."));
+            final String message = frameGenError;
+            post(() -> {
+                Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+                if (frameGenStatusListener != null) frameGenStatusListener.run();
+            });
+        } else {
+            frameGenError = "";
+            post(() -> { if (frameGenStatusListener != null) frameGenStatusListener.run(); });
         }
     }
 
@@ -667,8 +696,8 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         if (fr instanceof WinlatorHUD) hudRef = (WinlatorHUD) fr;
         else if (fr instanceof FrameRating) classicHudRef = (FrameRating) fr;
     }
-    public int getFpsLimit() { return fpsLimit; }
-    public void setFpsLimit(int limit) { this.fpsLimit = limit; }
+    public float getFpsLimit() { return fpsLimit; }
+    public void setFpsLimit(float limit) { this.fpsLimit = limit; }
     public void setPipMode(boolean pip) { inPipMode = pip; }
     public int getSurfaceWidth() { return surfaceWidth; }
     public int getSurfaceHeight() { return surfaceHeight; }

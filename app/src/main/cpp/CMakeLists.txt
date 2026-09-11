@@ -88,6 +88,7 @@ endfunction()
 compile_shader_header(window.vert window_vert.h window_vert_code "Compiling window.vert → window_vert.h")
 compile_shader_header(window.frag window_frag.h window_frag_code "Compiling window.frag → window_frag.h")
 compile_shader_header(window_sgsr.frag window_sgsr_frag.h window_sgsr_frag_code "Compiling window_sgsr.frag → window_sgsr_frag.h")
+compile_shader_header(window_sgsr_quality.frag window_sgsr_quality_frag.h window_sgsr_quality_frag_code "Compiling SGSR HQ → window_sgsr_quality_frag.h")
 compile_shader_header(window_fsr1.frag window_fsr1_frag.h window_fsr1_frag_code "Compiling single-pass FSR → window_fsr1_frag.h")
 compile_shader_header(window_lanczos.frag window_lanczos_frag.h window_lanczos_frag_code "Compiling Lanczos 2 → window_lanczos_frag.h")
 compile_shader_header(window_stretch.frag window_stretch_frag.h window_stretch_frag_code "Compiling window_stretch.frag → window_stretch_frag.h")
@@ -161,13 +162,13 @@ string(REPLACE
     "${VULKAN_CONTEXT_TEXT}")
 
 string(REPLACE
-    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR1\":\"LINEAR\"; };"
-    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR\":m==4?\"LANCZOS2\":\"LINEAR\"; };"
+    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR1\":m==5?\"SGSR_HQ\":\"LINEAR\"; };"
+    "auto modeName=[](int m){ return m==1?\"NEAREST\":m==2?\"SGSR\":m==3?\"FSR\":m==4?\"LANCZOS2\":m==5?\"SGSR_HQ\":\"LINEAR\"; };"
     VULKAN_CONTEXT_TEXT
     "${VULKAN_CONTEXT_TEXT}")
 string(REPLACE
-    "filterMode, filterMode==3?\"FSR1\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
-    "filterMode, filterMode==4?\"LANCZOS2\":filterMode==3?\"FSR\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
+    "filterMode, filterMode==5?\"SGSR_HQ\":filterMode==3?\"FSR1\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
+    "filterMode, filterMode==5?\"SGSR_HQ\":filterMode==4?\"LANCZOS2\":filterMode==3?\"FSR\":filterMode==2?\"SGSR\":filterMode==1?\"NEAREST\":\"LINEAR\");"
     VULKAN_CONTEXT_TEXT
     "${VULKAN_CONTEXT_TEXT}")
 
@@ -212,6 +213,7 @@ add_library(vulkan_renderer SHARED
         ${CMAKE_CURRENT_BINARY_DIR}/window_vert.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_frag.h
+        ${CMAKE_CURRENT_BINARY_DIR}/window_sgsr_quality_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_fsr1_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_lanczos_frag.h
         ${CMAKE_CURRENT_BINARY_DIR}/window_stretch_frag.h

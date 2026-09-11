@@ -414,7 +414,8 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         });
         if (btWineVersionOptions != null) btWineVersionOptions.setOnClickListener(v -> showWineVersionDownloadPopup(v, sWineVersion, refreshWineVersion));
 
-        loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize() : Container.DEFAULT_SCREEN_SIZE);
+        loadScreenSizeSpinner(view, isEditMode() ? container.getScreenSize()
+                : Container.defaultScreenSizeFor(requireContext()));
 
         final Spinner sGraphicsDriver = view.findViewById(R.id.SGraphicsDriver);
 
@@ -984,7 +985,7 @@ public class ContainerDetailFragment extends Fragment implements DXVKConfigDialo
         Spinner sScreenSize = view.findViewById(R.id.SScreenSize);
         String value = sScreenSize.getSelectedItem().toString();
         if (value.equalsIgnoreCase("custom")) {
-            value = Container.DEFAULT_SCREEN_SIZE;
+            value = Container.defaultScreenSizeFor(view.getContext());
             String strWidth = ((EditText) view.findViewById(R.id.ETScreenWidth)).getText().toString().trim();
             String strHeight = ((EditText) view.findViewById(R.id.ETScreenHeight)).getText().toString().trim();
             if (strWidth.matches("[0-9]+") && strHeight.matches("[0-9]+")) {

@@ -59,14 +59,21 @@ public class RendererOptionsDialog extends ContentDialog {
         "Bilinear",
         "Nearest neighbor",
         "Snapdragon Super Resolution",
+        "SGSR HQ (edge direction)",
         "AMD FidelityFX Super Resolution",
         "Lanczos 2"
     };
 
+    private static final int[] FILTER_VALUES_VULKAN = {0, 1, 2, 5, 3, 4};
+
     private static final String[] FILTER_LABELS_EGL = {
         "Bilinear",
-        "Nearest neighbor"
+        "Nearest neighbor",
+        "Snapdragon Super Resolution",
+        "SGSR HQ (edge direction)"
     };
+
+    private static final int[] FILTER_VALUES_EGL = {0, 1, 2, 5};
 
     public RendererOptionsDialog(View anchorView, Config config, boolean isNativeMode) {
         super(anchorView.getContext(), R.layout.renderer_options_dialog);
@@ -92,6 +99,10 @@ public class RendererOptionsDialog extends ContentDialog {
             if (PRESENT_MODE_IDS[i].equals(curPm)) { pmSel = i; break; }
         }
         spPresent.setSelection(pmSel);
+        findViewById(R.id.BTHelpPresentMode).setOnClickListener(v -> AppUtils.showHelpBox(ctx, v,
+                "FIFO queues frames in order and avoids tearing; use it with native frame generation. Mailbox keeps the newest completed frame and can reduce latency when frame generation is off."));
+        findViewById(R.id.BTHelpFrameGeneration).setOnClickListener(v -> AppUtils.showHelpBox(ctx, v,
+                "Win-FG Native is built in and runs at 2x. LSFG Native supports 2x–4x, requires Lossless.dll, Vulkan 1.3 and a compatible Vulkan renderer driver."));
 
         AdrenotoolsManager atm = new AdrenotoolsManager(ctx);
         List<String> driverLabels = new ArrayList<>();
@@ -110,9 +121,9 @@ public class RendererOptionsDialog extends ContentDialog {
         spDriver.setSelection(drvSel);
 
         String[] filterLabels = isNativeMode ? FILTER_LABELS_EGL : FILTER_LABELS_VULKAN;
+        int[] filterValues = isNativeMode ? FILTER_VALUES_EGL : FILTER_VALUES_VULKAN;
         setAmoledAdapter(ctx, spFilter, filterLabels);
-        int filterSel = config.getRendererFilterMode();
-        if (filterSel < 0 || filterSel >= filterLabels.length) filterSel = 0;
+        int filterSel = indexOf(filterValues, config.getRendererFilterMode());
         spFilter.setSelection(filterSel);
         cbSwapRB.setChecked(config.getRendererSwapRB());
 
@@ -130,7 +141,9 @@ public class RendererOptionsDialog extends ContentDialog {
                 : FrameGenManager.BACKEND_WIN_FG_NATIVE.equals(backend) ? 1
                 : Math.min(4, multiplier));
         float flowScale = config.getLsfgFlowScale();
-        tvStatus.setText("Win-FG Native is built in; LSFG Native requires an imported Lossless.dll");
+        tvStatus.setText(config.isLsfgDllAvailable()
+                ? "Win-FG Native is built in; LSFG Native uses the imported Lossless.dll."
+                : "LSFG Native can't run: Lossless.dll is missing. Import it, then relaunch the game. Win-FG Native is built in.");
         sbFlowScale.setMax(75);
         sbFlowScale.setProgress(Math.round((flowScale - 0.25f) * 100));
         tvFlowScale.setText(String.format(java.util.Locale.US, "%.2f", flowScale));
@@ -147,7 +160,7 @@ public class RendererOptionsDialog extends ContentDialog {
                 config.setRendererPresentMode(PRESENT_MODE_IDS[spPresent.getSelectedItemPosition()]);
                 config.setRendererDriverId(driverIds.get(spDriver.getSelectedItemPosition()));
             }
-            config.setRendererFilterMode(spFilter.getSelectedItemPosition());
+            config.setRendererFilterMode(filterValues[spFilter.getSelectedItemPosition()]);
             config.setRendererSwapRB(cbSwapRB.isChecked());
 
             int selection = spMultiplier.getSelectedItemPosition();
@@ -160,6 +173,11 @@ public class RendererOptionsDialog extends ContentDialog {
             config.setLsfgEnabled(!winFg && selectedMultiplier >= 2);
             config.setLsfgFlowScale(0.25f + sbFlowScale.getProgress() / 100f);
         });
+    }
+
+    private static int indexOf(int[] values, int value) {
+        for (int i = 0; i < values.length; i++) if (values[i] == value) return i;
+        return 0;
     }
 
     private void setAmoledAdapter(Context ctx, Spinner spinner, String[] items) {
