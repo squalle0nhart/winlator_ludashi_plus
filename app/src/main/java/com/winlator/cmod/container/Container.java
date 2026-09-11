@@ -47,6 +47,7 @@ public class Container {
         return com.winlator.cmod.core.FrameGenDisplayFit.defaultScreenSize(width, height);
     }
     public static final String DEFAULT_GRAPHICS_DRIVER = "zink";
+    public static final String DEFAULT_GRAPHICS_WRAPPER = "wrapper";
     public static final String DEFAULT_AUDIO_DRIVER = "pulse-audio-gn";
     public static final String DEFAULT_EMULATOR = "FEXCore";
     public static final String DEFAULT_DXWRAPPER = "dxvk+vkd3d";
@@ -148,6 +149,23 @@ public class Container {
 
     public void setGraphicsDriver(String graphicsDriver) {
         this.graphicsDriver = graphicsDriver;
+    }
+
+    public String getGraphicsWrapper() {
+        return normalizeGraphicsWrapper(getExtra("graphicsWrapper", DEFAULT_GRAPHICS_WRAPPER));
+    }
+
+    public void setGraphicsWrapper(String graphicsWrapper) {
+        putExtra("graphicsWrapper", normalizeGraphicsWrapper(graphicsWrapper));
+    }
+
+    public static String normalizeGraphicsWrapper(String graphicsWrapper) {
+        if (graphicsWrapper == null) return DEFAULT_GRAPHICS_WRAPPER;
+        String value = graphicsWrapper.toLowerCase(Locale.ENGLISH);
+        if (value.equals("wrapper-original") || value.equals("wrapper-v2")) return "wrapper-winnative";
+        if (value.equals("wrapper-winnative") || value.equals("wrapper-leegao") || value.equals("wrapper-legacy"))
+            return value;
+        return DEFAULT_GRAPHICS_WRAPPER;
     }
 
     public String getGraphicsDriverConfig() {
@@ -717,7 +735,19 @@ public class Container {
             }
             if (data.has("graphicsDriver")) {
                 String graphicsDriver = data.getString("graphicsDriver");
-                if (graphicsDriver.equals("wrapper") || graphicsDriver.equals("turnip-zink") || graphicsDriver.equals("turnip") || graphicsDriver.equals("llvmpipe")) {
+                if (graphicsDriver.startsWith("wrapper")) {
+                    if (data.has("id")) {
+                        JSONObject extraData = data.optJSONObject("extraData");
+                        if (extraData == null) extraData = new JSONObject();
+                        if (!extraData.has("graphicsWrapper"))
+                            extraData.put("graphicsWrapper", normalizeGraphicsWrapper(graphicsDriver));
+                        data.put("extraData", extraData);
+                    } else if (!data.has("graphicsWrapper")) {
+                        data.put("graphicsWrapper", normalizeGraphicsWrapper(graphicsDriver));
+                    }
+                    data.put("graphicsDriver", DEFAULT_GRAPHICS_DRIVER);
+                }
+                else if (graphicsDriver.equals("turnip-zink") || graphicsDriver.equals("turnip") || graphicsDriver.equals("llvmpipe")) {
                     data.put("graphicsDriver", DEFAULT_GRAPHICS_DRIVER);
                 }
             }

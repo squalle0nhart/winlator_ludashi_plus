@@ -84,6 +84,7 @@ public class ContainerSectionFragment extends Fragment {
         String[] rendererEntries = new String[]{"Vulkan", "EGL"};
         String[] screenEntries = getResources().getStringArray(R.array.screen_size_entries);
         String[] graphicsEntries = getResources().getStringArray(R.array.graphics_driver_entries);
+        String[] graphicsWrapperEntries = getResources().getStringArray(R.array.graphics_wrapper_entries);
         String[] audioEntries = getResources().getStringArray(R.array.audio_driver_entries);
         String[] wrapperEntries = getResources().getStringArray(R.array.dxwrapper_entries);
         String[] emulatorEntries = getResources().getStringArray(R.array.emulator_entries);
@@ -206,6 +207,8 @@ public class ContainerSectionFragment extends Fragment {
                 container.getScreenSize(),
                 graphicsEntries,
                 findIdentifierEntry(graphicsEntries, container.getGraphicsDriver()),
+                graphicsWrapperEntries,
+                findIdentifierEntry(graphicsWrapperEntries, container.getGraphicsWrapper()),
                 graphicsVersions.toArray(new String[0]),
                 installedGraphicsVersions.toArray(new String[0]),
                 container.getGraphicsDriverConfig(),
@@ -262,6 +265,7 @@ public class ContainerSectionFragment extends Fragment {
                             @NonNull String renderer,
                             @NonNull String screenSize,
                             @NonNull String graphicsDriver,
+                            @NonNull String graphicsWrapper,
                             @NonNull String graphicsDriverConfig,
                             @NonNull String audioDriver,
                             @NonNull String wrapper,
@@ -279,6 +283,7 @@ public class ContainerSectionFragment extends Fragment {
                         if (section == VIDEO) {
                             container.setScreenSize(normalizeScreenSize(screenSize));
                             container.setGraphicsDriver(StringUtils.parseIdentifier(graphicsDriver));
+                            container.setGraphicsWrapper(StringUtils.parseIdentifier(graphicsWrapper));
                             container.setGraphicsDriverConfig(graphicsDriverConfig);
                             container.setRendererNative(renderer.equalsIgnoreCase("EGL"));
                             container.setRendererPresentMode(rendererPresentMode);

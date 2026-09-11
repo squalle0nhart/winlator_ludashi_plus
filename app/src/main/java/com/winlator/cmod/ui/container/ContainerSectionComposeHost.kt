@@ -75,6 +75,7 @@ interface ContainerSectionCallbacks {
         renderer: String,
         screenSize: String,
         graphicsDriver: String,
+        graphicsWrapper: String,
         graphicsDriverConfig: String,
         audioDriver: String,
         wrapper: String,
@@ -104,6 +105,8 @@ object ContainerSectionComposeHost {
         customScreenSize: String,
         graphicsEntries: Array<String>,
         selectedGraphics: String,
+        graphicsWrapperEntries: Array<String>,
+        selectedGraphicsWrapper: String,
         graphicsVersionEntries: Array<String>,
         installedGraphicsVersionEntries: Array<String>,
         graphicsDriverConfig: String,
@@ -153,6 +156,8 @@ object ContainerSectionComposeHost {
                     initialCustomScreen = customScreenSize,
                     graphicsEntries = graphicsEntries,
                     initialGraphics = selectedGraphics,
+                    graphicsWrapperEntries = graphicsWrapperEntries,
+                    initialGraphicsWrapper = selectedGraphicsWrapper,
                     graphicsVersionEntries = graphicsVersionEntries,
                     installedGraphicsVersionEntries = installedGraphicsVersionEntries,
                     initialGraphicsDriverConfig = graphicsDriverConfig,
@@ -205,6 +210,8 @@ private fun ContainerSectionScreen(
     initialCustomScreen: String,
     graphicsEntries: Array<String>,
     initialGraphics: String,
+    graphicsWrapperEntries: Array<String>,
+    initialGraphicsWrapper: String,
     graphicsVersionEntries: Array<String>,
     installedGraphicsVersionEntries: Array<String>,
     initialGraphicsDriverConfig: String,
@@ -244,6 +251,7 @@ private fun ContainerSectionScreen(
     var renderer by remember(initialRenderer) { mutableStateOf(initialRenderer) }
     var screen by remember(initialScreen) { mutableStateOf(initialScreen) }
     var graphics by remember(initialGraphics) { mutableStateOf(initialGraphics) }
+    var graphicsWrapper by remember(initialGraphicsWrapper) { mutableStateOf(initialGraphicsWrapper) }
     val initialGraphicsValues = remember(initialGraphicsDriverConfig) { parseSemicolonConfig(initialGraphicsDriverConfig) }
     var graphicsOptionsExpanded by remember { mutableStateOf(false) }
     var graphicsVersion by remember(initialGraphicsDriverConfig) {
@@ -306,6 +314,7 @@ private fun ContainerSectionScreen(
                             renderer,
                             savedScreen,
                             graphics,
+                            graphicsWrapper,
                             mergeSemicolonConfig(
                                 initialGraphicsDriverConfig,
                                 mapOf(
@@ -436,10 +445,17 @@ private fun ContainerSectionScreen(
                             GroupDivider()
                             ChoiceSetting(
                                 Icons.Outlined.DesktopWindows,
-                                "Graphics Driver",
+                                "OpenGL Driver",
                                 graphics,
                                 graphicsEntries
                             ) { graphics = it }
+                            GroupDivider()
+                            ChoiceSetting(
+                                Icons.Outlined.DesktopWindows,
+                                "Vulkan Wrapper",
+                                graphicsWrapper,
+                                graphicsWrapperEntries
+                            ) { graphicsWrapper = it }
                             GroupDivider()
                             ActionSetting(
                                 Icons.Outlined.Tune,

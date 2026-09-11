@@ -19,6 +19,10 @@
         <item>1920x1080 (16:9)</item>
     </string-array>
     <string-array name="graphics_driver_entries">
+        <item>Zink</item>
+        <item>Freedreno</item>
+    </string-array>
+    <string-array name="graphics_wrapper_entries">
         <item>Wrapper (Current)</item>
         <item>Wrapper WinNative</item>
         <item>Wrapper Leegao</item>

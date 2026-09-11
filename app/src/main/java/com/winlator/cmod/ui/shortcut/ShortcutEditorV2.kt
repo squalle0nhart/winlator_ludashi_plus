@@ -178,6 +178,9 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
 
     var graphicsDriver by mutableStateOf(StringUtils.parseIdentifier(shortcut.getExtra("graphicsDriver", container.getGraphicsDriver())))
+    var graphicsWrapper by mutableStateOf(Container.normalizeGraphicsWrapper(
+        shortcut.getExtra("graphicsWrapper", container.getGraphicsWrapper())
+    ))
     private val defaultDriverVersion = runCatching {
         val context = container.manager.context
         if (GPUInformation.isDriverSupported(DefaultVersion.WRAPPER_ADRENO, context)) DefaultVersion.WRAPPER_ADRENO else DefaultVersion.WRAPPER
@@ -458,6 +461,7 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
 
     val screenEntries = remember { context.resources.getStringArray(R.array.screen_size_entries).toList() }
     val graphicsEntries = remember { context.resources.getStringArray(R.array.graphics_driver_entries).toList() }
+    val graphicsWrapperEntries = remember { context.resources.getStringArray(R.array.graphics_wrapper_entries).toList() }
     val audioEntries = remember { context.resources.getStringArray(R.array.audio_driver_entries).toList() }
     val wrapperEntries = remember { context.resources.getStringArray(R.array.dxwrapper_entries).toList() }
     val localeEntries = remember { listOf("Default") + context.resources.getStringArray(R.array.some_lc_all).toList() }
@@ -592,7 +596,7 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
                 ) {
                     item(category) {
                         ShortcutCategoryV2(
-                            category, state, catalog, screenEntries, graphicsEntries, audioEntries,
+                            category, state, catalog, screenEntries, graphicsEntries, graphicsWrapperEntries, audioEntries,
                             wrapperEntries, localeEntries, soundFonts, gpuNames, fexPresets, boxPresets,
                             profiles, containers, ::environmentLabel, ::changeContainer, ::createContainer, ::enterContainer,
                             ::installRuntime, ::installDriver, context
@@ -618,7 +622,7 @@ internal fun ShortcutEditorV2(fragment: Fragment, shortcut: Shortcut, close: () 
                 ) {
                     item(category) {
                         ShortcutCategoryV2(
-                            category, state, catalog, screenEntries, graphicsEntries, audioEntries,
+                            category, state, catalog, screenEntries, graphicsEntries, graphicsWrapperEntries, audioEntries,
                             wrapperEntries, localeEntries, soundFonts, gpuNames, fexPresets, boxPresets,
                             profiles, containers, ::environmentLabel, ::changeContainer, ::createContainer, ::enterContainer,
                             ::installRuntime, ::installDriver, context
@@ -661,6 +665,7 @@ private fun ShortcutCategoryV2(
     catalog: SettingsCatalog?,
     screenEntries: List<String>,
     graphicsEntries: List<String>,
+    graphicsWrapperEntries: List<String>,
     audioEntries: List<String>,
     wrapperEntries: List<String>,
     localeEntries: List<String>,
@@ -873,8 +878,19 @@ private fun ShortcutCategoryV2(
                 }
             }
             SettingsCard {
-                SettingChoice("Graphics Driver", graphicsDriverLabel(graphicsEntries, s.graphicsDriver), graphicsEntries) {
+                SettingChoice("OpenGL Driver", graphicsDriverLabel(graphicsEntries, s.graphicsDriver), graphicsEntries) {
                     s.selectGraphicsDriver(StringUtils.parseIdentifier(it))
+                }
+                SettingsDivider()
+                SettingChoice(
+                    "Vulkan Wrapper",
+                    graphicsWrapperEntries.firstOrNull {
+                        StringUtils.parseIdentifier(it).equals(s.graphicsWrapper, true)
+                    } ?: s.graphicsWrapper,
+                    graphicsWrapperEntries
+                ) {
+                    s.graphicsWrapper = StringUtils.parseIdentifier(it)
+                    s.extra("graphicsWrapper", s.graphicsWrapper)
                 }
                 catalog?.let { c ->
                     SettingsDivider()

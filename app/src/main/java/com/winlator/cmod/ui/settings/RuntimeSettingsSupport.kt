@@ -81,12 +81,7 @@ internal data class DriverOption(
 )
 
 internal fun graphicsDriverLabel(entries: List<String>, id: String): String {
-    val selected = when (id.lowercase()) {
-        "zink", "freedreno", "wrapper" -> "wrapper"
-        "wrapper-original", "wrapper-v2" -> "wrapper-winnative"
-        else -> id
-    }
-    return entries.firstOrNull { StringUtils.parseIdentifier(it).equals(selected, true) } ?: id
+    return entries.firstOrNull { StringUtils.parseIdentifier(it).equals(id, true) } ?: id
 }
 internal data class WineRuntimeOption(
     val id: String,
