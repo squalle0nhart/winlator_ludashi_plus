@@ -187,6 +187,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     var displayXPresentAtRefreshRate by mutableStateOf(shortcut.getDisplayXPresentAtRefreshRate())
     var displayXBackPressure by mutableStateOf(shortcut.getDisplayXBackPressure())
     var displayXPrecisePresentation by mutableStateOf(shortcut.getDisplayXPrecisePresentation())
+    var lsfgVk11Compat by mutableStateOf(shortcut.isLsfgVk11Compat())
     var frameGenBackend by mutableStateOf(shortcut.getFrameGenBackend())
     var lsfgMultiplier by mutableIntStateOf(shortcut.getLsfgMultiplier())
     var lsfgFlowScale by mutableStateOf(shortcut.getLsfgFlowScale())
@@ -423,6 +424,7 @@ private class ShortcutEditorStateV2(val shortcut: Shortcut) {
     }
 
     fun saveFrameGeneration() {
+        shortcut.setLsfgVk11Compat(lsfgVk11Compat)
         shortcut.setFrameGenBackend(frameGenBackend)
         shortcut.setLsfgMultiplier(lsfgMultiplier)
         shortcut.setLsfgEnabled(frameGenBackend == "lsfg_native" && lsfgMultiplier >= 2)
@@ -1033,8 +1035,8 @@ private fun ShortcutCategoryV2(
                         s.saveRenderer()
                     }
                     SettingsDivider()
-                    SettingToggle("Submit every buffer", s.displayXBackPressure) {
-                        s.displayXBackPressure = it
+                    SettingChoice("Present Mode", s.presentMode, listOf("fifo", "mailbox")) {
+                        s.presentMode = it
                         s.saveRenderer()
                     }
                     SettingsDivider()
@@ -1071,6 +1073,8 @@ private fun ShortcutCategoryV2(
                 SettingsCard {
                     FrameGenerationSettings(
                         backend = s.frameGenBackend,
+                        vk11Compat = s.lsfgVk11Compat,
+                        onVk11CompatChanged = { s.lsfgVk11Compat = it; s.saveFrameGeneration() },
                         multiplier = s.lsfgMultiplier,
                         flowScale = s.lsfgFlowScale,
                         lsfgAvailable = LosslessDll.isGlobalDllAvailable(context) || LosslessDll.containerDllPath(s.shortcut) != null,

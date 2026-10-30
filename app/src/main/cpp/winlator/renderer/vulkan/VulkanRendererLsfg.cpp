@@ -161,7 +161,7 @@ bool VulkanRendererContext::ensureLsfgEngine() {
     }
 
     auto engine = std::make_unique<lsfg::Engine>();
-    if (!engine->init(device, physicalDevice, lsfgCachePath_)) {
+    if (!engine->init(device, physicalDevice, lsfgCachePath_, lsfgCaps_.features.spirvTarget)) {
         RLOG_E("lsfg-native: engine init failed (cache %s)", lsfgCachePath_.c_str());
         return false;
     }
@@ -337,6 +337,16 @@ void VulkanRendererContext::recordFrameGenGeneration(VkCommandBuffer cb, uint32_
                 0, 0,nullptr, 0,nullptr, 2,post);
         }
     }
+}
+
+int VulkanRendererContext::frameGenProblem() const {
+    if (std::strcmp(lsfgCaps_.reason, "not probed") == 0) return -1;
+    if (!fgCapsOk()) return 1;
+    if (fgEngineKind_.load(std::memory_order_relaxed) == 1)
+        return ((winfgEngineTried_ && !winfgEngine_)
+            || (winfgEngine_ && winfgEngine_->unavailable())) ? 2 : 0;
+    return ((lsfgEngineTried_ && !lsfgEngine_)
+        || (lsfgEngine_ && lsfgEngine_->unavailable())) ? 2 : 0;
 }
 
 void VulkanRendererContext::setLsfgCachePath(const char* path) {

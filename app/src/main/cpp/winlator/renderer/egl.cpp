@@ -160,8 +160,12 @@ void EGLRenderer::renderingThreadLoop() {
         }
             
         if (requestUpdate && hasSurface && surfaceChanged && !badSurface && !badContext && !paused) {
-            if (context == EGL_NO_CONTEXT) init();
-            if (surface == EGL_NO_SURFACE) createEGLSurface = true;
+            if (context == EGL_NO_CONTEXT)
+                init();
+
+            if (surface == EGL_NO_SURFACE)
+                createEGLSurface = true;
+
             requestRender = requestUpdate;
             requestUpdate = false;
         }
@@ -179,9 +183,12 @@ void EGLRenderer::renderingThreadLoop() {
             if (ret == EGL_FALSE) {
                 printf("Failed to redraw screen");
                 requestRender = false;
+
                 int error = eglGetError();
-                if (error == EGL_BAD_SURFACE) badSurface = true;
-                else if (error == EGL_CONTEXT_LOST) badContext = true;
+                if (error == EGL_BAD_SURFACE)
+                    badSurface = true;
+                else if (error == EGL_CONTEXT_LOST)
+                    badContext = true;
             }
         }
         
@@ -189,9 +196,12 @@ void EGLRenderer::renderingThreadLoop() {
             EGLBoolean ret = drawFrame();
             if (ret == EGL_FALSE) {
                 printf("Failed to draw frame");
+
                 int error = eglGetError();
-                if (error == EGL_BAD_SURFACE) badSurface = true;
-                else if (error == EGL_CONTEXT_LOST) badContext = true;
+                if (error == EGL_BAD_SURFACE)
+                    badSurface = true;
+                else if (error == EGL_CONTEXT_LOST)
+                    badContext = true;
             }
         }
     }
@@ -254,7 +264,8 @@ EGLBoolean EGLRenderer::drawFrame() {
     glUniform2f(drawableShader->getUniformLoc("viewSize"), windowManager->getRootWindow()->width, windowManager->getRootWindow()->height);
         
     renderWindows();
-    if (cursorVisible) renderCursor();
+    if (cursorVisible)
+        renderCursor();
     
     drawableShader->disable();
         
@@ -267,14 +278,19 @@ EGLBoolean EGLRenderer::drawFrame() {
     
 void EGLRenderer::renderWindows() {
     for (const auto& renderableWindow : renderableWindows) {
-        if (renderableWindow == nullptr) continue;
+        if (renderableWindow == nullptr)
+            continue;
         
         auto window = renderableWindow->window;
-        if (!window) continue;
-        if (!window->hasContent && !window->hasExternalContents()) continue;
-        if (window->isHidden()) continue;
+        if (!window)
+            continue;
+
+        if (!window->hasContent && !window->hasExternalContents())
+            continue;
+
+        if (window->isHidden())
+            continue;
         
-            
         if (window->hasExternalContents())
             renderDrawable(window->externalContent, renderableWindow->rootX, renderableWindow->rootY, true);
         else
@@ -300,7 +316,8 @@ void EGLRenderer::renderCursor() {
 }
 
 void EGLRenderer::renderDrawable(Drawable *drawable, int x, int y, bool isWindow) {
-    if (drawable == nullptr) return;
+    if (drawable == nullptr)
+        return;
     
     if (drawable->glTexture == nullptr) {
         if (drawable->ahb != nullptr) 
@@ -337,10 +354,11 @@ void EGLRenderer::updateScene() {
 }
 
 void EGLRenderer::collectRenderableWindows(Window *window, int x, int y) {
-    if (!window->mapped || !window->inputOutput) return;
+    if (!window->mapped || !window->inputOutput)
+        return;
     
     if (window != windowManager->getRootWindow()) {
-        bool viewable = env->CallBooleanMethod(window->attributes, cache->windowAttributesIsEnabled);
+        bool viewable = window->enabled;
         bool renderable = window->width > 1 && window->height > 1;
 
         if (viewable && renderable) {
@@ -462,17 +480,20 @@ void EGLRenderer::renderDrawable(GLTexture *texture, int length, float xform[], 
 }
 
 std::unique_ptr<GLTexture> EGLRenderer::allocateTextureDirect(AHardwareBuffer* hardwareBuffer) {
-    if (!hardwareBuffer || !display) return nullptr;
+    if (!hardwareBuffer || !display)
+        return nullptr;
     
     std::unique_ptr<GLTexture> texture = std::make_unique<GLTexture>();
     
     const EGLint attribList[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
 
     EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID(hardwareBuffer);
-    if (!clientBuffer) return nullptr;
+    if (!clientBuffer)
+        return nullptr;
 
     texture->eglImage = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attribList);
-    if (!texture->eglImage) return nullptr;
+    if (!texture->eglImage)
+        return nullptr;
     
     glGenTextures(1, (GLuint *)&texture->id);
     glActiveTexture(GL_TEXTURE0);
@@ -562,7 +583,8 @@ void EGLRenderer::reallocateTextureDirect(GLTexture *texture, AHardwareBuffer* h
 }
 
 void EGLRenderer::destroyTexture(GLTexture* texture) {
-    if (!texture) return;
+    if (!texture)
+        return;
     
     glDeleteTextures(1, (GLuint *)&texture->id);
     eglDestroyImageKHR(display, texture->eglImage);

@@ -25,12 +25,9 @@ struct Window {
     Cursor *cursor;
     bool enabled;
     std::vector<Window *> children;
-    jobject attributes;
-    jobject windowObj;
     std::unordered_map<int, std::unique_ptr<struct Drawable>> directContents;
     Drawable *externalContent;
     ASurfaceControl *control;
-    bool backPressureEnabled = false;
     Window *surface = nullptr;
         
     bool hasExternalContents() {
@@ -97,6 +94,14 @@ struct Window {
         }
         
         return window;
+    }
+
+    bool hasSiblings() {
+        return this->parent->children.size() > 1;
+    }
+
+    bool isOnTop() {
+        return this->parent->children.back() == this;
     }
 };
 

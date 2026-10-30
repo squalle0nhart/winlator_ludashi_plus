@@ -18,6 +18,18 @@ class WineInfoTest {
     }
 
     @Test
+    fun multiDigitContentRevisionIsRemoved() {
+        assertEquals(
+            "proton-9.0-x86_64",
+            normalizeIdentifier(
+                "Proton-9.0-x86_64-123",
+                ContentProfile.ContentType.CONTENT_TYPE_PROTON,
+                "9.0-x86_64",
+            ),
+        )
+    }
+
+    @Test
     fun geProtonProfileResolvesAsItsInstalledRuntime() {
         assertEquals(
             "proton-11.1-ge-arm64ec",

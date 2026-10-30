@@ -51,6 +51,20 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeConfigureFrameGen(
     return nullptr;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_com_winlator_cmod_widget_VulkanXServerView_nativeFrameGenProblem(
+    JNIEnv*, jobject, jlong handle) {
+    auto* ctx = reinterpret_cast<VulkanRendererContext*>(handle);
+    if (!ctx) return -1;
+    int problem;
+    {
+        std::unique_lock<std::shared_mutex> frameLock(ctx->frameMutex);
+        problem = ctx->frameGenProblem();
+    }
+    if (problem > 0) ctx->setFrameGenArmed(false, 0);
+    return problem;
+}
+
 static void* openAdrenotoolsDriver(const char* driverPath, const char* libraryName,
                                    const char* nativeLibDir) {
     if (!driverPath || !libraryName || !nativeLibDir) return nullptr;
@@ -99,7 +113,7 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeInit(
     JNIEnv* env, jobject ,
     jobject surface, jint w, jint h,
     jstring jDriverPath, jstring jLibraryName, jstring jNativeLibDir,
-    jboolean validationEnabled)
+    jboolean validationEnabled, jboolean lsfgVk11Compat)
 {
     ANativeWindow* win = ANativeWindow_fromSurface(env, surface);
     if (!win) return 0;
@@ -132,7 +146,7 @@ Java_com_winlator_cmod_widget_VulkanXServerView_nativeInit(
     try {
         return reinterpret_cast<jlong>(
             new VulkanRendererContext(win, w, h, adrenotoolsHandle,
-                                      validationEnabled == JNI_TRUE));
+                                      validationEnabled == JNI_TRUE, lsfgVk11Compat == JNI_TRUE));
     } catch (...) {
         ANativeWindow_release(win);
         if (adrenotoolsHandle) dlclose(adrenotoolsHandle);

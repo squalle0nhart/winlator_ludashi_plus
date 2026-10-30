@@ -392,6 +392,14 @@ public class Shortcut {
     }
     public void setRendererSwapRB(boolean v) { putExtra("rendererSwapRB", v ? "1" : "0"); }
 
+    public boolean isLsfgVk11Compat() {
+        return "1".equals(getExtra("lsfgVk11Compat", container.isLsfgVk11Compat() ? "1" : "0"));
+    }
+
+    public void setLsfgVk11Compat(boolean enabled) {
+        putExtra("lsfgVk11Compat", enabled ? "1" : "0");
+    }
+
     public boolean isLsfgEnabled() {
         String value = getExtra("lsfgEnabled", null);
         if (value == null || value.isEmpty()) return container.isLsfgEnabled();

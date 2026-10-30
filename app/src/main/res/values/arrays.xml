@@ -88,6 +88,10 @@
         <item>immediate</item>
         <item>relaxed</item>
     </string-array>
+    <string-array name="displayx_present_mode_entries">
+        <item>mailbox</item>
+        <item>fifo</item>
+    </string-array>
     <string-array name="resource_type_entries">
         <item>auto</item>
         <item>dmabuf</item>

@@ -119,7 +119,7 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
     private native long nativeInit(Surface surface,
                                    int screenWidth, int screenHeight,
                                    String driverPath, String libraryName, String nativeLibDir,
-                                   boolean validationEnabled);
+                                   boolean validationEnabled, boolean lsfgVk11Compat);
     private native void nativeResize(long handle, int width, int height);
     private native void nativeDestroy(long handle);
     private native void nativeDetachSurface(long handle);
@@ -221,7 +221,8 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
                 nativeHandle = nativeInit(
                     surface,
                     xServer.screenInfo.width, xServer.screenInfo.height,
-                    driverPath, driverLibraryName, nativeLibDir, validationEnabled);
+                    driverPath, driverLibraryName, nativeLibDir, validationEnabled,
+                    lsfgVk11Compat && FrameGenManager.BACKEND_LSFG_NATIVE.equals(pendingFrameGenBackend));
 
                 if (nativeHandle != 0) {
                     nativeSetPresentMode(nativeHandle, pendingPresentMode);
@@ -346,15 +347,16 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
             cd = cursor.cursorImage; hotX = (short)cursor.hotSpotX; hotY = (short)cursor.hotSpotY;
         } else { cd = rootCursorDrawable; }
         nativeSetCursorVisible(nativeHandle, effVis);
-        if (effVis && cd != null && cd.backingAHB != 0) {
+        if (effVis && cd != null && cd.getGPUImage().getAHB() != 0) {
             synchronized (cd.renderLock) {
-                ByteBuffer pixels = cd.lockBuffer(cd.backingAHB);
+                cd.getGPUImage().lock();
+                ByteBuffer pixels = cd.getGPUImage().getVirtualData();
                 if (pixels != null) {
                     try {
                         nativeUpdateCursorImage(nativeHandle, pixels, cd.width, cd.height,
                             cd.getStride(), hotX, hotY);
                     } finally {
-                        cd.unlockBuffer(cd.backingAHB);
+                        cd.getGPUImage().unlock();
                     }
                 }
             }
@@ -500,9 +502,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
             if (nativeHandle == 0 || pixmap == null) return;
             final int rx = window.getRootX() + xOff, ry = window.getRootY() + yOff;
             synchronized (pixmap.renderLock) {
-                if (pixmap.backingAHB != 0) {
+                if (pixmap.getGPUImage().getAHB() != 0) {
                     nativeUpdateWindowContentAHB(nativeHandle, did(window.getContent()),
-                        pixmap.backingAHB, pixmap.width, pixmap.height, rx, ry);
+                        pixmap.getGPUImage().getAHB(), pixmap.width, pixmap.height, rx, ry);
                 }
             }
         }
@@ -595,9 +597,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
 
             final int rx = window.getRootX(), ry = window.getRootY();
             synchronized (drawable.renderLock) {
-                if (drawable.backingAHB != 0) {
+                if (drawable.getGPUImage().getAHB() != 0) {
                     nativeUpdateWindowContentAHB(nativeHandle, did(drawable),
-                        drawable.backingAHB, drawable.width, drawable.height, rx, ry);
+                        drawable.getGPUImage().getAHB(), drawable.width, drawable.height, rx, ry);
                 }
             }
         }
@@ -669,6 +671,12 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         synchronized (lock) { if (nativeHandle != 0) nativeSetSwapRB(nativeHandle, enabled); }
     }
 
+    private boolean lsfgVk11Compat;
+
+    public void setLsfgVk11Compat(boolean enabled) {
+        lsfgVk11Compat = enabled;
+    }
+
     public void setFrameGenNative(String backend, File dll, int multiplier, float flowScale) {
         synchronized (lock) {
             pendingFrameGenBackend = FrameGenManager.normalizeBackend(backend);
@@ -690,7 +698,19 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
         queueEvent(() -> { synchronized (lock) { if (nativeHandle != 0) applyFrameGenNative(); } });
     }
 
-    public String getFrameGenError() { return frameGenError; }
+    private native int nativeFrameGenProblem(long handle);
+
+    public String getFrameGenError() {
+        synchronized (lock) {
+            if (frameGenError.isEmpty() && nativeHandle != 0 && pendingLsfgMultiplier >= 2
+                    && nativeFrameGenProblem(nativeHandle) == 2) {
+                pendingLsfgMultiplier = 0;
+                frameGenError = "Frame generation can't run: this Renderer Driver rejected the shader chain. "
+                        + "Try a Turnip Renderer Driver, then relaunch the game.";
+            }
+            return frameGenError;
+        }
+    }
 
     public void setFrameGenStatusListener(Runnable listener) {
         frameGenStatusListener = listener;
@@ -723,7 +743,9 @@ public class VulkanXServerView extends XServerRendererView implements SurfaceHol
             frameGenError = (winFg ? "Win-FG Native" : "LSFG Native") + " can't run: "
                     + (oldDriver ? (error.contains("Vulkan version below")
                             ? "this Renderer Driver lacks Vulkan 1.3. " : "this Renderer Driver lacks a required Vulkan feature. ")
-                            + "Set Renderer Driver to a Turnip driver, then relaunch the game."
+                            + (!winFg && !lsfgVk11Compat && error.contains("Vulkan version below")
+                                ? "Enable experimental LSFG Vulkan 1.1/1.2 compatibility or choose a Turnip Renderer Driver, then relaunch."
+                                : "Set Renderer Driver to a Turnip driver, then relaunch the game.")
                             : error + (error.endsWith(".") ? "" : "."));
             final String message = frameGenError;
             post(() -> {

@@ -239,6 +239,14 @@ public class Container {
         putExtra("displayXPrecisePresentation", v ? "1" : "0");
     }
 
+    public boolean isLsfgVk11Compat() {
+        return "1".equals(getExtra("lsfgVk11Compat", "0"));
+    }
+
+    public void setLsfgVk11Compat(boolean enabled) {
+        putExtra("lsfgVk11Compat", enabled ? "1" : "0");
+    }
+
     public boolean isLsfgEnabled() {
         String value = getExtra("lsfgEnabled", "false");
         return "1".equals(value) || "true".equalsIgnoreCase(value);

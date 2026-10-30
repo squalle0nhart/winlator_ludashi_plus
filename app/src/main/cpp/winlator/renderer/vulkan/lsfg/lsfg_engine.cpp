@@ -96,7 +96,8 @@ Engine::~Engine() {
     shaders_.reset();
 }
 
-bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& cachePath) {
+bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::string& cachePath,
+                  uint32_t spirvTarget) {
     if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || cachePath.empty())
         return false;
     if (!lsfgVkdReady()) {
@@ -107,7 +108,7 @@ bool Engine::init(VkDevice device, VkPhysicalDevice physicalDevice, const std::s
     device_ = Device(device, physicalDevice);
     cachePath_ = cachePath;
 
-    shaders_ = std::make_unique<LsfgShaders>(device_, cachePath_);
+    shaders_ = std::make_unique<LsfgShaders>(device_, cachePath_, spirvTarget);
     if (!shaders_->IsValid()) {
         LSFG_LOGW("shader cache at %s did not yield all modules", cachePath.c_str());
         shaders_.reset();
@@ -221,8 +222,12 @@ uint32_t Engine::plan(uint32_t capacity, uint64_t sourceFrames) {
     warmStreak_ = warm_ ? warmStreak_ + 1 : 0;
     generating_ = warm_ && warmStreak_ >= kRecurrenceFrames && plan_.generations > 0;
 
-    // After arming or a pacing gap, fill the two-frame input ring before
-    // interpolating so the first generated frame is never blended with stale history.
+    // The ring is only seeded while generating, so the first frame after any
+    // gap - arming, or a pacer discontinuity after a hitch - would interpolate
+    // between this frame and whatever the other slot held when generation last
+    // stopped. That is a visible warp, and it happens every time the engine
+    // starts. Spend this frame filling the ring instead and generate from the
+    // next one, when both slots are genuinely consecutive.
     primeHistory_ = false;
     if (generating_ && !historyFresh()) {
         primeHistory_ = true;
@@ -259,6 +264,11 @@ void Engine::process(VkCommandBuffer cmd, VkImage source, uint32_t width, uint32
     lastCount_ = count;
     lastGenerations_ = generations;
 
+    // Seeding the input ring is a full-resolution image copy every frame, so it
+    // is NOT free at 100 fps - it was costing real frame rate while producing
+    // nothing. Copy only when generating, on the one priming frame that
+    // precedes generation, or while the governor is warming up towards a
+    // probe - so the ring is populated by the time it is needed.
     const bool needHistory = generations > 0 || primeHistory_
         || (governorEnabled_ && governor_.wantsHistory());
     if (needHistory) {

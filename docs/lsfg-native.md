@@ -7,8 +7,12 @@ Choose the **Vulkan** renderer, then select **Win-FG Native** for built-in 2x
 generation or import your Lossless.dll and select **LSFG Native 2x–4x**.
 Flow Scale applies to either engine. EGL and DisplayX are not supported.
 
-LSFG Native additionally requires Vulkan 1.3, Vulkan memory model, storage-image
-writes without a format, and extended storage-image formats. Both engines require
+LSFG Native normally requires Vulkan 1.3. The experimental **LSFG Vulkan 1.1/1.2
+compatibility** switch in the container and shortcut editors allows older drivers
+with the required extensions. It defaults off, inherits from the container unless
+overridden for a shortcut, and requires a relaunch. Vulkan memory model,
+storage-image writes without a format, and extended storage-image formats are
+still required. Both engines require
 storage access for the compositor's image format. Unsupported drivers continue
 without native frame generation. A container-local Lossless.dll can also be used
 if no global DLL has been imported.
@@ -42,3 +46,29 @@ An Android GPU/game smoke test is still required to measure frame generation,
 check cursor/rotation, and test background/foreground transitions.
 
 See [third-party notices](../THIRD-PARTY-LICENSES.md) for source and license details.
+
+## October 30 update
+
+Checked [Bannerlator main `dbd0289c7ef18cb0716be07aa850c2fc3c4eb13b`](https://github.com/The412Banner/Bannerlator/tree/dbd0289c7ef18cb0716be07aa850c2fc3c4eb13b).
+The latest LSFG engine changes are [#512 review fixes `ea93c2e3`](https://github.com/The412Banner/Bannerlator/commit/ea93c2e3e51549c120c715030f108fef317a2c6e),
+following experimental driver compatibility in `28ae0197`. The shader chain,
+translator, pacing, and governor otherwise match this fork's existing import.
+
+Imported the Vulkan 1.1/1.2 capability probe, extension/feature enablement with
+fallback to ordinary rendering, and SPIR-V lowering at shader-load time. Vulkan
+1.1 needs `VK_KHR_spirv_1_4`, `VK_KHR_shader_float_controls`, and
+`VK_KHR_vulkan_memory_model`; Vulkan 1.2 uses core SPIR-V 1.5. Only DXBC-translated
+modules are lowered; precompiled modules are not relabeled. Cached shader bytes
+remain unchanged. Module or pipeline startup failures are reported by the frame
+generation status and disarm the session when status is checked.
+
+Preserved automatic capture at the game/render height and the existing panel
+aspect/clamp, filtered upscale, effects, and Win-FG integration. Did not add
+Bannerlator's separate Panel/Game/custom capture picker or Wayland/cloud-player
+backends. Win-FG launches do not enable experimental LSFG device features.
+
+Validation: debug APK and JVM tests; native host checks with ASan/UBSan cover
+SPIR-V 1.4/1.5 lowering, memory-model extension insertion, unsupported/malformed
+preambles, Vulkan 1.1/1.2 opt-in gates, missing required extensions/features,
+and the existing pacing, DLL/cache, DXBC, and capture-resolution checks.
+Device testing of proprietary Vulkan 1.1/1.2 drivers remains required.

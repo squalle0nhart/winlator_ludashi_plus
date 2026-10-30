@@ -35,10 +35,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL logValidationMessage(
 }
 
 VulkanRendererContext::VulkanRendererContext(ANativeWindow* win, int cW, int cH,
-                                             void* aHandle, bool enableValidation)
+                                             void* aHandle, bool enableValidation, bool lsfgVk11Compat)
     : window(win), surfaceWidth(cW), surfaceHeight(cH),
       containerWidth(cW), containerHeight(cH),
-      adrenotoolsHandle(aHandle), validationRequested(enableValidation)
+      adrenotoolsHandle(aHandle), validationRequested(enableValidation), lsfgVk11Compat_(lsfgVk11Compat)
 {
     createInstance(); createSurface(); pickPhysicalDevice(); createLogicalDevice();
     createSwapchain(); createRenderPass(); createDSLayout();
@@ -373,20 +373,33 @@ void VulkanRendererContext::createLogicalDevice() {
     // device this block is inert and vkCreateDevice is called exactly as it
     // always has been.
     lsfgCaps_ = lsfg::Caps{};
-    lsfgCaps_.features = lsfg::queryFeatures(vk_, physicalDevice);
+    lsfgCaps_.features = lsfg::queryFeatures(vk_, physicalDevice, availableExts, lsfgVk11Compat_);
 
-    VkPhysicalDeviceVulkan12Features lsfgV12{};
-    VkPhysicalDeviceFeatures2        lsfgF2{};
+    // Copy so a rejected feature chain can fall back to the pre-LSFG list.
+    const std::vector<const char*> baseExtList = extList;
+    VkPhysicalDeviceVulkan12Features             lsfgV12{};
+    VkPhysicalDeviceVulkanMemoryModelFeaturesKHR lsfgMM{};
+    VkPhysicalDeviceFeatures2                    lsfgF2{};
     if (lsfgCaps_.features.deviceGatesPass()) {
-        lsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        lsfgV12.vulkanMemoryModel = VK_TRUE;
-        // Device scope is a separate SPIR-V capability; enable it only when the
-        // driver offers it, so a driver without it still gets the base model.
-        lsfgV12.vulkanMemoryModelDeviceScope =
-            lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
+        const bool khrPath = lsfgCaps_.features.deviceApiVersion < VK_API_VERSION_1_2;
+        if (khrPath) {
+            lsfgMM.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES_KHR;
+            lsfgMM.vulkanMemoryModel = VK_TRUE;
+            lsfgMM.vulkanMemoryModelDeviceScope =
+                lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
+            for (const char* e : lsfg::extensionNames(lsfgCaps_.features)) extList.push_back(e);
+            RLOG("createLogicalDevice: LSFG Vulkan 1.1 compat - enabling spirv_1_4 + vulkan_memory_model");
+        } else {
+            lsfgV12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+            lsfgV12.vulkanMemoryModel = VK_TRUE;
+            // Device scope is a separate SPIR-V capability; enable it only when the
+            // driver offers it, so a driver without it still gets the base model.
+            lsfgV12.vulkanMemoryModelDeviceScope =
+                lsfgCaps_.features.vulkanMemoryModelDeviceScope ? VK_TRUE : VK_FALSE;
+        }
 
         lsfgF2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        lsfgF2.pNext = &lsfgV12;
+        lsfgF2.pNext = khrPath ? (void*)&lsfgMM : (void*)&lsfgV12;
         lsfgF2.features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
         lsfgF2.features.shaderStorageImageExtendedFormats    = VK_TRUE;
 
@@ -395,6 +408,7 @@ void VulkanRendererContext::createLogicalDevice() {
         ci.pNext = &lsfgF2;
         lsfgCaps_.featuresEnabled = true;
     }
+    ci.enabledExtensionCount=(uint32_t)extList.size(); ci.ppEnabledExtensionNames=extList.data();
 
     if (vk_.CreateDevice(physicalDevice,&ci,nullptr,&device)!=VK_SUCCESS) {
         // A driver that rejects the feature chain must not cost us the whole
@@ -402,6 +416,7 @@ void VulkanRendererContext::createLogicalDevice() {
         if (lsfgCaps_.featuresEnabled) {
             RLOG_E("createLogicalDevice: CreateDevice failed WITH LSFG features; retrying without");
             ci.pNext = nullptr;
+            ci.enabledExtensionCount=(uint32_t)baseExtList.size(); ci.ppEnabledExtensionNames=baseExtList.data();
             lsfgCaps_.featuresEnabled = false;
             if (vk_.CreateDevice(physicalDevice,&ci,nullptr,&device)!=VK_SUCCESS)
                 throw std::runtime_error("device");
@@ -409,7 +424,6 @@ void VulkanRendererContext::createLogicalDevice() {
             throw std::runtime_error("device");
         }
     }
-
     vk_.GetDeviceProcAddr = (PFN_vkGetDeviceProcAddr)gipa(instance, "vkGetDeviceProcAddr");
     loadDeviceDispatch();
     vk_.GetDeviceQueue(device,graphicsQueueFamilyIndex,0,&graphicsQueue);

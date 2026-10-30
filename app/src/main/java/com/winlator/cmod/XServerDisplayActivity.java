@@ -115,7 +115,7 @@ import com.winlator.cmod.winhandler.WinHandler;
 import com.winlator.cmod.xconnector.UnixSocketConfig;
 import com.winlator.cmod.xenvironment.ImageFs;
 import com.winlator.cmod.xenvironment.XEnvironment;
-import com.winlator.cmod.xenvironment.components.ALSAServerComponent;
+import com.winlator.cmod.xenvironment.components.ALSAComponent;
 import com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent;
 import com.winlator.cmod.xenvironment.components.PulseAudioComponent;
 import com.winlator.cmod.xenvironment.components.SysVSharedMemoryComponent;
@@ -1461,11 +1461,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                         UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.XSERVER_PATH)));
 
         if (audioDriver.equals("alsa")) {
-            envVars.put("ANDROID_ALSA_SERVER", rootPath + UnixSocketConfig.ALSA_SERVER_PATH);
-            envVars.put("ANDROID_ASERVER_USE_SHM", "true");
-            environment.addComponent(
-                    new ALSAServerComponent(
-                            UnixSocketConfig.createSocket(rootPath, UnixSocketConfig.ALSA_SERVER_PATH)));
+            environment.addComponent(new ALSAComponent(this, imageFs));
         } else if (audioDriver.equals("pulseaudio") || audioDriver.equals("pulse-audio-gn")) {
             envVars.put("PULSE_SERVER", rootPath + UnixSocketConfig.PULSE_SERVER_PATH);
             environment.addComponent(
@@ -1543,6 +1539,8 @@ public class XServerDisplayActivity extends AppCompatActivity {
                     : container != null ? container.getLsfgFlowScale() : 0.80f;
             activeFrameGenDll = dll;
             activeFrameGenFlowScale = flowScale;
+            ((VulkanXServerView) renderer).setLsfgVk11Compat(shortcut != null
+                    ? shortcut.isLsfgVk11Compat() : container != null && container.isLsfgVk11Compat());
             ((VulkanXServerView) renderer).setFrameGenStatusListener(this::updateFrameGenUi);
             ((VulkanXServerView) renderer).setFrameGenNative(frameGenBackend, dll, multiplier, flowScale);
         } else if (multiplier >= 2) {
@@ -3080,7 +3078,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
         envVars.put("VK_ICD_FILENAMES", imageFs.getShareDir() + "/vulkan/icd.d/wrapper_icd.aarch64.json");
 
         File graphicsRuntimeMarker = new File(rootDir,
-                "usr/lib/.winlator-graphics-runtime-89e002fc-v4");
+                "usr/lib/.winlator-graphics-runtime-5fe51da6-v5");
         String wrapperArchive = resolveGraphicsWrapperArchiveName(graphicsWrapper);
         boolean installCommonRuntime = firstTimeBoot || !graphicsRuntimeMarker.isFile();
         boolean wrapperChanged = !wrapperArchive.equals(container.getExtra("installedGraphicsWrapper"));
@@ -3097,7 +3095,7 @@ public class XServerDisplayActivity extends AppCompatActivity {
                 container.putExtra("installedGraphicsWrapper", wrapperArchive);
                 container.saveData();
                 if (installCommonRuntime) FileUtils.writeString(graphicsRuntimeMarker,
-                        "wrapper=selectable;extra_libs=89e002fc;layers=9d57736d;opengl=split-v1");
+                        "wrapper=selectable;extra_libs=5fe51da6;layers=9d57736d;opengl=split-v1");
             }
         }
 
@@ -3241,10 +3239,18 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        boolean controllerBack = event.getKeyCode() == KeyEvent.KEYCODE_BACK
+                && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0
+                && ExternalController.isGameController(event.getDevice());
+        if (event.getAction() == KeyEvent.ACTION_DOWN
+                && (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE
+                    || event.getKeyCode() == KeyEvent.KEYCODE_HOME || controllerBack)) {
+            onBackPressed();
+            return true;
+        }
 
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE || event.getKeyCode() == KeyEvent.KEYCODE_HOME
-                    || event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_SELECT) {
+            if (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_SELECT) {
                 boolean handled = inputControlsView.onKeyEvent(event)
                         || (winHandler != null && winHandler.onKeyEvent(event))
                                 && (xServer != null && xServer.keyboard.onKeyEvent(event));
@@ -3309,10 +3315,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
             }
 
             Log.d(TAG, "Extracting nglide wrapper");
-            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir,
-                    onExtractFileListener);
+            TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "ddrawrapper/nglide.tzst", windowsDir, onExtractFileListener);
 
-            if (ddrawrapper.contains("None")) {
+            if (ddrawrapper.contains("none")) {
                 Log.d(TAG, "No DDRaw wrapper has been selected, restoring original ddraw files");
                 restoreOriginalDllFiles(new String[] { "ddraw.dll", "d3dimm.dll" });
             } else {
@@ -3669,7 +3674,11 @@ public class XServerDisplayActivity extends AppCompatActivity {
     }
 
     public void updateFrameRating(Window window) {
-        if (window == null || frameRatingWindowId != window.id) return;
+        if (window != null) updateFrameRating(window.id);
+    }
+
+    public void updateFrameRating(int windowId) {
+        if (frameRatingWindowId != windowId) return;
         if (classicHud != null) classicHud.update();
         if (modernHud != null) modernHud.onFrame();
     }

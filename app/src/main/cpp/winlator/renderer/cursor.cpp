@@ -6,9 +6,6 @@ void CursorManager::addCursor(int id, std::unique_ptr<struct Cursor> cursor) {
 }
 
 void CursorManager::removeCursor(JNIEnv *env, Cursor *cursor) {
-    env->DeleteGlobalRef(cursor->cursorObj);
-    env->DeleteGlobalRef(cursor->image->drawableObj);
-    
     {
         auto lock = cursorLock.lock();
         this->cursors.erase(cursor->id);

@@ -175,7 +175,7 @@ class VulkanRendererContext {
 public:
     VulkanRendererContext(ANativeWindow* window, int cWidth, int cHeight,
                           void* adrenotoolsHandle = nullptr,
-                          bool validationEnabled = false);
+                          bool validationEnabled = false, bool lsfgVk11Compat = false);
     ~VulkanRendererContext();
 
     void onSurfaceResized(int width, int height);
@@ -299,6 +299,7 @@ public:
     int surfaceWidth, surfaceHeight, containerWidth, containerHeight;
     void* adrenotoolsHandle = nullptr;
     bool validationRequested = false;
+    bool lsfgVk11Compat_ = false;
     VkDebugUtilsMessengerEXT validationMessenger = VK_NULL_HANDLE;
     int filterMode  = 0;
     int stretchMode = 0;
@@ -494,6 +495,7 @@ public:
     bool ensureLsfgEngine();
     bool ensureWinFgEngine();
     bool fgCapsOk() const;
+    int frameGenProblem() const;
     // One command buffer per pending present: slot 0 carries the composite,
     // the chain's shared passes and generated frame 0; each later generated
     // frame and the real frame are recorded and submitted on their own, so a

@@ -19,3 +19,18 @@ Updated only `usr/lib/displayx_layer.so` inside the split `extra_libs.tzst` asse
 Decoder controls work in the legacy and Compose container/shortcut editors. Component values retain decoder strings, compare installed DLL settings by key, and apply decoder environment flags on every launch.
 
 Validation: debug APK and unit tests pass; the host DisplayX queue check covers mailbox replacement, FIFO order, window removal, and fence closure. Device rendering and cutscene playback still need an Android device.
+
+## October 30 upstream sync
+
+Reviewed StevenMXZ `4.1` through `1042ba5d2444900068b14137bf93a4ed6689cdd4` and imported Pipetto `winlator_bionic` range `89e002fc..5fe51da62f7a42afcb8c433109704c1d7d62c397`. Steven’s only new change and Pipetto’s `98402f0f` fix multi-digit content revisions; the existing architecture-aware Wine parser already handles these. Added a regression test for revision `123`.
+
+- Ported GPUImage/drawable ownership and native renderer refactors, direct-content stacking, DisplayX FIFO completion protocol, and SurfaceControl locking. Adapted Vulkan rendering and bitmap cursors to GPUImage while preserving Ludashi filters, fullscreen controls, and HUDs.
+- Imported native XConnector streams and the XInput2 extension for Wine 10+ raw mouse input, including all pointer buttons.
+- Imported ALSA-Oboe `alsa.tzst` and startup component, replacing the old ALSA server. PulseAudio options remain available.
+- Ported multiple input-profile imports into the Compose UI and alphabetic profile ordering. Retained the equivalent local analog-stick and D-pad handling. Controller Home/Back opens the drawer; lowercase DDraw `none` restores Wine DLLs.
+- Replaced only `usr/lib/displayx_layer.so` inside the split graphics runtime archive with the exact upstream bytes. SHA-256: `930b789d550503d36c64dfa49c7fac4dd0f853c2aba1c7b75c1a14a80f686032`. Bumped the extraction marker so existing containers receive it. Exposed FIFO/mailbox in both Compose DisplayX editors and pass `DISPLAYX_PRESENT_MODE` at launch, replacing the removed submit-every-buffer option.
+- Completion requests copy swapchain metadata so callbacks do not dereference a destroyed swapchain. Preserved the queue removal/deduplication fixes, wakeups, atomic FPS state, and serialized composition.
+
+Kept this fork’s patchelf build and source dependencies rather than importing upstream’s unrelated source cleanup. No runtime versions or selectable driver assets were removed.
+
+Validation: debug APK, JVM unit tests, DisplayX queue/completion protocol host check, PostFX host check, and LSFG host check. Rendering, XInput2, and ALSA audio still need Android device testing.

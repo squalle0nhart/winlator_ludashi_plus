@@ -736,6 +736,8 @@ internal fun SettingToggle(
 @Composable
 internal fun FrameGenerationSettings(
     backend: String,
+    vk11Compat: Boolean,
+    onVk11CompatChanged: (Boolean) -> Unit,
     multiplier: Int,
     flowScale: Float,
     lsfgAvailable: Boolean,
@@ -776,9 +778,12 @@ internal fun FrameGenerationSettings(
             steps = 74
         )
     }
+    SettingsDivider()
+    SettingToggle("LSFG Vulkan 1.1/1.2 compatibility (experimental)", vk11Compat, onChanged = onVk11CompatChanged)
     Text(
         if (winFg) "Win-FG Native is built in and runs at 2x"
         else if (!lsfgAvailable) "Import Lossless.dll before enabling LSFG Native"
+        else if (vk11Compat) "LSFG compatibility requires driver support; relaunch after changing it"
         else "LSFG Native requires a Vulkan 1.3 driver",
         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         style = MaterialTheme.typography.bodySmall,

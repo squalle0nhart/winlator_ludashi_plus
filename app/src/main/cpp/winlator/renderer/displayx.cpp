@@ -90,6 +90,13 @@ static PFNAPERFORMANCEHINTREPORTACTUALWORKDURATION pfnAPerformanceHintReportActu
 static PFNAPERFORMANCEHINTUPDATETARGETWORKDURATION pfnAPerformanceHintUpdateTargetWorkDuration = nullptr;
 static PFNAPERFORMANCEHINTCLOSESESSION pfnAPerformanceHintCloseSession = nullptr;
 
+int64_t DisplayX::getCurrentTimeNanos() {
+    struct timespec ts{};
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
+}
+
 void DisplayX::onFrameCallback64(int64_t frameTimeNanos, void* data) {
     auto *self = reinterpret_cast<DisplayX *>(data);
    
@@ -102,6 +109,29 @@ void DisplayX::onFrameCallback64(int64_t frameTimeNanos, void* data) {
         if (!self->presentRequests.empty() && self->presentRR) {
             self->requestUpdate = true;
             self->presentLock.notify();
+        }
+    }
+
+    if (self->isPerformanceHintAPIAvailable() && self->perfMode && !self->performanceHintSession) {
+        self->performanceHintManager = pfnAPerformanceHintGetManager();
+        float targetFloat = self->xServer->refreshRate * 100.0f;
+        int64_t targetWorkDuration = static_cast<int64_t>(1000000000.0f / targetFloat);
+
+        int tid = gettid();
+        std::vector<int32_t> tids{tid};
+        self->performanceHintSession = pfnAPerformanceHintCreateSession(self->performanceHintManager,
+            tids.data(), tids.size(), targetWorkDuration);
+    }
+    else if (self->isPerformanceHintAPIAvailable() && self->perfMode && self->performanceHintSession && ((self->requestUpdate && self->presentRR) || (!self->presentRequests.empty() && !self->presentRR))) {
+        if (self->previousReportedWorkTime == 0) {
+            auto currentTime = self->getCurrentTimeNanos();
+            self->previousReportedWorkTime = currentTime;
+        }
+        else {
+            auto currentTime = self->getCurrentTimeNanos();
+            auto elapsed = currentTime - self->previousReportedWorkTime;
+            pfnAPerformanceHintReportActualWorkDuration(self->performanceHintSession, elapsed);
+            self->previousReportedWorkTime = currentTime;
         }
     }
     
@@ -127,6 +157,29 @@ void DisplayX::onVsyncCallback(const AChoreographerFrameCallbackData* callbackDa
         }
     }
     
+    if (self->isPerformanceHintAPIAvailable() && self->perfMode && !self->performanceHintSession) {
+        self->performanceHintManager = pfnAPerformanceHintGetManager();
+        float targetFloat = self->xServer->refreshRate * 100.0f;
+        int64_t targetWorkDuration = static_cast<int64_t>(1000000000.0f / targetFloat);
+
+        int tid = gettid();
+        std::vector<int32_t> tids{tid};
+        self->performanceHintSession = pfnAPerformanceHintCreateSession(self->performanceHintManager,
+            tids.data(), tids.size(), targetWorkDuration);
+    }
+    else if (self->isPerformanceHintAPIAvailable() && self->perfMode && self->performanceHintSession && ((self->requestUpdate && self->presentRR) || (!self->presentRequests.empty() && !self->presentRR))) {
+        if (self->previousReportedWorkTime == 0) {
+            auto currentTime = self->getCurrentTimeNanos();
+            self->previousReportedWorkTime = currentTime;
+        }
+        else {
+            auto currentTime = self->getCurrentTimeNanos();
+            auto elapsed = currentTime - self->previousReportedWorkTime;
+            pfnAPerformanceHintReportActualWorkDuration(self->performanceHintSession, elapsed);
+            self->previousReportedWorkTime = currentTime;
+        }
+    }
+
     pfnAChoreographerPostVsyncCallback(self->choreographer, DisplayX::onVsyncCallback, self);
 }
 
@@ -143,7 +196,8 @@ static void sendFD(int& socket, int fd) {
     msg.msg_iovlen = 1;
     msg.msg_control = control_buffer.data();
     msg.msg_controllen = control_buffer.size();
-                                                                                                             struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+
+    struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(sizeof(int));
@@ -299,7 +353,6 @@ void DisplayX::networkThreadLoop() {
                                 drawable->format = outDesc.format;
                                 drawable->isDirectContent = false;
                                 drawable->isDisplayX = true;
-                                drawable->drawableObj = nullptr;
                                 drawable->sync_fence = -1;
                                 
                                 swapchain->images[j] = std::move(drawable);
@@ -338,13 +391,15 @@ void DisplayX::networkThreadLoop() {
                             presentRequest->drawable = drawable;
                             presentRequest->sync_fence = fence;
                             presentRequest->presentId = present_id;
+                            presentRequest->index = index;
                             presentRequest->clientFd = events[i].data.fd;
                             presentRequest->window = swapchain->window;
-                            presentRequest->swapchainId = id;
+                            presentRequest->swapchainId = swapchain->id;
+                            presentRequest->presentMode = swapchain->presentMode;
                             
                             presentRequests.push(std::move(presentRequest), swapchain->presentMode == VK_PRESENT_MODE_MAILBOX_KHR);
                             if (xServer->isShowFPS.load(std::memory_order_relaxed))
-                                env->CallVoidMethod(xServer->xserverDisplayActivity, cache->updateFrameRating, swapchain->window->windowObj);
+                                env->CallVoidMethod(xServer->xserverDisplayActivity, cache->updateFrameRating, swapchain->window->id);
                             presentLock.notify();
                             break;
                         }    
@@ -460,56 +515,25 @@ void DisplayX::eventThreadLoop() {
     }
 }
 
-int64_t DisplayX::getCurrentTimeNanos() {
-    struct timespec ts{};
-    
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
-}
-
-void DisplayX::onCommitCallback(void *context, ASurfaceTransactionStats *stats) {
-    auto *self = reinterpret_cast<DisplayX *>(context);
-    if (!self->isPerformanceHintAPIAvailable() || !self->performanceHintSession || !self->performanceHintManager || !self->perfMode)
-        return;
-    
-    if (self->previousReportedWorkTime == 0) {
-        auto currentTime = self->getCurrentTimeNanos();
-        self->previousReportedWorkTime = currentTime;
-        return;
-    }     
-   
-    auto currentTime = self->getCurrentTimeNanos();
-    auto elapsed = currentTime - self->previousReportedWorkTime;
-    pfnAPerformanceHintReportActualWorkDuration(self->performanceHintSession, elapsed);
-    self->previousReportedWorkTime = currentTime;
-}
-
 void DisplayX::onCompleteCallback(void *context, ASurfaceTransactionStats *stats) {
     std::unique_ptr<OnCompleteContext> completeContext(static_cast<OnCompleteContext *>(context));
     
     for (auto &request : completeContext->requests) {
-        if (request->presentId >= 0) {
+        if (request->presentId != UINT64_MAX || request->presentMode == VK_PRESENT_MODE_FIFO_KHR) {
             int requestCode = 4;
             write(request->clientFd, &requestCode, 4);
             write(request->clientFd, &request->swapchainId, 1);
-            write(request->clientFd, &request->presentId, 8);
+
+            uint64_t presentId = request->presentId;
+            write(request->clientFd, &presentId, 8);
+
+            write(request->clientFd, &request->index, 4);
         }
     }
 }
 
 void DisplayX::presentThreadLoop() {
     ASurfaceTransaction *presentTransaction = pfnASurfaceTransactionCreate();
-    
-    if (isPerformanceHintAPIAvailable() && perfMode) {
-        performanceHintManager = pfnAPerformanceHintGetManager();
-        float targetFloat = xServer->refreshRate * 100.0f;
-        int64_t targetWorkDuration = static_cast<int64_t>(1000000000.0f / targetFloat);
-    
-        int tid = gettid();
-        std::vector<int32_t> tids{tid};
-        performanceHintSession = pfnAPerformanceHintCreateSession(performanceHintManager,
-            tids.data(), tids.size(), targetWorkDuration);
-    }     
     
     while(true) {
         auto lock = presentLock.lock();
@@ -545,7 +569,8 @@ void DisplayX::presentThreadLoop() {
             requestUpdate = false;
         }
         
-        if (vsyncId > -1) pfnASurfaceTransactionSetFrameTimeline(presentTransaction, vsyncId);
+        if (vsyncId > -1)
+            pfnASurfaceTransactionSetFrameTimeline(presentTransaction, vsyncId);
         
         lock.unlock();
 
@@ -580,23 +605,13 @@ void DisplayX::presentThreadLoop() {
                 if (drawable->isDisplayX) {
                    completeContext->requests.push_back(std::move(presentRequest));
                 }    
-                if (!window->backPressureEnabled && pfnASurfaceTransactionSetEnableBackPressure && backPressure)  {
-                    pfnASurfaceTransactionSetEnableBackPressure(presentTransaction, window->control, true);
-                    window->backPressureEnabled = true;
-                }
             }
         }
         
-        if (perfMode && pfnASurfaceTransactionSetOnCommit) 
-            pfnASurfaceTransactionSetOnCommit(presentTransaction, this, DisplayX::onCommitCallback);
         if (!completeContext->requests.empty()) 
             pfnASurfaceTransactionSetOnComplete(presentTransaction, completeContext.release(), DisplayX::onCompleteCallback);
             
         pfnASurfaceTransactionApply(presentTransaction);
-    }
-    
-    if (isPerformanceHintAPIAvailable() && performanceHintSession) {
-        pfnAPerformanceHintCloseSession(performanceHintSession);
     }
 }
 
@@ -650,6 +665,10 @@ void DisplayX::start() {
 }
 
 void DisplayX::stop() {
+    if (isPerformanceHintAPIAvailable() && performanceHintSession) {
+        pfnAPerformanceHintCloseSession(performanceHintSession);
+    }
+
     stopped = true;
     eventLock.notify();
     presentLock.notify();
@@ -762,11 +781,8 @@ void DisplayX::destroyWindowControl(Window *window) {
     if (!window || !window->control)
         return;
     
-    {
-        auto lock = presentLock.lock();
-        presentRequests.removeWindow(window);
-    }
-    
+    auto lock = presentLock.lock();
+    presentRequests.removeWindow(window);
     pfnASurfaceControlRelease(window->control);
     window->control = nullptr;
 }
@@ -951,16 +967,9 @@ void DisplayX::destroyRootCursorControl() {
     pfnASurfaceTransactionDelete(cursorTransaction);
     
     auto rootCursor = cursorManager->getRootCursor();
-    if (!rootCursor) 
+    if (!rootCursor || !cursorManager->control)
         return;
     
-    if (rootCursor->image->ahb) {
-        AHardwareBuffer_release(rootCursor->image->ahb);
-        rootCursor->image->ahb = nullptr;
-    }
-    
-    if (!cursorManager->control)
-        return;
 
     pfnASurfaceControlRelease(cursorManager->control);
     cursorManager->control = nullptr;
@@ -1028,10 +1037,6 @@ void DisplayX::setPerformanceMode(bool perfMode) {
 
 void DisplayX::setPresentRR(bool presentRR) {
     this->presentRR = presentRR;
-}
-
-void DisplayX::setBackPressure(bool backPressure) {
-    this->backPressure = backPressure;
 }
 
 void DisplayX::setPrecisePresentation(bool precisePresentation) {

@@ -11,7 +11,6 @@ struct Cursor {
     int hotspotX;
     int hotspotY;
     bool visible;
-    jobject cursorObj;
 };
 
 struct Pointer {

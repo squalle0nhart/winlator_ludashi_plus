@@ -359,7 +359,7 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
         execEnvVars.put("DISPLAY", ":0");
         execEnvVars.put("WINE_DISABLE_FULLSCREEN_HACK", "1");
         execEnvVars.put("GST_PLUGIN_FEATURE_RANK", "ximagesink:3000");
-        execEnvVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_aserver.conf");
+        execEnvVars.put("ALSA_CONFIG_PATH", rootDir.getPath() + "/usr/share/alsa/alsa.conf" + ":" + rootDir.getPath() + "/usr/etc/alsa/conf.d/android_alsa.conf");
         execEnvVars.put("ALSA_PLUGIN_DIR", rootDir.getPath() + "/usr/lib/alsa-lib");
         execEnvVars.put("OPENSSL_CONF", rootDir.getPath() + "/usr/etc/tls/openssl.cnf");
         execEnvVars.put("SSL_CERT_FILE", rootDir.getPath() + "/usr/etc/tls/cert.pem");
@@ -472,7 +472,12 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
                 : container != null ? container.getSurfaceFormat() : "rgba8";
 
         execEnvVars.put("WRAPPER_SURFACE_FORMAT", surfaceFormat);
-        if (useDisplayX) execEnvVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
+        if (useDisplayX) {
+            execEnvVars.put("DISPLAYX_SURFACE_FORMAT", surfaceFormat);
+            String presentMode = shortcut != null ? shortcut.getRendererPresentMode()
+                    : container.getRendererPresentMode();
+            execEnvVars.put("DISPLAYX_PRESENT_MODE", "mailbox".equals(presentMode) ? "mailbox" : "fifo");
+        }
         else execEnvVars.remove("DISPLAYX_SURFACE_FORMAT");
 
         final String displayXLayer = "VK_LAYER_DISPLAYX_display_x";

@@ -29,6 +29,8 @@ WinNative-Emu/WinNative, utkarshdalal/GameNative, and the Box64 preset community
 Imported from [Bannerlator 3.0.9](https://github.com/The412Banner/Bannerlator/tree/e6f3410)
 on 2026-09-10.
 
+Updated the engine, shader loader and compatibility probe from [Bannerlator #512 review fixes](https://github.com/The412Banner/Bannerlator/commit/ea93c2e3e51549c120c715030f108fef317a2c6e), checked against main `dbd0289c7ef18cb0716be07aa850c2fc3c4eb13b` on 2026-10-30.
+
 The native LSFG engine, shader extraction/cache code, Java cache bridge and adapted
 compositor integration are GPL-3.0-or-later. Credits: Bannerlator/The412Banner,
 WinNative, Camille LaVey and the Eden Emulator Project, and PancakeTAS/lsfg-vk.

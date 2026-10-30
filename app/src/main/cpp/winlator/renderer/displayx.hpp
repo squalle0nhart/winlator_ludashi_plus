@@ -55,11 +55,24 @@ class DisplayX {
            }
         };
         
+        struct DisplayXSwapchain {
+            uint8_t id;
+            Window *window;
+            uint32_t imageCount;
+            uint32_t presentMode;
+            uint32_t format;
+            uint32_t width;
+            uint32_t height;
+            std::vector<std::unique_ptr<Drawable>> images;
+        };
+
         struct PresentRequest {
             Drawable *drawable;
             int sync_fence;
             uint64_t presentId;
-            uint8_t swapchainId;
+            uint8_t swapchainId = 0;
+            uint32_t presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            uint32_t index;
             int clientFd;
             Window *window;
         };
@@ -157,17 +170,6 @@ class DisplayX {
                 }
         };
         
-        struct DisplayXSwapchain {
-            uint8_t id;
-            Window *window;
-            uint32_t imageCount;
-            uint32_t presentMode;
-            uint32_t format;
-            uint32_t width;
-            uint32_t height;
-            std::vector<std::unique_ptr<Drawable>> images;
-        };
-        
         struct OnCompleteContext {
             std::vector<std::unique_ptr<PresentRequest>> requests;
         };
@@ -204,7 +206,6 @@ class DisplayX {
         std::atomic_bool surfaceChanged{false};
         std::atomic_bool perfMode{true};
         std::atomic_bool presentRR{true};
-        std::atomic_bool backPressure{false};
         std::atomic_bool precisePresentation{false};
         
         bool requestUpdate = false;
@@ -219,7 +220,6 @@ class DisplayX {
         void presentThreadLoop();
         static void onFrameCallback64(int64_t frameTimeNanos, void *data);
         static void onVsyncCallback(const AChoreographerFrameCallbackData* callbackData, void* data);
-        static void onCommitCallback(void *context, ASurfaceTransactionStats *stats);
         static void onCompleteCallback(void *context, ASurfaceTransactionStats *stats);
         int64_t getCurrentTimeNanos();
         bool isPerformanceHintAPIAvailable();
@@ -265,6 +265,5 @@ class DisplayX {
         void setFullscreenMode(int mode);
         void setPerformanceMode(bool perfMode);
         void setPresentRR(bool presentRR);
-        void setBackPressure(bool backPressure);
         void setPrecisePresentation(bool precisePresentation);
 };
