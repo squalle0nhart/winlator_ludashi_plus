@@ -3239,12 +3239,9 @@ public class XServerDisplayActivity extends AppCompatActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        boolean controllerBack = event.getKeyCode() == KeyEvent.KEYCODE_BACK
-                && (event.getFlags() & KeyEvent.FLAG_FALLBACK) == 0
-                && ExternalController.isGameController(event.getDevice());
         if (event.getAction() == KeyEvent.ACTION_DOWN
                 && (event.getKeyCode() == KeyEvent.KEYCODE_BUTTON_MODE
-                    || event.getKeyCode() == KeyEvent.KEYCODE_HOME || controllerBack)) {
+                    || event.getKeyCode() == KeyEvent.KEYCODE_HOME)) {
             onBackPressed();
             return true;
         }
